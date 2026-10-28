@@ -24,7 +24,6 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
-import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import com.carellice.iptvision.data.Log
 import com.carellice.iptvision.data.XtreamClient
 
@@ -65,6 +64,8 @@ class PlayerController(context: Context) {
     private var startedAt = 0L
     private var userPaused = false
     private var everPlayed = false
+    private var lastFrames = -1
+    private var lastFrameAt = 0L
 
     init {
         val http = DefaultHttpDataSource.Factory()
@@ -72,9 +73,10 @@ class PlayerController(context: Context) {
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(10_000)
             .setReadTimeoutMs(15_000)
-        // Molti canali del digitale non dichiarano tutte le tracce nella PMT: si cercano anche quelle non annunciate.
+        // Impostazioni standard dell'estrattore TS: con FLAG_DETECT_ACCESS_UNITS e FLAG_ALLOW_NON_IDR_KEYFRAMES
+        // i fotogrammi H.264 venivano spezzati male, il decoder smetteva di accettarli e l'immagine si fermava
+        // (prima a scatti) mentre l'audio continuava.
         val extractors = DefaultExtractorsFactory()
-            .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS)
         val renderers = DefaultRenderersFactory(context)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
             .setEnableDecoderFallback(true)
@@ -152,6 +154,8 @@ class PlayerController(context: Context) {
         lastPos = -1
         startedAt = now()
         lastProgressAt = startedAt
+        lastFrames = -1
+        lastFrameAt = startedAt
         player.setMediaItem(item, if (isLive) C.TIME_UNSET else resumeMs)
         player.prepare()
         player.playWhenReady = !userPaused
@@ -195,6 +199,7 @@ class PlayerController(context: Context) {
             if (player.isPlaying && pos != lastPos && !starved) {
                 lastPos = pos
                 lastProgressAt = now()
+                if (videoFrozen()) { scheduleRetry("video fermo, audio regolare"); return }
                 // Dopo un minuto di visione regolare i tentativi ripartono da capo.
                 if (attempt > 0 && now() - startedAt > 60_000) attempt = 0
                 return
@@ -207,6 +212,27 @@ class PlayerController(context: Context) {
             }
             if (now() - lastProgressAt > limit) scheduleRetry("flusso bloccato")
         }
+    }
+
+    /**
+     * Il tempo di riproduzione segue l'audio: se il video si blocca (per esempio dopo un salto
+     * nei tempi del flusso TS, quando l'emittente riavvia la codifica) i fotogrammi arrivano "in ritardo"
+     * e vengono scartati, l'immagine resta ferma e l'audio continua. Qui si contano i fotogrammi
+     * davvero mostrati: se per 4 secondi non ne arriva nessuno mentre l'audio va avanti, si riapre il flusso.
+     */
+    private fun videoFrozen(): Boolean {
+        if (player.videoFormat == null) return false // canale solo audio
+        val counters = player.videoDecoderCounters ?: return false
+        counters.ensureUpdated()
+        val frames = counters.renderedOutputBufferCount
+        val t = now()
+        // Un decoder nuovo riparte da zero: conta come avanzamento.
+        if (frames != lastFrames) {
+            lastFrames = frames
+            lastFrameAt = t
+            return false
+        }
+        return everPlayed && t - startedAt > 8_000 && t - lastFrameAt > 4_000
     }
 
     init {
