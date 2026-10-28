@@ -48,6 +48,24 @@
     return { cats: cats.filter(function (c) { return by[c.id]; }), items: items, by: by };
   }
 
+  // Dopo quanto le liste salvate sul TV si riscaricano dal server ("Aggiorna liste" lo fa subito).
+  var MAX_AGE = { live: 6 * 3600000, movies: 24 * 3600000, series: 24 * 3600000 };
+
+  /** Categorie e contenuti di una sezione: dalla copia sul TV se è recente, altrimenti dal server. */
+  function loadList(kind, download) {
+    var client = A.client, a = client.account;
+    var key = kind + '|' + a.server + '|' + a.username;
+    return IPTV.Cache.get(key).then(function (c) {
+      if (c && c.items && c.items.length && Date.now() - c.at < MAX_AGE[kind]) return c;
+      return download().then(function (r) {
+        var v = { at: Date.now(), cats: r[0], items: r[1] };
+        // Si salva qualche secondo dopo, quando l'elenco è già a schermo.
+        setTimeout(function () { if (A.client === client) IPTV.Cache.put(key, v); }, 5000);
+        return v;
+      });
+    });
+  }
+
   function openAccount(account, autoPlay) {
     A.client = new X.Client(account);
     A.live = A.movies = A.series = null;
@@ -56,8 +74,10 @@
     A.section = 'Live';
     render();
     A.loading.live = true;
-    Promise.all([A.client.categories('get_live_categories'), A.client.channels()]).then(function (r) {
-      A.live = library(r[0], r[1]);
+    var client = A.client;
+    loadList('live', function () { return Promise.all([client.categories('get_live_categories'), client.channels()]); }).then(function (c) {
+      if (A.client !== client) return;
+      A.live = library(c.cats, c.items);
       A.loading.live = false;
       if (A.screen === 'home') render();
       if (autoPlay) autoPlayLast();
@@ -72,8 +92,10 @@
     if (A[kind] || A.loading[kind] || !A.client) return;
     A.loading[kind] = true;
     var cats = kind === 'movies' ? 'get_vod_categories' : 'get_series_categories';
-    Promise.all([A.client.categories(cats), kind === 'movies' ? A.client.movies() : A.client.series()]).then(function (r) {
-      A[kind] = library(r[0], r[1]);
+    var client = A.client;
+    loadList(kind, function () { return Promise.all([client.categories(cats), kind === 'movies' ? client.movies() : client.series()]); }).then(function (c) {
+      if (A.client !== client) return;
+      A[kind] = library(c.cats, c.items);
       A.loading[kind] = false;
       if (A.screen !== 'home') return;
       // In Cerca si aggiornano solo i risultati: ridisegnare tutto toglierebbe la tastiera a chi scrive.
@@ -428,8 +450,8 @@
     box.appendChild(h('div', { class: 'group-title', text: 'Dati' }));
     box.appendChild(V.focusable(h('div', { class: 'btn', text: '↻  Aggiorna liste' }), function () {
       A.epg = {};
-      openAccount(S.account(), false);
-      u.toast('Liste aggiornate');
+      u.toast('Aggiorno le liste…');
+      IPTV.Cache.clear().then(function () { openAccount(S.account(), false); });
     }));
     box.appendChild(h('div', { class: 'group-title', text: 'Versione' }));
     box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Installata' }), IPTV.VERSION]));
@@ -440,6 +462,7 @@
     box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Esci dall\'account' }), function () {
       Player.stop();
       S.clearAccount();
+      IPTV.Cache.clear();
       A.client = null; A.live = A.movies = A.series = null; A.stack = []; A.openCat = {};
       A.screen = 'login';
       render();
@@ -607,6 +630,7 @@
   var overlay = 'info'; // none | info | controls
   var overlayTimer = null;
   var panelOpen = false;
+  var playerTick = null; // aggiorna orologio e avanzamento senza ridisegnare (vedi renderPlayer)
   var digits = '', digitsTimer = null;
   var countdownTimer = null, countdown = 0;
 
@@ -735,14 +759,16 @@
     var keep = Nav.current();
     var keepKey = keep && pui.contains(keep) ? keep.dataset.key : null;
     pui.innerHTML = '';
+    playerTick = null;
     pui.className = overlay === 'none' ? 'overlay-hidden' : '';
     pui.appendChild(h('div', { class: 'shade-top' }));
     pui.appendChild(h('div', { class: 'shade-bottom' }));
     var res = Player.resolution();
+    var clockEl = h('b', { text: u.clock(Date.now() / 1000) });
     pui.appendChild(h('div', { class: 'p-top' }, [
       h('span', { text: p.kind === 'live' ? 'TV in diretta' : p.kind === 'movie' ? 'Film' : p.series.name }),
       res ? h('span', { class: 'badge', style: 'margin-left:1rem', text: res }) : null,
-      h('b', { text: u.clock(Date.now() / 1000) }),
+      clockEl,
     ]));
 
     var bottom = h('div', { class: 'p-bottom' });
@@ -750,24 +776,37 @@
       var ch = p.channel;
       var e = A.epg[ch.streamId], now = null, next = null, t = Date.now() / 1000;
       if (e) e.list.forEach(function (x, i) { if (x.start <= t && x.stop > t) { now = x; next = e.list[i + 1] || null; } });
+      var nowBar = now ? u.progressBar((t - now.start) / (now.stop - now.start)) : null;
+      playerTick = function () {
+        var t2 = Date.now() / 1000;
+        if (now && t2 >= now.stop) { renderPlayer(); return; } // è iniziato il programma successivo
+        clockEl.textContent = u.clock(t2);
+        if (nowBar) setProgress(nowBar, (t2 - now.start) / (now.stop - now.start));
+      };
       bottom.appendChild(h('div', { class: 'p-info' }, [
         h('div', { class: 'thumb' }, u.art(ch.logo, ch.initials)),
         h('div', { class: 'grow' }, [
           h('div', { class: 'p-title ellipsis' }, [h('span', { class: 'dot' }), ch.num > 0 ? ch.num + '  ' : '', ch.name, S.isFavorite(ch.streamId) ? '  ★' : '']),
           now ? h('div', { class: 'p-now ellipsis', text: u.clock(now.start) + ' – ' + u.clock(now.stop) + '  ' + now.title }) : null,
-          now ? h('div', { style: 'width:30rem' }, u.progressBar((t - now.start) / (now.stop - now.start))) : null,
+          now ? h('div', { style: 'width:30rem' }, nowBar) : null,
           next ? h('div', { class: 'p-next ellipsis', text: 'Dopo: ' + u.clock(next.start) + '  ' + next.title }) : null,
         ]),
       ]));
     } else {
       var title = p.kind === 'movie' ? p.movie.name : 'S' + p.episode.season + ' E' + p.episode.number + ' · ' + p.episode.title;
       var pos = Player.position(), dur = Player.duration();
+      var posEl = h('span', { text: u.formatTime(pos) });
+      var durEl = h('span', { text: dur > 0 ? u.formatTime(dur) : '--:--' });
+      var bar = u.progressBar(dur > 0 ? pos / dur : 0);
       bottom.appendChild(h('div', { class: 'p-title ellipsis', text: title }));
-      bottom.appendChild(h('div', { class: 'p-bar' }, [
-        h('span', { text: u.formatTime(pos) }),
-        u.progressBar(dur > 0 ? pos / dur : 0),
-        h('span', { text: dur > 0 ? u.formatTime(dur) : '--:--' }),
-      ]));
+      bottom.appendChild(h('div', { class: 'p-bar' }, [posEl, bar, durEl]));
+      playerTick = function () {
+        var p2 = Player.position(), d2 = Player.duration();
+        clockEl.textContent = u.clock(Date.now() / 1000);
+        posEl.textContent = u.formatTime(p2);
+        durEl.textContent = d2 > 0 ? u.formatTime(d2) : '--:--';
+        setProgress(bar, d2 > 0 ? p2 / d2 : 0);
+      };
     }
 
     if (overlay === 'controls') {
@@ -914,10 +953,13 @@
   function nextEpisode() { var p = A.playing, x = episodeOffset(1); if (x) playEpisode(p.series, x, p.episodes, true); }
   function prevEpisode() { var p = A.playing, x = episodeOffset(-1); if (x) playEpisode(p.series, x, p.episodes, false); }
 
+  function setProgress(bar, f) { bar.firstChild.style.width = Math.round(Math.max(0, Math.min(1, f)) * 100) + '%'; }
+
   // Aggiorna avanzamento e orologio a schermo; salva le posizioni ogni 15 secondi.
+  // Si cambiano solo i testi: ridisegnare tutto ogni secondo appesantiva i TV mentre il video gira.
   var ticks = 0;
   setInterval(function () {
-    if (A.screen === 'player' && overlay !== 'none' && overlay !== 'controls' && !panelOpen) renderPlayer();
+    if (A.screen === 'player' && overlay !== 'none' && playerTick) playerTick();
     if (++ticks % 15 === 0) savePosition();
   }, 1000);
 

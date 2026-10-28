@@ -62,7 +62,6 @@ body.playing #root { display: none; }
   background-color: var(--surface-pressed);
   -webkit-transform: scale(1.04);
   transform: scale(1.04);
-  box-shadow: 0 0.4rem 1.6rem rgba(0, 0, 0, 0.5);
 }
 .f.flat.focused { -webkit-transform: none; transform: none; }
 

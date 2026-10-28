@@ -48,9 +48,15 @@
 
     var isTs = /\.ts(\?|$)/i.test(url);
     if (live && isTs && canUseMse()) {
+      // Sui TV di fascia media:
+      // - la conversione del flusso gira in un worker, così menu e telecomando non la rallentano;
+      // - si tengono solo 30 s già visti: con i 3 minuti predefiniti la memoria del TV si riempiva
+      //   e il video andava a scatti;
+      // - niente inseguimento della latenza, perché i salti in avanti si vedevano come scatti.
       ts = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: url }, {
-        enableWorker: false, lazyLoad: false, autoCleanupSourceBuffer: true,
-        liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: 6, liveBufferLatencyMinRemain: 1.5,
+        enableWorker: true, lazyLoad: false, enableStashBuffer: true,
+        autoCleanupSourceBuffer: true, autoCleanupMaxBackwardDuration: 30, autoCleanupMinBackwardDuration: 15,
+        liveBufferLatencyChasing: false,
       });
       ts.on(mpegts.Events.ERROR, function () { scheduleRetry('errore del flusso'); });
       ts.attachMediaElement(video);
@@ -102,6 +108,9 @@
       if (P.state !== 'playing' && video.readyState >= 3) setState('playing');
       // Dopo un minuto di visione regolare i tentativi ripartono da capo.
       if (attempt > 0 && Date.now() - startedAt > 60000) attempt = 0;
+      // Senza inseguimento la diretta può restare indietro: oltre 25 s di ritardo si salta avanti, una volta sola.
+      var b = video.buffered;
+      if (live && b.length && b.end(b.length - 1) - t > 25) video.currentTime = b.end(b.length - 1) - 4;
       return;
     }
     var limit = live ? (everPlayed ? 12000 : 25000) : (everPlayed ? 20000 : 35000);

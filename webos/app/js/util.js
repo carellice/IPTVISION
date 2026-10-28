@@ -81,12 +81,16 @@ window.IPTV = IPTV;
     return tags.length ? tags.join(' ').toUpperCase() : null;
   }
 
-  /** Raggruppa le copie dello stesso titolo: resta il primo nell'ordine, con tutte le versioni. */
+  /**
+   * Raggruppa le copie dello stesso titolo: resta il primo nell'ordine, con tutte le versioni.
+   * La chiave si calcola una volta per titolo e resta salvata: con decine di migliaia di film
+   * ricalcolarla a ogni apertura di categoria rallentava i TV.
+   */
   function groupVariants(items, nameOf) {
     var map = {};
     var order = [];
     items.forEach(function (it) {
-      var k = variantKey(nameOf(it));
+      var k = it.vk || (it.vk = variantKey(nameOf(it)));
       if (map[k]) map[k].push(it);
       else { map[k] = [it]; order.push(k); }
     });
@@ -143,23 +147,42 @@ window.IPTV = IPTV;
     toastTimer = setTimeout(function () { el.className = ''; }, 3500);
   }
 
-  /** Immagine con le iniziali come segnaposto: si carica solo quando entra nello schermo. */
-  var observer = window.IntersectionObserver ? new IntersectionObserver(function (entries) {
-    entries.forEach(function (e) {
-      if (!e.isIntersecting) return;
-      var img = e.target;
-      observer.unobserve(img);
-      img.src = img.dataset.src;
+  /*
+   * Immagine con le iniziali come segnaposto: si carica quando si avvicina allo schermo e si
+   * libera quando se ne allontana molto. Negli elenchi lunghi le locandine già passate restavano
+   * tutte in memoria e i TV con poca RAM chiudevano l'app.
+   */
+  var IO = window.IntersectionObserver;
+  var loader = IO ? new IO(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting && !e.target.getAttribute('src')) e.target.src = e.target.dataset.src; });
+  }, { rootMargin: '600px' }) : null;
+  // Le locandine caricate si controllano ogni 4 s: quelle a più di 2500 px dallo schermo si liberano
+  // (il loader le ricarica quando tornano in vista). Un IntersectionObserver non basta, perché le
+  // aree scorrevoli tagliano il margine e le libererebbe appena escono dalla vista.
+  var loaded = [];
+  if (loader) setInterval(function () {
+    var limit = window.innerHeight + 2500;
+    loaded = loaded.filter(function (img) {
+      if (!img.getAttribute('src')) return false;
+      if (!document.body.contains(img)) { img.removeAttribute('src'); loader.unobserve(img); return false; }
+      var r = img.getBoundingClientRect();
+      if (r.bottom > -2500 && r.top < limit) return true;
+      img.removeAttribute('src');
+      img.style.visibility = 'hidden';
+      if (img.ini) img.ini.style.display = '';
+      return false;
     });
-  }, { rootMargin: '400px' }) : null;
+  }, 4000);
 
   function art(url, text) {
     var box = [h('div', { class: 'ini', text: text })];
     if (url) {
       var img = h('img', { alt: '' });
-      img.addEventListener('error', function () { img.style.display = 'none'; });
-      img.addEventListener('load', function () { box[0].style.display = 'none'; });
-      if (observer) { img.dataset.src = url; observer.observe(img); } else img.src = url;
+      img.ini = box[0];
+      img.style.visibility = 'hidden'; // non display:none, altrimenti l'IntersectionObserver non la vede mai
+      img.addEventListener('error', function () { img.style.visibility = 'hidden'; });
+      img.addEventListener('load', function () { img.style.visibility = ''; box[0].style.display = 'none'; if (loader) loaded.push(img); });
+      if (loader) { img.dataset.src = url; loader.observe(img); } else img.src = url;
       box.push(img);
     }
     return box;

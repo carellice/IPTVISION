@@ -233,6 +233,7 @@ Il puntatore del Magic Remote funziona come un mouse: basta puntare e premere la
 
 - **`ares-setup-device` o `ares-install` non trovano il TV:** controlla che TV e PC siano sulla stessa rete, che **Key Server** sia attivo e che l'IP sia quello giusto. Se il router assegna al TV un IP diverso a ogni accensione, fissalo dalle impostazioni del router.
 - **Un canale non parte:** in **Impostazioni** attiva **Formato HLS (m3u8)**. I flussi MPEG-TS sono letti da [mpegts.js](https://github.com/xqq/mpegts.js), quelli HLS dal lettore del TV, che su alcuni modelli va meglio.
+- **Mancano film o canali appena aggiunti dal fornitore:** il TV tiene una copia delle liste per aprirle subito, e la rinnova da solo ogni 6 ore per i canali e ogni 24 ore per film e serie. Per averle aggiornate subito: **Impostazioni → Aggiorna liste**.
 - **L'app è sparita:** la sessione è scaduta. Riattiva **Dev Mode Status**, rileggi il codice se hai ripristinato il TV e reinstalla l'`.ipk`.
 - **Tracce audio:** si possono scegliere solo con HLS, film ed episodi, cioè con il lettore del TV.
 

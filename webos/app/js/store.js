@@ -99,6 +99,39 @@
     },
   };
 
+  /*
+   * Liste di canali, film e serie salvate in IndexedDB: all'avvio si leggono da qui invece di
+   * riscaricarle e rianalizzarle dal server (decine di MB con i cataloghi grandi).
+   * Se IndexedDB non c'è o dà errore, si scarica tutto come prima.
+   */
+  var dbp = null;
+  function db() {
+    if (!dbp) dbp = new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error('IndexedDB assente')); return; }
+      var r = indexedDB.open('iptvision', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('lists'); };
+      r.onsuccess = function () { resolve(r.result); };
+      r.onerror = function () { reject(r.error); };
+    });
+    return dbp;
+  }
+  function tx(mode, fn) {
+    return db().then(function (d) {
+      return new Promise(function (resolve, reject) {
+        var t = d.transaction('lists', mode);
+        var req = fn(t.objectStore('lists'));
+        t.oncomplete = function () { resolve(req.result); };
+        t.onerror = t.onabort = function () { reject(t.error); };
+      });
+    });
+  }
+  var Cache = {
+    get: function (key) { return tx('readonly', function (s) { return s.get(key); }).catch(function () { return null; }); },
+    put: function (key, value) { return tx('readwrite', function (s) { return s.put(value, key); }).catch(function () {}); },
+    clear: function () { return tx('readwrite', function (s) { return s.clear(); }).catch(function () {}); },
+  };
+
   IPTV.Settings = Settings;
   IPTV.Positions = Positions;
+  IPTV.Cache = Cache;
 })();
