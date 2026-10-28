@@ -112,6 +112,20 @@ Anche l'app Android si aggiorna da sola: **Impostazioni → Aggiornamenti** scar
 
 IPTVISION gira anche sui TV LG con webOS 4.0 o successivo (modelli dal 2018 in poi). LG non permette di installare app fuori dal suo store come si fa con un APK: si usa la **modalità sviluppatore**, gratuita, che serve proprio a provare le proprie app sul TV. La guida è lunga ma si fa una volta sola; dopo, l'app compare tra le altre nella barra Home del TV.
 
+#### Installazione guidata (Windows)
+
+Il modo più semplice: scarica questa repository (**Code → Download ZIP** su GitHub, poi estrai lo ZIP) e fai doppio clic su `webos\installa-tv.bat`. La procedura ti dice cosa fare sul TV e sul sito LG, ti chiede l'IP del TV, la Passphrase e il file da installare, e fa da sola il resto:
+
+- installa [Node.js](https://nodejs.org/) con `winget` se manca e scarica gli strumenti di LG;
+- apre la pagina per creare l'account sviluppatore, se non ce l'hai;
+- controlla che il TV risponda, lo registra e scarica la chiave di accesso;
+- installa il file `.ipk` che indichi, oppure, se premi Invio, scarica e installa l'ultima versione dalle release, poi apre IPTVISION sul TV;
+- legge il codice della sessione dal TV, fa un primo rinnovo di prova e configura il rinnovo automatico. Puoi scegliere GitHub Actions (salva il segreto da sola se hai la [GitHub CLI](https://cli.github.com/) collegata), l'Utilità di pianificazione di Windows o entrambi.
+
+Per aggiornare IPTVISION basta rilanciare `installa-tv.bat`: se il TV è già collegato, la procedura salta direttamente all'installazione.
+
+Se preferisci fare tutto a mano, o non usi Windows, segui la guida qui sotto.
+
 Ti servono:
 - il TV e il PC collegati alla **stessa rete** (Wi-Fi o cavo);
 - sul PC [Node.js](https://nodejs.org/) 18 o successivo, che contiene anche `npm`;
@@ -281,7 +295,7 @@ src/IPTVISION/
   Themes/       stili e palette
   MainWindow    finestra, comandi sovrapposti al video, modalità TV
 android/        app Android e Android TV (data/ client Xtream e guida TV, player/ ExoPlayer, ui/ schermate Compose)
-webos/          app per TV LG (app/ HTML, CSS e JS; tools/devmode.js rinnovo della modalità sviluppatore)
+webos/          app per TV LG (app/ HTML, CSS e JS; installa-tv.bat installazione guidata; tools/devmode.js rinnovo della modalità sviluppatore)
 installer/      script Inno Setup
 scripts/        script di rilascio
 ```
