@@ -4,13 +4,14 @@
 
 # IPTVISION
 
-**Lettore IPTV per Windows: leggero e veloce, pensato per guardare la TV dal PC o dal divano.**
+**Lettore IPTV per Windows, Android e Android TV: leggero e veloce, pensato per guardare la TV dal PC, dal telefono o dal divano.**
 
 TV in diretta, film e serie da un account Xtream Codes, con guida TV, ricerca vocale e una modalità TV da usare con controller o telecomando.
 
 [![Ultima versione](https://img.shields.io/github/v/release/carellice/IPTVISION?label=versione&color=3D7BFF)](https://github.com/carellice/IPTVISION/releases/latest)
 [![Download](https://img.shields.io/github/downloads/carellice/IPTVISION/total?label=download&color=00C2FF)](https://github.com/carellice/IPTVISION/releases)
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4)
+![Android 7+](https://img.shields.io/badge/Android%20%2F%20TV-7%2B-3DDC84)
 ![.NET 8](https://img.shields.io/badge/.NET-8-512BD4)
 
 ### [⬇ Scarica l'ultima versione](https://github.com/carellice/IPTVISION/releases/latest)
@@ -81,6 +82,27 @@ All'avvio IPTVISION controlla se è uscita una nuova versione. Se c'è, la trovi
 
 Il programma si installa in `%LOCALAPPDATA%\Programs\IPTVISION` e funziona su Windows 10 e 11 a 64 bit.
 
+### Android e Android TV
+
+Un solo APK per telefoni, tablet, Android TV, Google TV e box Android (Android 7 o successivo).
+
+1. Scarica `IPTVISION-x.y.z.apk` dalle [release](https://github.com/carellice/IPTVISION/releases/latest). Su una TV puoi usare un'app come Downloader, oppure installarlo con `adb install`.
+2. Aprilo e consenti l'installazione da origini sconosciute, se Android lo chiede.
+3. Accedi con gli stessi dati di Windows.
+
+Sul telefono si usa col dito; sulla TV basta il telecomando:
+
+| Telecomando | Mentre guardi la TV | Mentre guardi film/episodi |
+|---|---|---|
+| ▲ / ▼, CH+ / CH− | Canale successivo / precedente | Avanti / indietro 1 min |
+| ◀ / ▶ | Elenco canali / info | Indietro / avanti 10 s |
+| OK | Comandi (pausa, canali, preferito, audio e sottotitoli) | Comandi |
+| 0–9 | Vai al canale per numero | |
+| Menu, pressione lunga | Aggiungi/togli dai preferiti | |
+| Microfono | Ricerca vocale (sezione Cerca) | |
+
+Anche l'app Android si aggiorna da sola: **Impostazioni → Aggiornamenti** scarica il nuovo APK dalle release e apre l'installazione.
+
 ## Scorciatoie da tastiera
 
 | Tasto | Azione |
@@ -121,6 +143,14 @@ Serve: [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) su Windows
 dotnet run --project src/IPTVISION
 ```
 
+L'app Android sta in `android/` (Kotlin, Jetpack Compose, Media3 ExoPlayer). Serve un JDK 17+ e l'Android SDK; si apre con Android Studio oppure:
+
+```bash
+cd android && gradlew.bat installDebug
+```
+
+La versione Android si legge da `IPTVISION.csproj`, così Windows e Android escono sempre con lo stesso numero.
+
 Struttura del progetto:
 
 ```
@@ -129,6 +159,7 @@ src/IPTVISION/
   ViewModels/   logica dell'interfaccia (MVVM con CommunityToolkit.Mvvm)
   Themes/       stili e palette
   MainWindow    finestra, comandi sovrapposti al video, modalità TV
+android/        app Android e Android TV (data/ client Xtream e guida TV, player/ ExoPlayer, ui/ schermate Compose)
 installer/      script Inno Setup
 scripts/        script di rilascio
 ```
@@ -146,18 +177,22 @@ Lo script fa tutto da solo:
 1. aumenta la versione in `IPTVISION.csproj` (`1.2.3` diventa `1.2.4`);
 2. compila il programma in modalità self-contained;
 3. crea il setup con Inno Setup, e se Inno Setup manca lo installa con winget;
-4. fa il commit, crea il tag `vX.Y.Z` e fa il push;
-5. crea la release su GitHub, carica il setup e scrive le note prendendole dai commit.
+4. compila l'APK Android firmato, con la stessa versione;
+5. fa il commit, crea il tag `vX.Y.Z` e fa il push;
+6. crea la release su GitHub, carica setup e APK e scrive le note prendendole dai commit.
 
 Altre varianti:
 - `release.bat minor` aumenta la versione minore (`1.3.0`);
 - `release.bat major "Note della versione"` aumenta la versione principale e usa le note che scrivi tu.
 
-Serve la [GitHub CLI](https://cli.github.com/) già autenticata (`gh auth login`).
+Serve la [GitHub CLI](https://cli.github.com/) già autenticata (`gh auth login`), più JDK e Android SDK per l'APK.
+
+L'APK è firmato con una chiave che sta fuori dal progetto, in `%USERPROFILE%\.android\iptvision-signing\`: al primo rilascio lo script la crea da solo. Conservane una copia: senza quella chiave chi ha già l'app Android non può più aggiornarla.
 
 ## Tecnologie
 
 [WPF / .NET 8](https://github.com/dotnet/wpf) · [LibVLCSharp](https://github.com/videolan/libvlcsharp) · [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) · [Inno Setup](https://jrsoftware.org/isinfo.php)
+Android: [Jetpack Compose](https://developer.android.com/compose) · [Media3 ExoPlayer](https://github.com/androidx/media) · [OkHttp](https://square.github.io/okhttp/) · [Coil](https://coil-kt.github.io/coil/)
 
 ## Licenza
 

@@ -1,5 +1,5 @@
 @echo off
-rem Pubblica una nuova versione di IPTVISION su GitHub con il setup per Windows.
+rem Pubblica una nuova versione di IPTVISION su GitHub: setup per Windows e APK per Android/Android TV.
 rem   release.bat                      versione patch (1.2.3 -> 1.2.4), note dai commit
 rem   release.bat minor                1.2.3 -> 1.3.0
 rem   release.bat major "Note..."      2.0.0 con note personalizzate
