@@ -162,6 +162,9 @@ fun SettingsSection(vm: AppViewModel) {
             vm.settings.autoPlayLastChannel = it
             vm.refreshUi()
         }
+        Toggle("Nascondi XXX", "Toglie canali, film e serie delle categorie con XXX nel nome.", vm.settings.hideAdult) {
+            vm.setHideAdult(it)
+        }
 
         if (!vm.isTv) {
             Group("Download")

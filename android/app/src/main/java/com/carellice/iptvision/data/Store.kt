@@ -53,6 +53,11 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
         get() = p.getBoolean("autoCheckUpdates", true)
         set(v) = p.edit().putBoolean("autoCheckUpdates", v).apply()
 
+    /** Nasconde le categorie con "XXX" nel nome (canali, film e serie). */
+    var hideAdult: Boolean
+        get() = p.getBoolean("hideAdult", false)
+        set(v) = p.edit().putBoolean("hideAdult", v).apply()
+
     /** Ordinamento scelto per una sezione ("Live", "Movies", "Series"). */
     fun sort(section: String): String? = p.getString("sort_$section", null)
     fun setSort(section: String, value: String) = p.edit().putString("sort_$section", value).apply()

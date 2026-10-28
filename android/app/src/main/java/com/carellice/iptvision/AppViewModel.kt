@@ -358,8 +358,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         c.download(action, file(kind, c.account.key), timeoutSec)
 
     private fun <T> library(cats: List<Category>, items: List<T>, catOf: (T) -> String?): Library<T> {
-        val by = items.groupBy(catOf)
-        return Library(cats.filter { by[it.id]?.isNotEmpty() == true }, items, by)
+        // "Nascondi XXX": via le categorie con XXX nel nome e tutto il loro contenuto, anche da Tutti e dalla ricerca.
+        val hidden = if (settings.hideAdult) cats.filter { it.name.contains("xxx", ignoreCase = true) }.map { it.id }.toSet() else emptySet()
+        val visible = if (hidden.isEmpty()) items else items.filter { catOf(it) !in hidden }
+        val by = visible.groupBy(catOf)
+        return Library(cats.filter { it.id !in hidden && by[it.id]?.isNotEmpty() == true }, visible, by)
+    }
+
+    fun setHideAdult(value: Boolean) {
+        settings.hideAdult = value
+        refreshUi()
+        val c = client ?: return
+        val hadMovies = movies != null
+        val hadSeries = series != null
+        movies = null; series = null
+        liveOpen = null; moviesOpen = null; seriesOpen = null
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { loadLive(c.account.key) }?.let { live = it }
+            if (hadMovies || section == Section.Movies) ensureMovies()
+            if (hadSeries || section == Section.Series) ensureSeries()
+        }
     }
 
     private fun loadLive(key: String): Library<Channel>? {

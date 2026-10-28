@@ -21,6 +21,8 @@ public sealed partial class MainViewModel
     private List<Series> _series = [];
     private List<Category> _vodCats = [];
     private List<Category> _seriesCats = [];
+    private (List<Category> Cats, List<VodData> Items)? _rawMovies;
+    private (List<Category> Cats, List<SeriesData> Items)? _rawSeries;
     private Task? _moviesTask;
     private Task? _seriesTask;
     private Series? _playingSeries;
@@ -75,6 +77,8 @@ public sealed partial class MainViewModel
     private void ResetLibrary()
     {
         _movies = [];
+        _rawMovies = null;
+        _rawSeries = null;
         _series = [];
         _vodCats = [];
         _seriesCats = [];
@@ -164,6 +168,8 @@ public sealed partial class MainViewModel
     private void PopulateMovies(List<Category> cats, List<VodData> items)
     {
         var playingId = CurrentMovie?.StreamId;
+        _rawMovies = (cats, items);
+        (cats, items) = WithoutHidden(cats, items, i => i.CategoryId);
         _vodCats = cats;
         _movies = items.GroupBy(i => i.StreamId).Select(g => g.First()).Select(d =>
         {
@@ -182,6 +188,8 @@ public sealed partial class MainViewModel
     private void PopulateSeries(List<Category> cats, List<SeriesData> items)
     {
         var playingId = _playingSeries?.SeriesId;
+        _rawSeries = (cats, items);
+        (cats, items) = WithoutHidden(cats, items, i => i.CategoryId);
         _seriesCats = cats;
         _series = items.GroupBy(i => i.SeriesId).Select(g => g.First()).Select(d =>
         {

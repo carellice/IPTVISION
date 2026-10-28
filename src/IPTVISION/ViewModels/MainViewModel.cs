@@ -19,6 +19,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private XtreamClient? _client;
     private List<Channel> _all = [];
     private List<Category> _liveCats = [];
+    // Liste così come arrivano dal server: servono a rifare il filtro quando si cambia "Nascondi XXX".
+    private (List<Category> Cats, List<ChannelData> Items)? _rawLive;
     private Dictionary<int, Channel> _byId = [];
     private Channel? _previous;
     private CancellationTokenSource? _refreshCts;
@@ -287,6 +289,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _previous = null;
         _client = null;
         _all = [];
+        _rawLive = null;
         _byId = [];
         _liveCats = [];
         ResetLibrary();
@@ -448,6 +451,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var currentId = CurrentChannel?.StreamId;
         var previousId = _previous?.StreamId;
 
+        _rawLive = (cats, chans);
+        (cats, chans) = WithoutHidden(cats, chans, c => c.CategoryId);
         _liveCats = cats;
         _all = chans
             .GroupBy(c => c.StreamId).Select(g => g.First())
@@ -768,6 +773,42 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ToggleSettings() => IsSettingsOpen = !IsSettingsOpen;
+
+    /// <summary>Nasconde le categorie con "XXX" nel nome, con tutto il loro contenuto (anche da Tutti e dalla ricerca).</summary>
+    public bool HideAdult
+    {
+        get => _settings.HideAdult;
+        set
+        {
+            if (_settings.HideAdult == value) return;
+            _settings.HideAdult = value;
+            OnPropertyChanged();
+            ScheduleSave();
+            ReapplyHidden();
+        }
+    }
+
+    private static bool IsHiddenCategory(Category c) => c.Name.Contains("xxx", StringComparison.OrdinalIgnoreCase);
+
+    private (List<Category>, List<T>) WithoutHidden<T>(List<Category> cats, List<T> items, Func<T, string?> categoryOf)
+    {
+        if (!_settings.HideAdult) return (cats, items);
+        var hidden = cats.Where(IsHiddenCategory).Select(c => c.Id).ToHashSet();
+        if (hidden.Count == 0) return (cats, items);
+        return (cats.Where(c => !hidden.Contains(c.Id)).ToList(),
+            items.Where(i => categoryOf(i) is not { } id || !hidden.Contains(id)).ToList());
+    }
+
+    private void ReapplyHidden()
+    {
+        if (_rawLive is { } l) Populate(l.Cats, l.Items);
+        if (_rawMovies is { } m) PopulateMovies(m.Cats, m.Items);
+        if (_rawSeries is { } s) PopulateSeries(s.Cats, s.Items);
+        RebuildCategories();
+        ApplyFilter();
+        if (!string.IsNullOrWhiteSpace(SearchText)) RunSearch();
+        RefreshTvItems();
+    }
 
     public bool UseHls
     {

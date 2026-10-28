@@ -20,7 +20,7 @@
     server: null, username: null, password: null,
     favorites: [], lastStreamId: null, lastCategoryId: null,
     outputFormat: 'ts', autoPlayLast: true, autoCheckUpdates: true,
-    sorts: {}, grids: { Movies: true, Series: true },
+    sorts: {}, grids: { Movies: true, Series: true }, hideAdult: false,
   };
   Object.keys(defaults).forEach(function (k) { if (settings[k] === undefined) settings[k] = defaults[k]; });
 

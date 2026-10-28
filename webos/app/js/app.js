@@ -43,9 +43,19 @@
   // ---------- Dati ----------
 
   function library(cats, items) {
+    // "Nascondi XXX": via le categorie con XXX nel nome e tutto il loro contenuto, anche da Tutti e dalla ricerca.
+    var hidden = {};
+    if (S.get('hideAdult')) cats.forEach(function (c) { if (/xxx/i.test(c.name)) hidden[c.id] = true; });
+    var visible = items.filter(function (it) { return !hidden[it.categoryId]; });
     var by = {};
-    items.forEach(function (it) { (by[it.categoryId] = by[it.categoryId] || []).push(it); });
-    return { cats: cats.filter(function (c) { return by[c.id]; }), items: items, by: by };
+    visible.forEach(function (it) { (by[it.categoryId] = by[it.categoryId] || []).push(it); });
+    return { cats: cats.filter(function (c) { return by[c.id]; }), items: visible, by: by, raw: { cats: cats, items: items } };
+  }
+
+  /** Rifà le liste con il filtro attuale (dopo aver cambiato "Nascondi XXX"). */
+  function reapplyHidden() {
+    ['live', 'movies', 'series'].forEach(function (k) { if (A[k]) A[k] = library(A[k].raw.cats, A[k].raw.items); });
+    A.openCat = {};
   }
 
   // Dopo quanto le liste salvate sul TV si riscaricano dal server ("Aggiorna liste" lo fa subito).
@@ -447,6 +457,8 @@
       S.get('outputFormat') === 'm3u8', function () { S.set('outputFormat', S.get('outputFormat') === 'm3u8' ? 'ts' : 'm3u8'); }));
     box.appendChild(settingRow('Riprendi l\'ultimo canale all\'avvio', 'Apri l\'app e il canale riparte da dov\'eri rimasto.',
       S.get('autoPlayLast'), function () { S.set('autoPlayLast', !S.get('autoPlayLast')); }));
+    box.appendChild(settingRow('Nascondi XXX', 'Toglie canali, film e serie delle categorie con XXX nel nome.',
+      S.get('hideAdult'), function () { S.set('hideAdult', !S.get('hideAdult')); reapplyHidden(); }));
     box.appendChild(h('div', { class: 'group-title', text: 'Dati' }));
     box.appendChild(V.focusable(h('div', { class: 'btn', text: '↻  Aggiorna liste' }), function () {
       A.epg = {};

@@ -58,6 +58,9 @@ Film ed episodi si possono scaricare e guardare senza connessione, per esempio i
 ### 🗂️ Elenco o griglia, in ordine
 Prima scegli la categoria, poi vedi canali, film o serie. Ogni sezione si può mostrare come **elenco** o come **griglia** e **ordinare** per nome (A-Z o Z-A), numero di canale, anno, voto o film aggiunti di recente. La scelta resta salvata per ogni sezione.
 
+### 🙈 Nascondi XXX
+Nelle impostazioni (su Windows, Android e TV LG) c'è **Nascondi XXX**: spariscono tutte le categorie che hanno "XXX" nel nome, in TV in diretta, film e serie, insieme al loro contenuto, che non compare più nemmeno in **Tutti** e nella ricerca. Non distingue maiuscole e minuscole ed è spenta di base; spegnendola torna tutto com'era.
+
 ### 🔎 Ricerca unica, anche a voce
 Cerca insieme tra canali, film e serie, oppure solo in uno dei tre (**Tutto**, **Canali**, **Film**, **Serie**): i risultati sono raggruppati per tipo e non serve scrivere gli accenti. Il pulsante 🎤 o **Ctrl+M** attiva la digitazione vocale di Windows, che capisce l'italiano.
 

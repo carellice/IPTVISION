@@ -951,6 +951,13 @@
                                             <TextBlock Text="Apri il programma e sei già sul canale" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5" />
                                         </StackPanel>
                                     </CheckBox>
+                                    <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding HideAdult}" Margin="0,6,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Nascondi XXX" />
+                                            <TextBlock Text="Toglie canali, film e serie delle categorie con XXX nel nome" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </CheckBox>
 
                                     <TextBlock Text="MODALITÀ TV" Style="{StaticResource SectionTitle}" />
                                     <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="14,12">
