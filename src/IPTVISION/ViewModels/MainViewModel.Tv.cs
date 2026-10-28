@@ -112,6 +112,7 @@ public sealed partial class MainViewModel
     {
         OnPropertyChanged(nameof(ShowTvLayer));
         OnPropertyChanged(nameof(ShowVideo));
+        NotifyVariantChooser();
     }
 
     // ---------- Entrata / uscita ----------
@@ -211,6 +212,12 @@ public sealed partial class MainViewModel
             index = playing == null ? 0 : Math.Max(0, IndexOfItem(items, playing));
         }
         SetTvItems(items, Mode == LibraryMode.Live ? 4 : 6, index);
+    }
+
+    /// <summary>Cambiato l'ordinamento: la griglia della categoria aperta si ricostruisce.</summary>
+    private void RefreshTvItems()
+    {
+        if (IsTvMode && TvScreen == TvScreen.Items && _tvCategory != null) ShowTvItems(_tvCategory, 0);
     }
 
     private async Task ShowTvSeries(Series s)
@@ -452,10 +459,13 @@ public sealed partial class MainViewModel
                 ShowTvItems(c);
                 break;
             case Series s:
-                _ = ShowTvSeries(s);
+                OpenSeriesItem(s);
                 break;
             case SearchHit { Item: Series s }:
-                _ = ShowTvSeries(s);
+                OpenSeriesItem(s);
+                break;
+            case SearchHit { Item: Movie { HasVariants: true } vm }:
+                OpenMovie(vm);
                 break;
             case SearchHit h:
                 ActivateSearchHit(h);
@@ -466,8 +476,8 @@ public sealed partial class MainViewModel
                 IsTvBrowsing = false;
                 break;
             case Movie m:
-                PlayMovie(m);
-                IsTvBrowsing = false;
+                OpenMovie(m);
+                if (!m.HasVariants) IsTvBrowsing = false;
                 break;
             case Episode e:
                 PlayEpisode(e);

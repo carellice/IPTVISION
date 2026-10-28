@@ -32,7 +32,7 @@ public sealed partial class MainViewModel
         }
 
         // Film e serie si caricano solo quando servono: la prima ricerca li richiede in background.
-        if (_client != null && (_moviesTask == null || _seriesTask == null))
+        if (_client != null && SearchScope != SearchScope.Channels && (_moviesTask == null || _seriesTask == null))
         {
             IsSearchCatalogLoading = true;
             var pending = Task.WhenAll(EnsureMoviesAsync(), EnsureSeriesAsync());
@@ -44,14 +44,16 @@ public sealed partial class MainViewModel
         }
 
         var isNumber = q.All(char.IsDigit);
-        var channels = Rank(_all, c => c.SearchKey, q)
+        var scope = SearchScope;
+        IEnumerable<SearchHit> channels = scope is not (SearchScope.All or SearchScope.Channels) ? [] : Rank(_all, c => c.SearchKey, q)
             .Concat(isNumber ? _all.Where(c => c.Num.ToString().StartsWith(q, StringComparison.Ordinal)) : [])
             .Distinct().Take(MaxHitsPerKind)
             .Select(c => new SearchHit(c, "Canale", c.Name, c.NowTitle ?? (c.Num > 0 ? $"Canale {c.Num}" : null)));
-        var movies = Rank(_movies, m => m.SearchKey, q).Take(MaxHitsPerKind)
-            .Select(m => new SearchHit(m, "Film", m.Name, m.Meta));
-        var series = Rank(_series, s => s.SearchKey, q).Take(MaxHitsPerKind)
-            .Select(s => new SearchHit(s, "Serie TV", s.Name, s.Meta));
+        // Le copie dello stesso titolo diventano un solo risultato, con il numero di versioni.
+        IEnumerable<SearchHit> movies = scope is not (SearchScope.All or SearchScope.Movies) ? [] : GroupVariants(Rank(_movies, m => m.SearchKey, q)).Take(MaxHitsPerKind)
+            .Select(m => new SearchHit(m, "Film", m.Name, m.HasVariants ? TextHelpers.JoinMeta(m.Meta, m.VariantsText) : m.Meta));
+        IEnumerable<SearchHit> series = scope is not (SearchScope.All or SearchScope.Series) ? [] : GroupVariants(Rank(_series, s => s.SearchKey, q)).Take(MaxHitsPerKind)
+            .Select(s => new SearchHit(s, "Serie TV", s.Name, s.HasVariants ? TextHelpers.JoinMeta(s.Meta, s.VariantsText) : s.Meta));
 
         var results = new List<object>();
         var hits = new List<SearchHit>();
@@ -87,8 +89,8 @@ public sealed partial class MainViewModel
         switch (hit?.Item)
         {
             case Channel c: PlayChannel(c); break;
-            case Movie m: PlayMovie(m); break;
-            case Series s: _ = OpenSeriesDetail(s); break;
+            case Movie m: OpenMovie(m); break;
+            case Series s: OpenSeriesItem(s); break;
         }
     }
 }

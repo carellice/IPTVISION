@@ -29,6 +29,7 @@ import com.carellice.iptvision.ui.LoginScreen
 import com.carellice.iptvision.ui.MovieDetailScreen
 import com.carellice.iptvision.ui.PlayerScreen
 import com.carellice.iptvision.ui.SeriesDetailScreen
+import com.carellice.iptvision.ui.VariantDialog
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -60,14 +61,13 @@ class MainActivity : ComponentActivity() {
                     vm.error?.let { if (vm.live != null) { Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show(); vm.error = null } }
                 }
 
-                BackHandler(enabled = vm.stack.size > 1 || (vm.screen == Screen.Home && vm.section != Section.Live)) { vm.back() }
+                BackHandler(enabled = vm.canGoBack) { vm.back() }
 
                 Box(
                     Modifier.fillMaxSize().background(C.Bg).onPreviewKeyEvent { e ->
                         // Indietro del telecomando: si naviga subito, senza che Compose lo usi prima per togliere il focus.
                         // Il player gestisce da sé il proprio.
-                        val handled = e.key == Key.Back && vm.screen != Screen.Player &&
-                            (vm.stack.size > 1 || (vm.screen == Screen.Home && vm.section != Section.Live))
+                        val handled = e.key == Key.Back && vm.screen != Screen.Player && vm.canGoBack
                         if (handled && e.type == KeyEventType.KeyUp) vm.back()
                         handled
                     },
@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
                         is Screen.SeriesDetail -> SeriesDetailScreen(vm, s.series)
                         Screen.Player -> PlayerScreen(vm)
                     }
+                    VariantDialog(vm)
                 }
             }
         }

@@ -189,6 +189,36 @@ public static class TextHelpers
 
     public static string JoinMeta(params string?[] parts) =>
         string.Join("  ·  ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+
+    // Sigle di qualità, codifica e lingua che i pannelli aggiungono al titolo ("Film (2020) FHD", "Film 4K HDR").
+    private static readonly HashSet<string> QualityTags = new(StringComparer.Ordinal)
+    {
+        "4k", "uhd", "2160p", "fhd", "1080p", "1080i", "hd", "720p", "sd", "576p", "480p",
+        "hdr", "hdr10", "dv", "hevc", "h265", "x265", "h264", "x264", "10bit",
+        "3d", "ita", "eng", "subita", "multisub", "bluray", "bdrip", "webdl", "webrip", "dvdrip",
+    };
+
+    private static readonly System.Text.RegularExpressions.Regex LangPrefix =
+        new(@"^\s*[\[\(|]?\s*[A-Z]{2,3}\s*[\]\)|:\-]\s*", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// Chiave per riconoscere lo stesso titolo pubblicato più volte: nome senza sigle di qualità,
+    /// senza prefisso di lingua ("IT | ") e senza accenti o punteggiatura.
+    /// </summary>
+    public static string VariantKey(string name)
+    {
+        var words = Normalize(LangPrefix.Replace(name, "")).Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => !QualityTags.Contains(w)).ToArray();
+        return words.Length == 0 ? Normalize(name) : string.Join(' ', words);
+    }
+
+    /// <summary>Le sigle di qualità presenti nel titolo, per distinguere le versioni ("4K HDR", "FHD").</summary>
+    public static string? QualityOf(string name)
+    {
+        var tags = Normalize(name).Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(QualityTags.Contains).Distinct().Select(t => t.ToUpperInvariant()).ToArray();
+        return tags.Length == 0 ? null : string.Join(' ', tags);
+    }
 }
 
 public sealed partial class Channel : ObservableObject
@@ -215,6 +245,7 @@ public sealed partial class Channel : ObservableObject
     [ObservableProperty] private bool _isFavorite;
     [ObservableProperty] private bool _isPlaying;
     [ObservableProperty] private bool _isTvFocused;
+    [ObservableProperty] private bool _isGridSelected;
     [ObservableProperty] private string? _nowTitle;
     [ObservableProperty] private double _nowProgress;
 
@@ -275,8 +306,25 @@ public abstract partial class ArtworkItem : ObservableObject
 
     [ObservableProperty] private bool _isPlaying;
     [ObservableProperty] private bool _isTvFocused;
+    [ObservableProperty] private bool _isGridSelected;
 
     public bool HasProgress => Progress > 0 && Progress < 1;
+
+    public abstract string ItemName { get; }
+
+    /// <summary>
+    /// Lo stesso titolo pubblicato più volte (per esempio in FHD e in 4K): nelle liste compare
+    /// un solo elemento e al clic si sceglie la versione. Contiene anche questo elemento.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasVariants), nameof(VariantsText))]
+    private IReadOnlyList<ArtworkItem> _variants = [];
+
+    public bool HasVariants => Variants.Count > 1;
+    public string VariantsText => $"{Variants.Count} versioni";
+
+    /// <summary>Qualità letta dal titolo, mostrata nella scelta della versione.</summary>
+    public string? Quality => TextHelpers.QualityOf(ItemName);
 }
 
 public sealed class Movie : ArtworkItem
@@ -298,6 +346,7 @@ public sealed class Movie : ArtworkItem
     public string Initials { get; }
     public string Meta { get; }
     public string Key => $"m:{StreamId}";
+    public override string ItemName => Name;
     protected override string? ArtUrl => Data.Poster;
 }
 
@@ -319,6 +368,7 @@ public sealed class Series : ArtworkItem
     public string Initials { get; }
     public string Meta { get; }
     public string Key => $"s:{SeriesId}";
+    public override string ItemName => Name;
     protected override string? ArtUrl => Data.Cover;
 }
 
@@ -335,6 +385,7 @@ public sealed partial class Episode : ArtworkItem
     public string? Image { get; init; }
 
     public string Key => $"e:{Id}";
+    public override string ItemName => DisplayTitle;
     public string Label => $"S{Season} E{Number}";
     public string DisplayTitle => string.IsNullOrWhiteSpace(Title) ? $"Episodio {Number}" : Title;
     public string DurationText => DurationSecs > 0 ? $"{Math.Max(1, (int)Math.Round(DurationSecs / 60.0))} min" : "";

@@ -45,9 +45,13 @@ Molti guardano i canali del digitale terrestre in streaming perché non hanno l'
 - Locandine, categorie, anno e voto.
 - Se interrompi un film o un episodio, la volta dopo riparte da lì. La sezione **Continua a guardare** raccoglie tutto quello che hai lasciato a metà.
 - Per le serie: stagioni ed episodi, con quelli già visti segnati. Alla fine di un episodio parte il successivo dopo 10 secondi, e puoi annullarlo.
+- Se lo stesso titolo è pubblicato più volte (per esempio in FHD e in 4K), nelle liste compare una volta sola con l'indicazione "2 versioni". Quando lo apri scegli quale guardare: per ogni versione si vede la qualità letta dal titolo.
+
+### 🗂️ Elenco o griglia, in ordine
+Prima scegli la categoria, poi vedi canali, film o serie. Ogni sezione si può mostrare come **elenco** o come **griglia** e **ordinare** per nome (A-Z o Z-A), numero di canale, anno, voto o film aggiunti di recente. La scelta resta salvata per ogni sezione.
 
 ### 🔎 Ricerca unica, anche a voce
-Cerca insieme tra canali, film e serie: i risultati sono raggruppati per tipo e non serve scrivere gli accenti. Il pulsante 🎤 o **Ctrl+M** attiva la digitazione vocale di Windows, che capisce l'italiano.
+Cerca insieme tra canali, film e serie, oppure solo in uno dei tre (**Tutto**, **Canali**, **Film**, **Serie**): i risultati sono raggruppati per tipo e non serve scrivere gli accenti. Il pulsante 🎤 o **Ctrl+M** attiva la digitazione vocale di Windows, che capisce l'italiano.
 
 <img src="docs/screenshots/ricerca.png" alt="Ricerca unica" />
 

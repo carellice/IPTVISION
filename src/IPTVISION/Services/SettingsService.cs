@@ -26,6 +26,11 @@ public sealed class AppSettings
     public bool StartInTvMode { get; set; }
     public bool AutoCheckUpdates { get; set; } = true;
 
+    /// <summary>Ordinamento scelto per ogni sezione ("Live", "Movies", "Series").</summary>
+    public Dictionary<string, string> ListSort { get; set; } = [];
+    /// <summary>Sezioni mostrate a griglia invece che a elenco.</summary>
+    public HashSet<string> GridViews { get; set; } = [];
+
     public double? WinLeft { get; set; }
     public double? WinTop { get; set; }
     public double? WinWidth { get; set; }

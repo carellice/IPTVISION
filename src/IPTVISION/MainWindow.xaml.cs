@@ -110,6 +110,10 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.IsTvMode):
                 SyncTvWindow();
                 break;
+            case nameof(MainViewModel.IsVariantChooserOpen):
+                if (_vm.IsVariantChooserOpen) FocusVariantList();
+                else if (!_vm.IsTvMode) FocusList();
+                break;
             case nameof(MainViewModel.ShowTvLayer):
                 if (!_vm.ShowTvLayer && _vm.IsTvMode) { Focus(); ShowBanner(); }
                 break;
@@ -440,6 +444,8 @@ public partial class MainWindow : Window
         if (!_vm.IsLoggedIn) return false;
         var ctrl = mods.HasFlag(ModifierKeys.Control);
 
+        if (_vm.IsVariantChooserOpen) return HandleVariantKey(key);
+
         if (ctrl && key == Key.T) { ToggleTvMode(); return true; }
         if (ctrl && key == Key.M) { StartVoiceSearch(); return true; }
         if (HandleTvKey(key)) return true;
@@ -501,6 +507,21 @@ public partial class MainWindow : Window
 
         var inList = ActiveList().IsKeyboardFocusWithin;
         var vod = _vm.IsVod;
+
+        // Griglia del pannello: le frecce spostano la selezione tra i riquadri.
+        if (GridList.IsKeyboardFocusWithin && mods == ModifierKeys.None)
+        {
+            switch (key)
+            {
+                case Key.Left: ScrollGrid(_vm.GridMove(-1, 0)); return true;
+                case Key.Right: ScrollGrid(_vm.GridMove(1, 0)); return true;
+                case Key.Up: ScrollGrid(_vm.GridMove(0, -1)); return true;
+                case Key.Down: ScrollGrid(_vm.GridMove(0, 1)); return true;
+                case Key.Enter:
+                    if (_vm.GridSelectedItem is { } item) Activate(item);
+                    return true;
+            }
+        }
 
         if (!vod)
         {
@@ -604,6 +625,7 @@ public partial class MainWindow : Window
         _vm.OpenSeries != null ? EpisodeList
         : _vm.IsSearchActive ? SearchList
         : !_vm.IsCategoryOpen ? CategoryList
+        : _vm.IsGridView ? GridList
         : _vm.Mode switch
         {
             LibraryMode.Movies => MovieList,
@@ -617,8 +639,8 @@ public partial class MainWindow : Window
         switch (item)
         {
             case Channel ch: _vm.PlayChannel(ch); break;
-            case Movie m: _vm.PlayMovie(m); break;
-            case Series s: _ = _vm.OpenSeriesDetailCommand.ExecuteAsync(s); break;
+            case Movie m: _vm.OpenMovie(m); break;
+            case Series s: _vm.OpenSeriesItem(s); break;
             case Episode ep: _vm.PlayEpisode(ep); break;
             case CategoryItem c: _vm.OpenCategoryCommand.Execute(c); break;
             case SearchHit h: _vm.ActivateSearchHit(h); break;
@@ -629,6 +651,12 @@ public partial class MainWindow : Window
     {
         var list = ActiveList();
         if (list.Items.Count == 0) return;
+        if (list == GridList)
+        {
+            GridList.Focus();
+            if (_vm.GridSelectedItem == null) ScrollGrid(_vm.GridMove(0, 0));
+            return;
+        }
         if (list.SelectedIndex < 0) list.SelectedIndex = 0;
         list.UpdateLayout();
         if (list.ItemContainerGenerator.ContainerFromIndex(list.SelectedIndex) is ListBoxItem item) item.Focus();
@@ -840,6 +868,108 @@ public partial class MainWindow : Window
             Activate(item);
             e.Handled = true;
         }
+    }
+
+    private void GridList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        var dep = e.OriginalSource as DependencyObject;
+        while (dep != null && dep != sender)
+        {
+            if (dep is FrameworkElement { Tag: "tile", DataContext: { } item })
+            {
+                _vm.GridSelect(item);
+                Activate(item);
+                return;
+            }
+            dep = dep is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(dep) : LogicalTreeHelper.GetParent(dep);
+        }
+    }
+
+    private void GridList_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (_vm.GridSelectedItem == null) ScrollGrid(_vm.GridMove(0, 0));
+    }
+
+    private void ScrollGrid(GridRow? row)
+    {
+        if (row != null) GridList.ScrollIntoView(row);
+    }
+
+    /// <summary>Ordinamento della sezione: menu con le opzioni disponibili.</summary>
+    private void Sort_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu { PlacementTarget = SortButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        menu.Items.Add(new MenuItem { Header = "ORDINA PER", IsEnabled = false, FontSize = 11, FontWeight = FontWeights.Bold });
+        foreach (var option in _vm.SortOptions)
+        {
+            var mi = new MenuItem { Header = option.Label, IsChecked = option == _vm.SelectedSort };
+            mi.Click += (_, _) => _vm.SelectedSort = option;
+            menu.Items.Add(mi);
+        }
+        menu.IsOpen = true;
+    }
+
+    // ---------- Scelta della versione ----------
+
+    /// <summary>La lista della scelta visibile ora: nel pannello o a schermo intero (modalità TV).</summary>
+    private ListBox ActiveVariantList => _vm.ShowVariantOverlay ? VariantList : VariantPanelList;
+
+    private bool HandleVariantKey(Key key)
+    {
+        var list = ActiveVariantList;
+        var count = list.Items.Count;
+        switch (key)
+        {
+            case Key.Up:
+                if (count > 0) list.SelectedIndex = Math.Max(0, list.SelectedIndex - 1);
+                break;
+            case Key.Down:
+                if (count > 0) list.SelectedIndex = Math.Min(count - 1, list.SelectedIndex + 1);
+                break;
+            case Key.Enter:
+            case Key.Space:
+                _vm.ChooseVariant(list.SelectedItem as ArtworkItem);
+                return true;
+            case Key.Escape:
+            case Key.BrowserBack:
+            case Key.Back:
+                _vm.CloseVariants();
+                return true;
+            default:
+                return true; // la scelta resta in primo piano: gli altri tasti non agiscono sotto
+        }
+        list.ScrollIntoView(list.SelectedItem);
+        return true;
+    }
+
+    private void FocusVariantList()
+    {
+        if (!_vm.ShowVariantOverlay && !_panelVisible) SetPanel(true, save: false);
+        Dispatcher.BeginInvoke(() =>
+        {
+            var list = ActiveVariantList;
+            list.SelectedIndex = 0;
+            list.Focus();
+        }, DispatcherPriority.Input);
+    }
+
+    private void VariantList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        var dep = e.OriginalSource as DependencyObject;
+        while (dep != null && dep != sender)
+        {
+            if (dep is ListBoxItem { DataContext: ArtworkItem item })
+            {
+                _vm.ChooseVariant(item);
+                return;
+            }
+            dep = dep is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(dep) : LogicalTreeHelper.GetParent(dep);
+        }
+    }
+
+    private void VariantLayer_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource == VariantLayer) _vm.CloseVariants();
     }
 
     private void CategoryList_PreviewMouseWheel(object sender, MouseWheelEventArgs e)

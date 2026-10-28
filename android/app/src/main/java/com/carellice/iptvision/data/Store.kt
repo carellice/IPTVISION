@@ -53,6 +53,14 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
         get() = p.getBoolean("autoCheckUpdates", true)
         set(v) = p.edit().putBoolean("autoCheckUpdates", v).apply()
 
+    /** Ordinamento scelto per una sezione ("Live", "Movies", "Series"). */
+    fun sort(section: String): String? = p.getString("sort_$section", null)
+    fun setSort(section: String, value: String) = p.edit().putString("sort_$section", value).apply()
+
+    /** Griglia o elenco per una sezione; senza scelta: griglia per film e serie, elenco per i canali. */
+    fun isGrid(section: String): Boolean = p.getBoolean("grid_$section", section != "Live")
+    fun setGrid(section: String, value: Boolean) = p.edit().putBoolean("grid_$section", value).apply()
+
     fun clearAccount() {
         p.edit().remove("server").remove("username").remove("password").remove("lastStreamId").remove("lastCategoryId").apply()
     }

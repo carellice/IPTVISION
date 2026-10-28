@@ -15,6 +15,8 @@ import androidx.lifecycle.viewModelScope
 import com.carellice.iptvision.data.Category
 import com.carellice.iptvision.data.Channel
 import com.carellice.iptvision.data.EpgService
+import com.carellice.iptvision.data.Entry
+import com.carellice.iptvision.data.groupVariants
 import com.carellice.iptvision.data.Episode
 import com.carellice.iptvision.data.Log
 import com.carellice.iptvision.data.Movie
@@ -40,6 +42,28 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 enum class Section(val title: String) { Live("TV in diretta"), Movies("Film"), Series("Serie TV"), Search("Cerca"), Settings("Impostazioni") }
+
+enum class ListSort(val label: String) {
+    Default("Predefinito"), Number("Numero"), NameAsc("Nome (A-Z)"), NameDesc("Nome (Z-A)"),
+    Recent("Aggiunti di recente"), Year("Anno (più recenti)"), Rating("Voto");
+
+    companion object {
+        fun optionsFor(section: Section) = when (section) {
+            Section.Live -> listOf(Default, Number, NameAsc, NameDesc)
+            Section.Movies -> listOf(Default, Recent, NameAsc, NameDesc, Year, Rating)
+            else -> listOf(Default, NameAsc, NameDesc, Year, Rating)
+        }
+    }
+}
+
+enum class SearchScope(val label: String) { All("Tutto"), Channels("Canali"), Movies("Film"), Series("Serie") }
+
+/** Un titolo pubblicato più volte: si sceglie quale versione aprire. */
+sealed interface VariantChoice {
+    val title: String
+    data class Films(override val title: String, val items: List<Movie>) : VariantChoice
+    data class Shows(override val title: String, val items: List<Series>) : VariantChoice
+}
 
 sealed interface Screen {
     data object Login : Screen
@@ -89,14 +113,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Restituisce false se non c'è niente da chiudere (l'activity può uscire). */
     fun back(): Boolean {
+        if (variantChoice != null) { variantChoice = null; return true }
         if (stack.size > 1) {
             val top = stack.removeAt(stack.lastIndex)
             if (top == Screen.Player) leavePlayer()
             return true
         }
+        if (screen == Screen.Home && openCategory(section) != null) { closeCategory(section); return true }
         if (screen == Screen.Home && section != Section.Live) { section = Section.Live; return true }
         return false
     }
+
+    /** C'è qualcosa da chiudere con Indietro prima di uscire dall'app. */
+    val canGoBack: Boolean
+        get() = variantChoice != null || stack.size > 1 ||
+            (screen == Screen.Home && (openCategory(section) != null || section != Section.Live))
 
     // ---------- Stato ----------
     var status by mutableStateOf<String?>(null); private set
@@ -111,9 +142,68 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var seriesLoading by mutableStateOf(false); private set
 
     var favorites by mutableStateOf(settings.favorites); private set
-    var liveCategory by mutableStateOf(settings.lastCategoryId ?: ALL_ID)
-    var movieCategory by mutableStateOf(ALL_ID)
-    var seriesCategory by mutableStateOf(ALL_ID)
+    // Prima si sceglie la categoria, poi si vede l'elenco: null = elenco delle categorie.
+    private var liveOpen by mutableStateOf<String?>(null)
+    private var moviesOpen by mutableStateOf<String?>(null)
+    private var seriesOpen by mutableStateOf<String?>(null)
+
+    fun openCategory(s: Section): String? = when (s) {
+        Section.Live -> liveOpen
+        Section.Movies -> moviesOpen
+        Section.Series -> seriesOpen
+        else -> null
+    }
+
+    /** L'ultima categoria aperta per sezione: tornando all'elenco il focus riparte da lì. */
+    val lastCategory = HashMap<Section, String>()
+
+    fun openCategory(s: Section, id: String) {
+        lastCategory[s] = id
+        when (s) {
+            Section.Live -> { liveOpen = id; settings.lastCategoryId = id }
+            Section.Movies -> moviesOpen = id
+            Section.Series -> seriesOpen = id
+            else -> {}
+        }
+    }
+
+    fun closeCategory(s: Section) {
+        when (s) {
+            Section.Live -> liveOpen = null
+            Section.Movies -> moviesOpen = null
+            Section.Series -> seriesOpen = null
+            else -> {}
+        }
+    }
+
+    // ---------- Ordinamento ed elenco/griglia, ricordati per sezione ----------
+    private var sorts by mutableStateOf(Section.entries.associateWith { s ->
+        settings.sort(s.name)?.let { v -> ListSort.entries.firstOrNull { it.name == v } } ?: ListSort.Default
+    })
+    private var grids by mutableStateOf(Section.entries.associateWith { settings.isGrid(it.name) })
+
+    fun sortOf(s: Section): ListSort = sorts[s] ?: ListSort.Default
+    fun setSort(s: Section, value: ListSort) {
+        sorts = sorts + (s to value)
+        settings.setSort(s.name, value.name)
+    }
+
+    fun isGrid(s: Section): Boolean = grids[s] == true
+    fun setGrid(s: Section, value: Boolean) {
+        grids = grids + (s to value)
+        settings.setGrid(s.name, value)
+    }
+
+    var variantChoice by mutableStateOf<VariantChoice?>(null)
+
+    /** Film dalle liste: se ne esistono più versioni si sceglie prima quale. */
+    fun openMovieEntry(e: Entry<Movie>) {
+        if (e.hasVariants) variantChoice = VariantChoice.Films(e.item.name, e.variants) else openMovie(e.item)
+    }
+
+    fun openSeriesEntry(e: Entry<Series>) {
+        if (e.hasVariants) variantChoice = VariantChoice.Shows(e.item.name, e.variants) else openSeries(e.item)
+    }
 
     /** Cambia quando la guida TV o le posizioni si aggiornano: le liste si ridisegnano. */
     var epgVersion by mutableIntStateOf(0); private set
@@ -324,41 +414,65 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Liste ----------
     fun channelsFor(categoryId: String): List<Channel> {
         val l = live ?: return emptyList()
-        return when (categoryId) {
+        val list = when (categoryId) {
             ALL_ID -> l.items
             FAVORITES_ID -> l.items.filter { it.streamId in favorites }
             else -> l.byCategory[categoryId] ?: emptyList()
         }
-    }
-
-    fun moviesFor(categoryId: String): List<Movie> {
-        val l = movies ?: return emptyList()
-        return when (categoryId) {
-            ALL_ID -> l.items.sortedByDescending { it.added }
-            CONTINUE_ID -> l.items.filter { positions.resumeMs(it.key) > 0 }.sortedByDescending { positions.updatedAt(it.key) ?: 0 }
-            else -> l.byCategory[categoryId] ?: emptyList()
+        return when (sortOf(Section.Live)) {
+            ListSort.Number -> list.sortedBy { if (it.num <= 0) Int.MAX_VALUE else it.num }
+            ListSort.NameAsc -> list.sortedBy { it.searchKey }
+            ListSort.NameDesc -> list.sortedByDescending { it.searchKey }
+            else -> list
         }
     }
 
-    fun seriesFor(categoryId: String): List<Series> {
+    private fun yearValue(y: String?) = y?.toIntOrNull() ?: 0
+
+    fun moviesFor(categoryId: String): List<Entry<Movie>> {
+        val l = movies ?: return emptyList()
+        val list = when (categoryId) {
+            ALL_ID -> l.items
+            CONTINUE_ID -> l.items.filter { positions.resumeMs(it.key) > 0 }.sortedByDescending { positions.updatedAt(it.key) ?: 0 }
+            else -> l.byCategory[categoryId] ?: emptyList()
+        }
+        val sorted = when (sortOf(Section.Movies)) {
+            ListSort.Recent -> list.sortedByDescending { it.added }
+            ListSort.NameAsc -> list.sortedBy { it.searchKey }
+            ListSort.NameDesc -> list.sortedByDescending { it.searchKey }
+            ListSort.Year -> list.sortedWith(compareByDescending<Movie> { yearValue(it.year) }.thenBy { it.searchKey })
+            ListSort.Rating -> list.sortedWith(compareByDescending<Movie> { it.rating }.thenBy { it.searchKey })
+            else -> list
+        }
+        return groupVariants(sorted) { it.name }
+    }
+
+    fun seriesFor(categoryId: String): List<Entry<Series>> {
         val l = series ?: return emptyList()
-        return when (categoryId) {
+        val list = when (categoryId) {
             ALL_ID -> l.items
             CONTINUE_ID -> l.items.mapNotNull { s -> positions.lastEpisode(s.seriesId)?.let { s to it.second } }
                 .sortedByDescending { it.second }.map { it.first }
             else -> l.byCategory[categoryId] ?: emptyList()
         }
+        val sorted = when (sortOf(Section.Series)) {
+            ListSort.NameAsc -> list.sortedBy { it.searchKey }
+            ListSort.NameDesc -> list.sortedByDescending { it.searchKey }
+            ListSort.Year -> list.sortedWith(compareByDescending<Series> { yearValue(it.year) }.thenBy { it.searchKey })
+            ListSort.Rating -> list.sortedWith(compareByDescending<Series> { it.rating }.thenBy { it.searchKey })
+            else -> list
+        }
+        return groupVariants(sorted) { it.name }
     }
+
+    /** Avanzamento di un titolo raggruppato: il più avanti tra le sue versioni. */
+    fun progressOf(e: Entry<Movie>): Float = e.variants.maxOf { positions.progress(it.key) }
 
     fun toggleFavorite(ch: Channel) {
         favorites = if (ch.streamId in favorites) favorites - ch.streamId else favorites + ch.streamId
         settings.favorites = favorites
     }
 
-    fun selectLiveCategory(id: String) {
-        liveCategory = id
-        settings.lastCategoryId = id
-    }
 
     fun ensureShortEpg(ch: Channel) {
         val c = client ?: return
@@ -366,23 +480,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- Ricerca ----------
-    data class SearchResults(val channels: List<Channel>, val movies: List<Movie>, val series: List<Series>) {
+    data class SearchResults(val channels: List<Channel>, val movies: List<Entry<Movie>>, val series: List<Entry<Series>>) {
         val total get() = channels.size + movies.size + series.size
     }
 
+    var searchScope by mutableStateOf(SearchScope.All)
+
     fun setQuery(q: String) {
         searchQuery = q
-        if (q.isNotBlank()) { ensureMovies(); ensureSeries() }
+        if (q.isNotBlank() && searchScope != SearchScope.Channels) { ensureMovies(); ensureSeries() }
     }
 
-    fun search(q: String): SearchResults {
+    fun changeScope(s: SearchScope) {
+        searchScope = s
+        setQuery(searchQuery)
+    }
+
+    fun search(q: String, scope: SearchScope): SearchResults {
         val tokens = TextHelpers.normalize(q).split(' ').filter { it.isNotEmpty() }
         if (tokens.isEmpty()) return SearchResults(emptyList(), emptyList(), emptyList())
         fun ok(key: String) = tokens.all { key.contains(it) }
+        fun wants(s: SearchScope) = scope == SearchScope.All || scope == s
+        // Le copie dello stesso titolo diventano un solo risultato.
         return SearchResults(
-            live?.items?.filter { ok(it.searchKey) }?.take(60) ?: emptyList(),
-            movies?.items?.filter { ok(it.searchKey) }?.take(60) ?: emptyList(),
-            series?.items?.filter { ok(it.searchKey) }?.take(60) ?: emptyList(),
+            if (wants(SearchScope.Channels)) live?.items?.filter { ok(it.searchKey) }?.take(60) ?: emptyList() else emptyList(),
+            if (wants(SearchScope.Movies)) groupVariants(movies?.items?.filter { ok(it.searchKey) } ?: emptyList()) { it.name }.take(60) else emptyList(),
+            if (wants(SearchScope.Series)) groupVariants(series?.items?.filter { ok(it.searchKey) } ?: emptyList()) { it.name }.take(60) else emptyList(),
         )
     }
 
@@ -391,7 +514,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val id = settings.lastStreamId ?: return
         if (playing != null) return
         val ch = live?.items?.firstOrNull { it.streamId == id } ?: return
-        playChannel(ch, channelsFor(liveCategory).takeIf { l -> l.any { it.streamId == id } } ?: live!!.items)
+        val cat = settings.lastCategoryId ?: ALL_ID
+        playChannel(ch, channelsFor(cat).takeIf { l -> l.any { it.streamId == id } } ?: live!!.items)
     }
 
     fun playChannel(ch: Channel, playlist: List<Channel>) {

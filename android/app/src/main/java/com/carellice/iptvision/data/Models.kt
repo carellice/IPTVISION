@@ -132,4 +132,38 @@ object TextHelpers {
     }
 
     fun joinMeta(vararg parts: String?): String = parts.filter { !it.isNullOrBlank() }.joinToString("  ·  ")
+
+    // Sigle di qualità, codifica e lingua che i pannelli aggiungono al titolo ("Film (2020) FHD", "Film 4K HDR").
+    private val qualityTags = setOf(
+        "4k", "uhd", "2160p", "fhd", "1080p", "1080i", "hd", "720p", "sd", "576p", "480p",
+        "hdr", "hdr10", "dv", "hevc", "h265", "x265", "h264", "x264", "10bit",
+        "3d", "ita", "eng", "subita", "multisub", "bluray", "bdrip", "webdl", "webrip", "dvdrip",
+    )
+    private val langPrefix = Regex("""^\s*[\[(|]?\s*[A-Z]{2,3}\s*[\])|:\-]\s*""")
+
+    /**
+     * Chiave per riconoscere lo stesso titolo pubblicato più volte: nome senza sigle di qualità,
+     * senza prefisso di lingua ("IT | ") e senza accenti o punteggiatura.
+     */
+    fun variantKey(name: String): String {
+        val words = normalize(langPrefix.replace(name, "")).split(' ').filter { it.isNotEmpty() && it !in qualityTags }
+        return if (words.isEmpty()) normalize(name) else words.joinToString(" ")
+    }
+
+    /** Le sigle di qualità presenti nel titolo, per distinguere le versioni ("4K HDR", "FHD"). */
+    fun qualityOf(name: String): String? =
+        normalize(name).split(' ').filter { it in qualityTags }.distinct().joinToString(" ") { it.uppercase() }.ifEmpty { null }
+}
+
+/** Un titolo nelle liste: se è pubblicato più volte (per esempio in FHD e in 4K) raccoglie tutte le versioni. */
+data class Entry<T>(val item: T, val variants: List<T>) {
+    val hasVariants get() = variants.size > 1
+    val variantsText get() = "${variants.size} versioni"
+}
+
+/** Raggruppa le copie dello stesso titolo; resta il primo nell'ordine della lista. */
+fun <T> groupVariants(items: List<T>, name: (T) -> String): List<Entry<T>> {
+    val groups = LinkedHashMap<String, MutableList<T>>()
+    for (it in items) groups.getOrPut(TextHelpers.variantKey(name(it))) { ArrayList(1) } += it
+    return groups.values.map { Entry(it[0], it) }
 }

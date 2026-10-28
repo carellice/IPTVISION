@@ -17,6 +17,38 @@
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
 
+    <Window.Resources>
+        <DataTemplate x:Key="VariantItemTemplate" DataType="{x:Type m:ArtworkItem}">
+            <Grid Height="76" Margin="6,0" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="44" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Width="44" Height="62" CornerRadius="6" Background="#1C1F27" ClipToBounds="True">
+                    <Grid>
+                        <TextBlock Text="{Binding Initials}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding HasArt, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                        <Image Source="{Binding Art}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Grid>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Background="{StaticResource AccentSoftBrush}" CornerRadius="4" Padding="6,1" Margin="0,0,8,0"
+                                Visibility="{Binding Quality, Converter={StaticResource NullToVis}}">
+                            <TextBlock Text="{Binding Quality}" FontSize="11" FontWeight="Bold" Foreground="#9DBBFF" />
+                        </Border>
+                        <Border Background="{StaticResource SurfacePressedBrush}" CornerRadius="4" Padding="6,1"
+                                Visibility="{Binding HasProgress, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Iniziato" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding ItemName}" FontSize="13.5" FontWeight="SemiBold" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
+
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0,0,0,1"
                       CornerRadius="0" UseAeroCaptionButtons="False" />
@@ -199,12 +231,49 @@
                         </UniformGrid>
                     </Border>
 
+                    <!-- Ambito della ricerca: tutto oppure solo canali, film o serie -->
+                    <Border Grid.Row="1" Margin="14,0,14,8" Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="2"
+                            Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}}">
+                        <UniformGrid Columns="4">
+                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="scope" IsChecked="{Binding IsScopeAll}" Content="Tutto" />
+                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="scope" IsChecked="{Binding IsScopeChannels}" Content="Canali" />
+                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="scope" IsChecked="{Binding IsScopeMovies}" Content="Film" />
+                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="scope" IsChecked="{Binding IsScopeSeries}" Content="Serie" />
+                        </UniformGrid>
+                    </Border>
+
                     <!-- Intestazione della categoria aperta -->
                     <Grid Grid.Row="2" Margin="8,0,14,4" Visibility="{Binding ShowCategoryHeader, Converter={StaticResource BoolToVis}}">
-                        <Button Style="{StaticResource IconButton}" Content="&#xE72B;" FontSize="13" HorizontalAlignment="Left"
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Style="{StaticResource IconButton}" Content="&#xE72B;" FontSize="13"
                                 Command="{Binding CloseCategoryCommand}" ToolTip="Torna alle categorie (Esc)" />
-                        <TextBlock Text="{Binding SelectedCategory.Name}" FontFamily="{StaticResource DisplayFont}" FontSize="16" FontWeight="SemiBold"
-                                   Margin="42,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding SelectedCategory.Name}" FontFamily="{StaticResource DisplayFont}" FontSize="16" FontWeight="SemiBold"
+                                   Margin="6,0,6,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <Button x:Name="SortButton" Grid.Column="2" Style="{StaticResource IconButton}" Width="Auto" Click="Sort_Click"
+                                ToolTip="Ordina">
+                            <StackPanel Orientation="Horizontal" Margin="8,0">
+                                <TextBlock Text="&#xE8CB;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding SelectedSort.Label}" FontFamily="{StaticResource UiFont}" FontSize="12" Margin="6,0,0,0"
+                                           VerticalAlignment="Center" MaxWidth="110" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Button>
+                        <Border Grid.Column="3" Background="{StaticResource SurfaceBrush}" CornerRadius="9" Margin="4,0,0,0" Padding="1">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Style="{StaticResource SegmentButton}" GroupName="view" Width="32" ToolTip="Elenco"
+                                             IsChecked="{Binding IsGridView, Converter={StaticResource InvertBool}}">
+                                    <TextBlock Text="&#xE8FD;" FontFamily="{StaticResource IconFont}" FontSize="12" />
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource SegmentButton}" GroupName="view" Width="32" ToolTip="Griglia"
+                                             IsChecked="{Binding IsGridView}">
+                                    <TextBlock Text="&#xF0E2;" FontFamily="{StaticResource IconFont}" FontSize="12" />
+                                </RadioButton>
+                            </StackPanel>
+                        </Border>
                     </Grid>
 
                     <!-- Elenco categorie (si sceglie prima la categoria) -->
@@ -244,7 +313,7 @@
                     </ListBox>
 
                     <!-- Risultati della ricerca unica -->
-                    <ListBox x:Name="SearchList" Grid.Row="1" Grid.RowSpan="3" ItemsSource="{Binding SearchResults}" Style="{StaticResource LibraryList}"
+                    <ListBox x:Name="SearchList" Grid.Row="2" Grid.RowSpan="2" ItemsSource="{Binding SearchResults}" Style="{StaticResource LibraryList}"
                              Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}}"
                              PreviewMouseLeftButtonUp="ChannelList_PreviewMouseLeftButtonUp" KeyDown="ChannelList_KeyDown">
                         <ListBox.Resources>
@@ -410,6 +479,10 @@
                                                    TextTrimming="CharacterEllipsis" MaxHeight="38" />
                                         <TextBlock Text="{Binding Meta}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"
                                                    Visibility="{Binding Meta, Converter={StaticResource NullToVis}}" />
+                                        <Border Background="{StaticResource SurfacePressedBrush}" CornerRadius="4" Padding="6,1" Margin="0,6,0,0"
+                                                HorizontalAlignment="Left" Visibility="{Binding HasVariants, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding VariantsText}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </Border>
                                         <Grid x:Name="Track" Height="3" Width="120" HorizontalAlignment="Left" Margin="0,7,0,0" Background="#262A34"
                                               Visibility="{Binding HasProgress, Converter={StaticResource BoolToVis}}">
                                             <Border HorizontalAlignment="Left" Background="{StaticResource BrandBrush}">
@@ -458,14 +531,130 @@
                                         <TextBlock Text="{Binding Meta}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"
                                                    TextTrimming="CharacterEllipsis"
                                                    Visibility="{Binding Meta, Converter={StaticResource NullToVis}}" />
-                                        <Border Background="{StaticResource AccentSoftBrush}" CornerRadius="4" Padding="6,1" Margin="0,6,0,0"
-                                                HorizontalAlignment="Left" Visibility="{Binding HasProgress, Converter={StaticResource BoolToVis}}">
-                                            <TextBlock Text="In corso" FontSize="10.5" FontWeight="SemiBold" Foreground="#9DBBFF" />
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Background="{StaticResource AccentSoftBrush}" CornerRadius="4" Padding="6,1" Margin="0,6,6,0"
+                                                    HorizontalAlignment="Left" Visibility="{Binding HasProgress, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="In corso" FontSize="10.5" FontWeight="SemiBold" Foreground="#9DBBFF" />
+                                            </Border>
+                                            <Border Background="{StaticResource SurfacePressedBrush}" CornerRadius="4" Padding="6,1" Margin="0,6,0,0"
+                                                    HorizontalAlignment="Left" Visibility="{Binding HasVariants, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="{Binding VariantsText}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </Border>
+                                        </StackPanel>
                                     </StackPanel>
                                     <TextBlock Grid.Column="2" Text="&#xE76C;" Style="{StaticResource Icon}" FontSize="11"
                                                Foreground="{StaticResource TextTertiaryBrush}" />
                                 </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Vista a griglia: righe virtualizzate di riquadri -->
+                    <ListBox x:Name="GridList" Grid.Row="3" ItemsSource="{Binding GridRows}" Style="{StaticResource LibraryList}"
+                             Visibility="{Binding ShowGridList, Converter={StaticResource BoolToVis}}" Padding="6,2,6,8"
+                             PreviewMouseLeftButtonUp="GridList_PreviewMouseLeftButtonUp" GotKeyboardFocus="GridList_GotKeyboardFocus">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Focusable" Value="False" />
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter />
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:GridRow}">
+                                <ItemsControl ItemsSource="{Binding Items}" Focusable="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1" Columns="{Binding Columns}" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.Resources>
+                                        <Style x:Key="Tile" TargetType="Border">
+                                            <Setter Property="Tag" Value="tile" />
+                                            <Setter Property="Margin" Value="3" />
+                                            <Setter Property="CornerRadius" Value="10" />
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderBrush" Value="Transparent" />
+                                            <Setter Property="BorderThickness" Value="2" />
+                                            <Setter Property="Cursor" Value="Hand" />
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+                                                </Trigger>
+                                                <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsGridSelected}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="White" />
+                                                    <Setter Property="Background" Value="{StaticResource SurfaceHoverBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                        <DataTemplate DataType="{x:Type m:Channel}">
+                                            <Border Style="{StaticResource Tile}" Height="96">
+                                                <Grid Margin="6">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <Border Background="#1C1F27" CornerRadius="8">
+                                                        <Grid>
+                                                            <TextBlock Text="{Binding Initials}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       Visibility="{Binding HasLogo, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                                                            <Image Source="{Binding Logo}" Stretch="Uniform" Margin="6" RenderOptions.BitmapScalingMode="HighQuality" />
+                                                            <TextBlock Text="&#xE735;" FontFamily="{StaticResource IconFont}" FontSize="10" Foreground="{StaticResource StarBrush}"
+                                                                       HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,5,0"
+                                                                       Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVis}}" />
+                                                        </Grid>
+                                                    </Border>
+                                                    <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="11.5" FontWeight="SemiBold" Margin="2,5,2,0"
+                                                               TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                        <DataTemplate DataType="{x:Type m:ArtworkItem}">
+                                            <Border Style="{StaticResource Tile}">
+                                                <StackPanel Margin="5">
+                                                    <Grid Height="146">
+                                                        <Border Background="#1C1F27" CornerRadius="7" ClipToBounds="True">
+                                                            <Grid>
+                                                                <TextBlock Text="{Binding Initials}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"
+                                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                           Visibility="{Binding HasArt, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                                                                <Image Source="{Binding Art}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                                            </Grid>
+                                                        </Border>
+                                                        <Border Background="#D0111318" CornerRadius="4" Padding="5,1" Margin="5" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                                Visibility="{Binding HasVariants, Converter={StaticResource BoolToVis}}">
+                                                            <TextBlock Text="{Binding VariantsText}" FontSize="10" FontWeight="SemiBold" Foreground="White" />
+                                                        </Border>
+                                                        <Grid x:Name="Track" Height="3" VerticalAlignment="Bottom" Margin="6,0,6,6" Background="#80262A34"
+                                                              Visibility="{Binding HasProgress, Converter={StaticResource BoolToVis}}">
+                                                            <Border HorizontalAlignment="Left" Background="{StaticResource BrandBrush}">
+                                                                <Border.Width>
+                                                                    <MultiBinding Converter="{StaticResource ProgressWidth}">
+                                                                        <Binding Path="Progress" />
+                                                                        <Binding ElementName="Track" Path="ActualWidth" />
+                                                                    </MultiBinding>
+                                                                </Border.Width>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding ItemName}" FontSize="11.5" FontWeight="SemiBold" Margin="1,5,1,0"
+                                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Height="30" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.Resources>
+                                </ItemsControl>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -597,6 +786,30 @@
                         <TextBlock Grid.Row="3" Text="{Binding SeriesError}" Foreground="{StaticResource TextSecondaryBrush}" Margin="30,0"
                                    TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center"
                                    Visibility="{Binding SeriesError, Converter={StaticResource NullToVis}}" />
+                    </Grid>
+
+                    <!-- Scelta della versione (titolo pubblicato più volte) -->
+                    <Grid Grid.Row="0" Grid.RowSpan="5" Background="{StaticResource PanelBrush}" Panel.ZIndex="10"
+                          Visibility="{Binding ShowVariantPanel, Converter={StaticResource BoolToVis}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid Margin="8,8,14,8">
+                            <Button Style="{StaticResource IconButton}" Content="&#xE72B;" FontSize="13" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Command="{Binding CloseVariantsCommand}" ToolTip="Annulla (Esc)" />
+                            <StackPanel Margin="44,4,0,0">
+                                <TextBlock Text="Scegli la versione" FontFamily="{StaticResource DisplayFont}" FontSize="17" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding VariantOwner.ItemName}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5"
+                                           Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Grid>
+                        <ListBox x:Name="VariantPanelList" Grid.Row="1" ItemsSource="{Binding VariantChoices}" Style="{StaticResource LibraryList}"
+                                 ItemTemplate="{StaticResource VariantItemTemplate}"
+                                 PreviewMouseLeftButtonUp="VariantList_PreviewMouseLeftButtonUp" />
+                        <TextBlock Grid.Row="2" Text="Invio per guardare  ·  Esc per annullare" Foreground="{StaticResource TextTertiaryBrush}"
+                                   FontSize="12" Margin="16,8,16,12" />
                     </Grid>
 
                     <!-- Stati vuoti / caricamento -->
@@ -1266,6 +1479,10 @@
                                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                                Visibility="{Binding HasArt, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
                                     <Image Source="{Binding Art}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <Border Background="#D0111318" CornerRadius="6" Padding="9,3" Margin="10" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Visibility="{Binding HasVariants, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding VariantsText}" FontSize="13" FontWeight="SemiBold" Foreground="White" />
+                                    </Border>
                                     <Grid x:Name="Track" Height="5" VerticalAlignment="Bottom" Background="#80000000"
                                           Visibility="{Binding HasProgress, Converter={StaticResource BoolToVis}}">
                                         <Border HorizontalAlignment="Left" Background="{StaticResource BrandBrush}">
@@ -1301,6 +1518,10 @@
                                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                                Visibility="{Binding HasArt, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
                                     <Image Source="{Binding Art}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <Border Background="#D0111318" CornerRadius="6" Padding="9,3" Margin="10" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Visibility="{Binding HasVariants, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding VariantsText}" FontSize="13" FontWeight="SemiBold" Foreground="White" />
+                                    </Border>
                                     <Border Background="{StaticResource AccentBrush}" CornerRadius="6" Padding="8,3" Margin="10"
                                             HorizontalAlignment="Left" VerticalAlignment="Bottom"
                                             Visibility="{Binding HasProgress, Converter={StaticResource BoolToVis}}">
@@ -1578,6 +1799,37 @@
                     <Border Style="{StaticResource Key}"><TextBlock Text="Menu · Start" /></Border>
                     <TextBlock Text="Torna alla visione" VerticalAlignment="Center" />
                 </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ======================= Scelta della versione ======================= -->
+        <Grid x:Name="VariantLayer" Grid.RowSpan="2" Panel.ZIndex="100" Background="#B8000000"
+              Visibility="{Binding ShowVariantOverlay, Converter={StaticResource BoolToVis}}"
+              MouseLeftButtonUp="VariantLayer_MouseLeftButtonUp">
+            <!-- Da lontano serve più grande: la scelta a schermo intero c'è solo in modalità TV. -->
+            <Border Width="540" MaxHeight="600" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="22,20"
+                    Background="{StaticResource PanelBrush}" CornerRadius="16" BorderBrush="{StaticResource StrokeStrongBrush}" BorderThickness="1">
+                <Border.LayoutTransform>
+                    <ScaleTransform ScaleX="1.4" ScaleY="1.4" />
+                </Border.LayoutTransform>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Scegli la versione" FontFamily="{StaticResource DisplayFont}" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Grid.Row="1" Text="{Binding VariantOwner.ItemName}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                               Margin="0,4,0,12" TextTrimming="CharacterEllipsis" />
+                    <ListBox x:Name="VariantList" Grid.Row="2" ItemsSource="{Binding VariantChoices}" Style="{StaticResource LibraryList}"
+                             ItemTemplate="{StaticResource VariantItemTemplate}"
+                             PreviewMouseLeftButtonUp="VariantList_PreviewMouseLeftButtonUp">
+
+                    </ListBox>
+                    <TextBlock Grid.Row="3" Text="Invio o A per guardare  ·  Esc o B per annullare" Foreground="{StaticResource TextTertiaryBrush}"
+                               FontSize="12" Margin="0,12,0,0" />
+                </Grid>
             </Border>
         </Grid>
     </Grid>

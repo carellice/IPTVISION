@@ -144,15 +144,21 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    public string SearchPlaceholder => "Cerca canali, film e serie   (Ctrl+F)";
+    public string SearchPlaceholder => SearchScope switch
+    {
+        SearchScope.Channels => "Cerca canali   (Ctrl+F)",
+        SearchScope.Movies => "Cerca film   (Ctrl+F)",
+        SearchScope.Series => "Cerca serie   (Ctrl+F)",
+        _ => "Cerca canali, film e serie   (Ctrl+F)",
+    };
 
     // Cosa mostra il pannello: elenco categorie, contenuti della categoria o risultati di ricerca.
     public bool IsSearchActive => !string.IsNullOrWhiteSpace(SearchText);
     public bool IsCategoryOpen => SelectedCategory != null;
     public bool ShowCategoryList => !IsSearchActive && !IsCategoryOpen;
-    public bool ShowChannelList => !IsSearchActive && IsCategoryOpen && Mode == LibraryMode.Live;
-    public bool ShowMovieList => !IsSearchActive && IsCategoryOpen && Mode == LibraryMode.Movies;
-    public bool ShowSeriesList => !IsSearchActive && IsCategoryOpen && Mode == LibraryMode.Series;
+    public bool ShowChannelList => !IsSearchActive && IsCategoryOpen && !IsGridView && Mode == LibraryMode.Live;
+    public bool ShowMovieList => !IsSearchActive && IsCategoryOpen && !IsGridView && Mode == LibraryMode.Movies;
+    public bool ShowSeriesList => !IsSearchActive && IsCategoryOpen && !IsGridView && Mode == LibraryMode.Series;
     public bool ShowCategoryHeader => !IsSearchActive && IsCategoryOpen;
 
     private void UpdateViewFlags()
@@ -164,6 +170,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowMovieList));
         OnPropertyChanged(nameof(ShowSeriesList));
         OnPropertyChanged(nameof(ShowCategoryHeader));
+        OnPropertyChanged(nameof(ShowGridList));
         NotifyCounts();
     }
 
@@ -173,6 +180,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         LoginServer = _settings.Server ?? "";
         LoginUsername = _settings.Username ?? "";
+        LoadBrowsePrefs();
 
         var password = _settings.HasAccount ? SettingsService.Unprotect(_settings.ProtectedPassword) : null;
         if (password == null) { IsLoggedIn = false; return; }
@@ -375,6 +383,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsMoviesMode));
         OnPropertyChanged(nameof(IsSeriesMode));
         OnPropertyChanged(nameof(FooterInfo));
+        LoadBrowsePrefs();
         RebuildCategories();
         ApplyFilter();
         UpdateViewFlags();
@@ -497,18 +506,21 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         switch (Mode)
         {
             case LibraryMode.Movies:
-                VisibleMovies = cat == null ? [] : FilterLibrary(_movies, cat, m => m.CategoryId, m => m.HasProgress, m => _positions.GetUpdatedAt(m.Key));
+                VisibleMovies = cat == null ? []
+                    : GroupVariants(SortMovies(FilterLibrary(_movies, cat, m => m.CategoryId, m => m.HasProgress, m => _positions.GetUpdatedAt(m.Key))));
                 break;
             case LibraryMode.Series:
-                VisibleSeries = cat == null ? [] : FilterLibrary(_series, cat, s => s.CategoryId, s => s.HasProgress, s => _positions.GetLastEpisode(s.SeriesId)?.UpdatedAt);
+                VisibleSeries = cat == null ? []
+                    : GroupVariants(SortSeries(FilterLibrary(_series, cat, s => s.CategoryId, s => s.HasProgress, s => _positions.GetLastEpisode(s.SeriesId)?.UpdatedAt)));
                 break;
             default:
                 VisibleChannels = cat == null ? []
-                    : cat.IsFavorites ? _all.Where(c => c.IsFavorite).ToList()
-                    : cat.Id == CategoryItem.AllId ? _all
-                    : _all.Where(c => c.CategoryId == cat.Id).ToList();
+                    : SortChannels(cat.IsFavorites ? _all.Where(c => c.IsFavorite).ToList()
+                        : cat.Id == CategoryItem.AllId ? _all
+                        : _all.Where(c => c.CategoryId == cat.Id).ToList());
                 break;
         }
+        BuildGridRows();
     }
 
     private static List<T> FilterLibrary<T>(List<T> all, CategoryItem cat, Func<T, string?> catId,

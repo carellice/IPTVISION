@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.carellice.iptvision.AppViewModel
+import com.carellice.iptvision.SearchScope
+import com.carellice.iptvision.data.TextHelpers
 import com.carellice.iptvision.data.UpdateService
 
 // ---------- Ricerca unica: canali, film e serie insieme ----------
@@ -50,7 +52,8 @@ import com.carellice.iptvision.data.UpdateService
 @Composable
 fun SearchSection(vm: AppViewModel, onVoiceSearch: () -> Unit) {
     val q = vm.searchQuery
-    val results = remember(q, vm.live, vm.movies, vm.series) { vm.search(q) }
+    val scope = vm.searchScope
+    val results = remember(q, scope, vm.live, vm.movies, vm.series) { vm.search(q, scope) }
     Column(Modifier.fillMaxSize()) {
         SectionTitle("Cerca", if (q.isBlank()) "Canali, film e serie insieme" else "${results.total} risultati")
         VSpace(12.dp)
@@ -61,7 +64,17 @@ fun SearchSection(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = C.Text2) },
                 trailingIcon = if (q.isNotEmpty()) { { IconButton(onClick = { vm.setQuery("") }) { Icon(Icons.Default.Close, "Cancella", tint = C.Text2) } } } else null,
-                placeholder = { Text("Nome del canale, del film o della serie", color = C.Text3) },
+                placeholder = {
+                    Text(
+                        when (scope) {
+                            SearchScope.Channels -> "Nome del canale"
+                            SearchScope.Movies -> "Titolo del film"
+                            SearchScope.Series -> "Titolo della serie"
+                            SearchScope.All -> "Nome del canale, del film o della serie"
+                        },
+                        color = C.Text3,
+                    )
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = C.Accent, unfocusedBorderColor = C.StrokeStrong,
@@ -76,7 +89,12 @@ fun SearchSection(vm: AppViewModel, onVoiceSearch: () -> Unit) {
             ) { Icon(Icons.Default.Mic, "Ricerca vocale", tint = C.Accent) }
         }
         VSpace(10.dp)
-        if (vm.moviesLoading || vm.seriesLoading) Text("Carico anche film e serie…", color = C.Text3, fontSize = 12.sp)
+        // Dove cercare: tutto insieme oppure solo canali, film o serie.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SearchScope.entries.forEach { s -> Pill(s.label, s == scope) { vm.changeScope(s) } }
+        }
+        VSpace(8.dp)
+        if ((vm.moviesLoading || vm.seriesLoading) && scope != SearchScope.Channels) Text("Carico anche film e serie…", color = C.Text3, fontSize = 12.sp)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
             if (results.channels.isNotEmpty()) {
                 item { Header("Canali", results.channels.size) }
@@ -84,14 +102,16 @@ fun SearchSection(vm: AppViewModel, onVoiceSearch: () -> Unit) {
             }
             if (results.movies.isNotEmpty()) {
                 item { Header("Film", results.movies.size) }
-                items(results.movies, key = { "m${it.streamId}" }) { m ->
-                    Hit(m.name, m.meta, "Film", m.poster, m.initials) { vm.openMovie(m) }
+                items(results.movies, key = { "m${it.item.streamId}" }) { e ->
+                    val m = e.item
+                    Hit(m.name, if (e.hasVariants) TextHelpers.joinMeta(m.meta, e.variantsText) else m.meta, "Film", m.poster, m.initials) { vm.openMovieEntry(e) }
                 }
             }
             if (results.series.isNotEmpty()) {
                 item { Header("Serie TV", results.series.size) }
-                items(results.series, key = { "s${it.seriesId}" }) { s ->
-                    Hit(s.name, s.meta, "Serie", s.cover, s.initials) { vm.openSeries(s) }
+                items(results.series, key = { "s${it.item.seriesId}" }) { e ->
+                    val s = e.item
+                    Hit(s.name, if (e.hasVariants) TextHelpers.joinMeta(s.meta, e.variantsText) else s.meta, "Serie", s.cover, s.initials) { vm.openSeriesEntry(e) }
                 }
             }
             if (q.isNotBlank() && results.total == 0 && !vm.moviesLoading && !vm.seriesLoading) item { Empty("Nessun risultato per \"$q\".") }
