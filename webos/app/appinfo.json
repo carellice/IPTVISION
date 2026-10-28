@@ -1,0 +1,16 @@
+{
+  "id": "com.carellice.iptvision",
+  "version": "1.5.0",
+  "vendor": "carellice",
+  "type": "web",
+  "main": "index.html",
+  "title": "IPTVISION",
+  "icon": "img/icon.png",
+  "largeIcon": "img/largeIcon.png",
+  "splashBackground": "img/splash.png",
+  "bgColor": "#0A0B0F",
+  "iconColor": "#0F1830",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true,
+  "requiredACG": []
+}

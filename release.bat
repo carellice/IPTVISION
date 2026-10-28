@@ -1,8 +1,8 @@
 @echo off
-rem Pubblica una nuova versione di IPTVISION su GitHub: setup per Windows e APK per Android/Android TV.
+rem Pubblica una nuova versione di IPTVISION su GitHub: setup per Windows, APK per Android/Android TV, .ipk per TV LG.
 rem   release.bat                      versione patch (1.2.3 -> 1.2.4), note dai commit
 rem   release.bat minor                1.2.3 -> 1.3.0
-rem   release.bat major "Note..."      2.0.0 con note personalizzate
+rem   release.bat major "Note..."      2.0.0 con note personalizzate (\n per andare a capo)
 setlocal
 rem UTF-8: le note con lettere accentate arrivano intatte a PowerShell.
 chcp 65001 >nul

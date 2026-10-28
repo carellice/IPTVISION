@@ -1,0 +1,33 @@
+# Rinnova ogni giorno la modalità sviluppatore del TV LG su cui è installato IPTVISION.
+# Senza rinnovo la sessione scade e il TV rimuove le app installate a mano.
+# Serve il segreto LG_DEVMODE_TOKEN (vedi README, "TV LG (webOS)"): senza, il job non fa nulla.
+name: Rinnovo modalità sviluppatore LG
+
+on:
+  schedule:
+    - cron: '17 4 * * *'   # ogni giorno alle 4:17 UTC
+  workflow_dispatch:       # avvio a mano dalla scheda Actions
+
+permissions: {}
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Rinnova la sessione
+        env:
+          TOKEN: ${{ secrets.LG_DEVMODE_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::notice::Segreto LG_DEVMODE_TOKEN non impostato: niente da rinnovare."
+            exit 0
+          fi
+          body=$(curl -sS --max-time 30 --retry 3 --retry-delay 10 \
+            "https://developer.lge.com/secure/ResetDevModeSession.dev?sessionToken=${TOKEN}")
+          echo "Risposta LG: $body"
+          if ! echo "$body" | grep -Eq '"result" *: *"success"'; then
+            echo "::error::Rinnovo non riuscito. Se il TV è stato ripristinato o la modalità sviluppatore reinstallata, rileggi il codice (npm run devmode-token) e aggiorna il segreto."
+            exit 1
+          fi
+          echo "Sessione rinnovata."

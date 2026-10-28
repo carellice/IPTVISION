@@ -4,8 +4,9 @@
     2. compila l'app (self-contained, non serve installare .NET)
     3. crea il setup con Inno Setup
     4. compila l'APK Android (telefoni e Android TV), con la stessa versione
-    5. commit + tag vX.Y.Z + push
-    6. crea la release su GitHub e carica setup e APK
+    5. crea il pacchetto .ipk per i TV LG (webOS), con la stessa versione
+    6. commit + tag vX.Y.Z + push
+    7. crea la release su GitHub e carica setup, APK e .ipk
 
   Uso:  release.bat [patch|minor|major] ["note della versione"]
 #>
@@ -24,6 +25,9 @@ $InstallerDir = Join-Path $Root 'dist\installer'
 $Iss = Join-Path $Root 'installer\IPTVISION.iss'
 $AndroidDir = Join-Path $Root 'android'
 $KeystoreProps = Join-Path $AndroidDir 'keystore.properties'
+$WebosDir = Join-Path $Root 'webos'
+$WebosAppInfo = Join-Path $WebosDir 'app\appinfo.json'
+$WebosVersionJs = Join-Path $WebosDir 'app\js\version.js'
 $Utf8 = New-Object System.Text.UTF8Encoding($false)
 
 function Step($text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
@@ -88,7 +92,7 @@ Set-Location $Root
 
 # ---------- Controlli ----------
 Step 'Controllo strumenti'
-foreach ($tool in 'dotnet', 'git', 'gh') {
+foreach ($tool in 'dotnet', 'git', 'gh', 'npm') {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { Fail "$tool non trovato nel PATH" }
 }
 gh auth status *> $null
@@ -136,6 +140,12 @@ Write-Host "$old -> $version"
 $originalXml = $xml
 [IO.File]::WriteAllText($Csproj, $xml.Remove($match.Index, $match.Length).Insert($match.Index, "<Version>$version</Version>"), $Utf8)
 
+# webOS non legge il .csproj: la versione va scritta in appinfo.json e in version.js (mostrata nell'app).
+$originalAppInfo = [IO.File]::ReadAllText($WebosAppInfo)
+$originalVersionJs = [IO.File]::ReadAllText($WebosVersionJs)
+[IO.File]::WriteAllText($WebosAppInfo, ($originalAppInfo -replace '"version"\s*:\s*"[^"]*"', "`"version`": `"$version`""), $Utf8)
+[IO.File]::WriteAllText($WebosVersionJs, ($originalVersionJs -replace "IPTV\.VERSION = '[^']*'", "IPTV.VERSION = '$version'"), $Utf8)
+
 try {
     # ---------- Compilazione ----------
     Step 'Compilazione'
@@ -161,13 +171,34 @@ try {
     Copy-Item (Join-Path $AndroidDir 'app\build\outputs\apk\release\app-release.apk') $apk -Force -ErrorAction Stop
     $apkMb = '{0:N1}' -f ((Get-Item $apk).Length / 1MB)
     Write-Host "APK: $apk ($apkMb MB)"
+
+    # ---------- TV LG (webOS) ----------
+    Step 'Pacchetto per TV LG (webOS)'
+    Push-Location $WebosDir
+    try {
+        # Gli strumenti di LG (ares-package) stanno in webos/node_modules.
+        if (-not (Test-Path (Join-Path $WebosDir 'node_modules\.bin\ares-package.cmd'))) { Run 'npm' @('ci', '--no-fund', '--no-audit') }
+        $ipkTmp = Join-Path $env:TEMP "iptvision-ipk-$version"
+        if (Test-Path $ipkTmp) { Remove-Item $ipkTmp -Recurse -Force }
+        Run (Join-Path $WebosDir 'node_modules\.bin\ares-package.cmd') @('app', '-o', $ipkTmp)
+    }
+    finally { Pop-Location }
+    $ipk = Join-Path $InstallerDir "IPTVISION-$version.ipk"
+    Copy-Item (Get-ChildItem $ipkTmp -Filter '*.ipk' | Select-Object -First 1).FullName $ipk -Force -ErrorAction Stop
+    Remove-Item $ipkTmp -Recurse -Force -ErrorAction SilentlyContinue
+    $ipkKb = '{0:N0}' -f ((Get-Item $ipk).Length / 1KB)
+    Write-Host "IPK: $ipk ($ipkKb KB)"
 }
 catch {
     [IO.File]::WriteAllText($Csproj, $originalXml, $Utf8)
+    [IO.File]::WriteAllText($WebosAppInfo, $originalAppInfo, $Utf8)
+    [IO.File]::WriteAllText($WebosVersionJs, $originalVersionJs, $Utf8)
     Fail "$($_.Exception.Message)`nVersione riportata a $old."
 }
 
 # ---------- Note di rilascio ----------
+# Da release.bat gli a capo non passano: nelle note si scrive \n e qui diventa un a capo vero.
+$Notes = $Notes -replace '\\n', "`n"
 if (-not $Notes) {
     $lastTag = (git describe --tags --abbrev=0 2>$null)
     $range = if ($LASTEXITCODE -eq 0 -and $lastTag) { "$($lastTag.Trim())..HEAD" } else { 'HEAD' }
@@ -181,6 +212,7 @@ $Notes
 ---
 **Windows:** scarica ``IPTVISION-Setup-$version.exe`` e avvialo (non servono permessi di amministratore).
 **Android e Android TV:** scarica ``IPTVISION-$version.apk`` sul dispositivo e aprilo (consenti l'installazione da origini sconosciute).
+**TV LG (webOS):** installa ``IPTVISION-$version.ipk`` dal PC con la modalità sviluppatore attiva (guida nel README).
 Chi ha già IPTVISION riceve l'aggiornamento direttamente dall'app (Impostazioni → Aggiornamenti).
 "@
 [IO.File]::WriteAllText($notesFile, $body, $Utf8)
@@ -195,7 +227,7 @@ Run git @('push', 'origin', $tag)
 
 # ---------- Release GitHub ----------
 Step 'Pubblicazione release su GitHub'
-Run gh @('release', 'create', $tag, $setup, $apk, '--title', "IPTVISION $version", '--notes-file', $notesFile, '--latest')
+Run gh @('release', 'create', $tag, $setup, $apk, $ipk, '--title', "IPTVISION $version", '--notes-file', $notesFile, '--latest')
 Remove-Item $notesFile -ErrorAction SilentlyContinue
 
 $url = (gh release view $tag --json url -q .url)

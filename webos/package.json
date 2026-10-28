@@ -1,0 +1,17 @@
+{
+  "name": "iptvision-webos",
+  "private": true,
+  "description": "IPTVISION per TV LG con webOS: strumenti per creare e installare il pacchetto .ipk",
+  "scripts": {
+    "package": "ares-package app -o ../dist/installer",
+    "setup-tv": "ares-setup-device",
+    "install-tv": "ares-install --device tv",
+    "launch-tv": "ares-launch --device tv com.carellice.iptvision",
+    "devmode-token": "node tools/devmode.js token",
+    "devmode-renew": "node tools/devmode.js renew"
+  },
+  "devDependencies": {
+    "@webos-tools/cli": "3.2.6",
+    "mpegts.js": "1.8.2"
+  }
+}

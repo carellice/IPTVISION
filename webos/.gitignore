@@ -1,0 +1,4 @@
+node_modules/
+# Codice della sessione della modalità sviluppatore: è personale, non va nel repository.
+.devmode-token
+devmode-rinnovo.log
