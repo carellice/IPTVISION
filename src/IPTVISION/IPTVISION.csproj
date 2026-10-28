@@ -10,7 +10,7 @@
     <AssemblyName>IPTVISION</AssemblyName>
     <RootNamespace>IPTVISION</RootNamespace>
     <Product>IPTVISION</Product>
-    <Version>1.5.1</Version>
+    <Version>1.5.2</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\iptvision.ico</ApplicationIcon>
     <PlatformTarget>x64</PlatformTarget>
