@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.Icon
@@ -84,6 +85,7 @@ fun MovieDetailScreen(vm: AppViewModel, m: Movie) {
                     ActionButton(if (resume > 0) "Riprendi da ${TextHelpers.formatTime(resume)}" else "Guarda", Icons.Default.PlayArrow, primary = true,
                         modifier = Modifier.focusRequester(play)) { vm.playMovie(m) }
                     if (resume > 0) ActionButton("Dall'inizio", Icons.Default.Replay) { vm.playMovie(m, fromStart = true) }
+                    if (!vm.isTv) DownloadButton(vm, m.key) { vm.downloadMovie(m) }
                 }
                 VSpace(18.dp)
                 info?.plot?.let { Text(it, color = C.Text, fontSize = 15.sp, lineHeight = 22.sp) }
@@ -154,6 +156,12 @@ fun SeriesDetailScreen(vm: AppViewModel, s: Series) {
                         items(seasons) { n -> Pill("Stagione $n", n == season, onFocus = { if (vm.isTv) season = n }) { season = n } }
                     }
                 }
+                if (!vm.isTv) item {
+                    val missing = shown.filter { vm.downloads.get(it.key) == null }
+                    if (missing.isNotEmpty()) ActionButton("Scarica la stagione $season (${missing.size} episodi)", Icons.Default.Download, modifier = Modifier.padding(bottom = 6.dp)) {
+                        missing.forEach { vm.downloadEpisode(s, it) }
+                    }
+                }
                 items(shown, key = { it.id }) { ep -> EpisodeRow(vm, s, ep, episodes, ep.id == resumeEp?.id) }
             }
         }
@@ -181,5 +189,6 @@ private fun EpisodeRow(vm: AppViewModel, s: Series, ep: Episode, all: List<Episo
             Text(ep.displayTitle, color = C.Text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             ep.plot?.let { Text(it, color = C.Text2, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
         }
+        if (!vm.isTv) DownloadButton(vm, ep.key, compact = true) { vm.downloadEpisode(s, ep) }
     }
 }

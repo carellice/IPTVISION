@@ -295,7 +295,9 @@ public sealed partial class MainViewModel
     [RelayCommand]
     public void PlayMovie(Movie? m)
     {
-        if (m == null || _client == null) return;
+        // Scaricato: si guarda dal file, anche senza connessione.
+        var url = m == null ? null : DownloadService.LocalFile(m.Key) ?? _client?.GetMovieUrl(m.StreamId, m.Extension);
+        if (m == null || url == null) return;
         if (m == CurrentMovie && Player.IsActive)
         {
             MediaStarted?.Invoke(m);
@@ -306,7 +308,7 @@ public sealed partial class MainViewModel
         m.IsPlaying = true;
 
         var resume = _positions.GetResumeMs(m.Key);
-        Player.Play(_client.GetMovieUrl(m.StreamId, m.Extension), live: false, startMs: resume);
+        Player.Play(url, live: false, startMs: resume);
 
         NowPlayingTitle = m.Name;
         NowPlayingSubtitle = null;
@@ -339,7 +341,8 @@ public sealed partial class MainViewModel
     [RelayCommand]
     public void PlayEpisode(Episode? ep)
     {
-        if (ep == null || _client == null) return;
+        var url = ep == null ? null : DownloadService.LocalFile(ep.Key) ?? _client?.GetEpisodeUrl(ep.Id, ep.Extension);
+        if (ep == null || url == null) return;
         if (ep == CurrentEpisode && Player.IsActive)
         {
             MediaStarted?.Invoke(ep);
@@ -358,12 +361,12 @@ public sealed partial class MainViewModel
         }
 
         var resume = _positions.GetResumeMs(ep.Key);
-        Player.Play(_client.GetEpisodeUrl(ep.Id, ep.Extension), live: false, startMs: resume);
+        Player.Play(url, live: false, startMs: resume);
         _positions.SetLastEpisode(ep.SeriesId, ep.Id);
         _positions.Save();
 
         var info = _seriesInfo.GetValueOrDefault(ep.SeriesId);
-        NowPlayingTitle = series?.Name ?? "Serie TV";
+        NowPlayingTitle = series?.Name ?? DownloadedSeriesName(ep.SeriesId) ?? "Serie TV";
         NowPlayingSubtitle = string.IsNullOrWhiteSpace(ep.Title) ? ep.Label : $"{ep.Label} · {ep.Title}";
         NowPlayingMeta = TextHelpers.JoinMeta(info?.Year ?? series?.Data.Year, info?.Genre ?? series?.Data.Genre, ep.DurationText);
         NowPlayingPlot = ep.Plot ?? info?.Plot ?? series?.Data.Plot;
@@ -501,11 +504,12 @@ public sealed partial class MainViewModel
 
     private Episode? EpisodeOffset(Episode ep, int offset)
     {
-        if (!_seriesInfo.TryGetValue(ep.SeriesId, out var info)) return null;
-        var i = info.Episodes.IndexOf(ep);
-        if (i < 0) i = info.Episodes.FindIndex(e => e.Id == ep.Id);
+        // Senza i dati della serie (per esempio offline) valgono gli episodi scaricati.
+        var list = _seriesInfo.TryGetValue(ep.SeriesId, out var info) ? info.Episodes : DownloadedEpisodes(ep.SeriesId);
+        var i = list.IndexOf(ep);
+        if (i < 0) i = list.FindIndex(e => e.Id == ep.Id);
         var j = i + offset;
-        return i >= 0 && j >= 0 && j < info.Episodes.Count ? info.Episodes[j] : null;
+        return i >= 0 && j >= 0 && j < list.Count ? list[j] : null;
     }
 
     [RelayCommand]

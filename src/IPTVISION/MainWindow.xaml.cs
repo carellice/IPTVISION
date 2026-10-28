@@ -127,6 +127,9 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.IsSettingsOpen):
                 if (_vm.IsSettingsOpen && !_panelVisible) SetPanel(true, save: false);
                 break;
+            case nameof(MainViewModel.IsDownloadsOpen):
+                if (_vm.IsDownloadsOpen && !_panelVisible) SetPanel(true, save: false);
+                break;
         }
     }
 
@@ -534,6 +537,7 @@ public partial class MainWindow : Window
             case Key.Escape:
                 if (_fullscreen) ToggleFullscreen();
                 else if (_vm.IsSettingsOpen) _vm.IsSettingsOpen = false;
+                else if (_vm.IsDownloadsOpen) _vm.IsDownloadsOpen = false;
                 else if (_vm.NextEpisodeOffer != null) _vm.CancelNextEpisodeCommand.Execute(null);
                 else if (_vm.OpenSeries != null) _vm.CloseSeriesCommand.Execute(null);
                 else if (_vm.IsSearchActive) _vm.SearchText = "";
@@ -642,6 +646,7 @@ public partial class MainWindow : Window
             case Movie m: _vm.OpenMovie(m); break;
             case Series s: _vm.OpenSeriesItem(s); break;
             case Episode ep: _vm.PlayEpisode(ep); break;
+            case DownloadItem d: _vm.PlayDownload(d); break;
             case CategoryItem c: _vm.OpenCategoryCommand.Execute(c); break;
             case SearchHit h: _vm.ActivateSearchHit(h); break;
         }
@@ -868,6 +873,49 @@ public partial class MainWindow : Window
             Activate(item);
             e.Handled = true;
         }
+        else if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.None && sender is ListBox { SelectedItem: { } sel })
+        {
+            // D: scarica il film, la serie o l'episodio selezionato.
+            _vm.Download(sel is SearchHit h ? h.Item : sel);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Delete && sender == DownloadList && DownloadList.SelectedItem is DownloadItem d)
+        {
+            _vm.DeleteDownloadCommand.Execute(d);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Tasto destro su film, serie ed episodi (anche in griglia e nella ricerca): Scarica.</summary>
+    private void Library_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        e.Handled = true;
+        object? item = null;
+        var dep = e.OriginalSource as DependencyObject;
+        while (dep != null && dep != sender && item == null)
+        {
+            if (dep is FrameworkElement { DataContext: Movie or Series or Episode or SearchHit } fe) item = fe.DataContext;
+            dep = dep is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(dep) : LogicalTreeHelper.GetParent(dep);
+        }
+        if (item is SearchHit h) item = h.Item;
+        if (item is not (Movie or Series or Episode)) return;
+
+        var key = item switch { Movie m => m.Key, Episode ep => ep.Key, _ => null };
+        var existing = key != null ? _vm.DownloadService.Get(key) : null;
+        var menu = new ContextMenu { PlacementTarget = (UIElement)sender };
+        var mi = new MenuItem
+        {
+            Header = existing != null ? (existing.IsDone ? "Scaricato · mostra i download" : "Tra i download · mostra")
+                : item is Series ? "Scarica tutti gli episodi" : "Scarica per guardare offline",
+            InputGestureText = existing == null ? "D" : "",
+        };
+        mi.Click += (_, _) =>
+        {
+            if (existing == null) _vm.Download(item);
+            else _vm.IsDownloadsOpen = true;
+        };
+        menu.Items.Add(mi);
+        menu.IsOpen = true;
     }
 
     private void GridList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -998,6 +1046,7 @@ public partial class MainWindow : Window
         PanelColumn.Width = new GridLength(visible ? PanelWidth : 0);
         Panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         if (!visible && _vm.IsSettingsOpen) _vm.IsSettingsOpen = false;
+        if (!visible && _vm.IsDownloadsOpen) _vm.IsDownloadsOpen = false;
         if (save)
         {
             _vm.Settings.PanelVisible = visible;

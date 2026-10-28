@@ -40,6 +40,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Fine di un download anche ad app chiusa: parte il prossimo in coda. -->
+        <receiver android:name=".data.DownloadReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

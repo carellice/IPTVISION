@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:IPTVISION"
         xmlns:m="clr-namespace:IPTVISION.Models"
         xmlns:vm="clr-namespace:IPTVISION.ViewModels"
+        xmlns:svc="clr-namespace:IPTVISION.Services"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         Title="IPTVISION"
@@ -18,6 +19,8 @@
         SnapsToDevicePixels="True">
 
     <Window.Resources>
+        <!-- Segnaposto: il menu vero si costruisce in Library_ContextMenuOpening secondo l'elemento sotto il mouse. -->
+        <ContextMenu x:Key="EmptyMenu" />
         <DataTemplate x:Key="VariantItemTemplate" DataType="{x:Type m:ArtworkItem}">
             <Grid Height="76" Margin="6,0" Background="Transparent">
                 <Grid.ColumnDefinitions>
@@ -85,6 +88,15 @@
                     <Button x:Name="TogglePanelButton" Style="{StaticResource IconButton}" Width="34" Height="30" FontSize="14"
                             Content="&#xE8A0;" ToolTip="Mostra/nascondi lista canali (L)" Click="TogglePanel_Click"
                             WindowChrome.IsHitTestVisibleInChrome="True" />
+                    <Grid>
+                        <Button Style="{StaticResource IconButton}" Width="34" Height="30" FontSize="14" Content="&#xE896;"
+                                ToolTip="Download (film ed episodi offline)" Command="{Binding ToggleDownloadsCommand}"
+                                WindowChrome.IsHitTestVisibleInChrome="True" />
+                        <!-- Pallino: download in corso o in coda -->
+                        <Ellipse Width="7" Height="7" Fill="#3DDC97" IsHitTestVisible="False"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,7,0"
+                                 Visibility="{Binding HasActiveDownloads, Converter={StaticResource BoolToVis}}" />
+                    </Grid>
                     <Grid>
                         <Button Style="{StaticResource IconButton}" Width="34" Height="30" FontSize="14" Content="&#xE713;"
                                 ToolTip="Impostazioni" Command="{Binding ToggleSettingsCommand}"
@@ -313,7 +325,7 @@
                     </ListBox>
 
                     <!-- Risultati della ricerca unica -->
-                    <ListBox x:Name="SearchList" Grid.Row="2" Grid.RowSpan="2" ItemsSource="{Binding SearchResults}" Style="{StaticResource LibraryList}"
+                    <ListBox x:Name="SearchList" ContextMenuOpening="Library_ContextMenuOpening" ContextMenu="{StaticResource EmptyMenu}" Grid.Row="2" Grid.RowSpan="2" ItemsSource="{Binding SearchResults}" Style="{StaticResource LibraryList}"
                              Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}}"
                              PreviewMouseLeftButtonUp="ChannelList_PreviewMouseLeftButtonUp" KeyDown="ChannelList_KeyDown">
                         <ListBox.Resources>
@@ -451,7 +463,7 @@
                     </ListBox>
 
                     <!-- Lista film -->
-                    <ListBox x:Name="MovieList" Grid.Row="3" ItemsSource="{Binding VisibleMovies}"
+                    <ListBox x:Name="MovieList" ContextMenuOpening="Library_ContextMenuOpening" ContextMenu="{StaticResource EmptyMenu}" Grid.Row="3" ItemsSource="{Binding VisibleMovies}"
                              Visibility="{Binding ShowMovieList, Converter={StaticResource BoolToVis}}"
                              Style="{StaticResource LibraryList}"
                              PreviewMouseLeftButtonUp="ChannelList_PreviewMouseLeftButtonUp" KeyDown="ChannelList_KeyDown">
@@ -501,7 +513,7 @@
                     </ListBox>
 
                     <!-- Lista serie -->
-                    <ListBox x:Name="SeriesList" Grid.Row="3" ItemsSource="{Binding VisibleSeries}"
+                    <ListBox x:Name="SeriesList" ContextMenuOpening="Library_ContextMenuOpening" ContextMenu="{StaticResource EmptyMenu}" Grid.Row="3" ItemsSource="{Binding VisibleSeries}"
                              Visibility="{Binding ShowSeriesList, Converter={StaticResource BoolToVis}}"
                              Style="{StaticResource LibraryList}"
                              PreviewMouseLeftButtonUp="ChannelList_PreviewMouseLeftButtonUp" KeyDown="ChannelList_KeyDown">
@@ -550,7 +562,7 @@
                     </ListBox>
 
                     <!-- Vista a griglia: righe virtualizzate di riquadri -->
-                    <ListBox x:Name="GridList" Grid.Row="3" ItemsSource="{Binding GridRows}" Style="{StaticResource LibraryList}"
+                    <ListBox x:Name="GridList" ContextMenuOpening="Library_ContextMenuOpening" ContextMenu="{StaticResource EmptyMenu}" Grid.Row="3" ItemsSource="{Binding GridRows}" Style="{StaticResource LibraryList}"
                              Visibility="{Binding ShowGridList, Converter={StaticResource BoolToVis}}" Padding="6,2,6,8"
                              PreviewMouseLeftButtonUp="GridList_PreviewMouseLeftButtonUp" GotKeyboardFocus="GridList_GotKeyboardFocus">
                         <ListBox.ItemContainerStyle>
@@ -706,6 +718,14 @@
                                 <TextBlock Text="{Binding OpenSeriesMeta}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding OpenSeriesPlot}" FontSize="12" Foreground="#C2C8D2" TextWrapping="Wrap" Margin="0,6,0,0"
                                            MaxHeight="86" TextTrimming="WordEllipsis" ToolTip="{Binding OpenSeriesPlot}" />
+                                <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,8,0,0" Height="30" FontSize="12" Padding="10,0"
+                                        Command="{Binding DownloadSeasonCommand}" ToolTip="Scarica tutti gli episodi della stagione per guardarli offline"
+                                        Visibility="{Binding SelectedSeason, Converter={StaticResource NullToVis}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE896;" Style="{StaticResource Icon}" FontSize="12" VerticalAlignment="Center" />
+                                        <TextBlock Text="Scarica la stagione" Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
                         </Grid>
 
@@ -735,7 +755,7 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
 
-                        <ListBox x:Name="EpisodeList" Grid.Row="3" ItemsSource="{Binding VisibleEpisodes}" Style="{StaticResource LibraryList}"
+                        <ListBox x:Name="EpisodeList" ContextMenuOpening="Library_ContextMenuOpening" ContextMenu="{StaticResource EmptyMenu}" Grid.Row="3" ItemsSource="{Binding VisibleEpisodes}" Style="{StaticResource LibraryList}"
                                  PreviewMouseLeftButtonUp="ChannelList_PreviewMouseLeftButtonUp" KeyDown="ChannelList_KeyDown">
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="{x:Type m:Episode}">
@@ -1016,6 +1036,86 @@
                                     </TextBlock>
                                 </StackPanel>
                             </ScrollViewer>
+                        </Grid>
+                    </Border>
+
+                    <!-- ==== Download (sopra la lista) ==== -->
+                    <Border Grid.RowSpan="5" Background="{StaticResource PanelBrush}"
+                            Visibility="{Binding IsDownloadsOpen, Converter={StaticResource BoolToVis}}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid Margin="18,10,10,4">
+                                <TextBlock Text="Download" FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE838;" FontSize="13"
+                                            Command="{Binding OpenDownloadsFolderCommand}" ToolTip="Apri la cartella dei download" />
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE8BB;" FontSize="11"
+                                            Command="{Binding ToggleDownloadsCommand}" ToolTip="Chiudi (Esc)" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Grid.Row="1" Text="{Binding DownloadsSummary}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                                       Margin="20,0,18,10" TextWrapping="Wrap" />
+
+                            <ListBox x:Name="DownloadList" Grid.Row="2" ItemsSource="{Binding DownloadService.Items}" Style="{StaticResource LibraryList}"
+                                     PreviewMouseLeftButtonUp="ChannelList_PreviewMouseLeftButtonUp" KeyDown="ChannelList_KeyDown">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type svc:DownloadItem}">
+                                        <Grid Margin="8,8,4,8" Background="Transparent">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="36" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="Glyph" Text="&#xE8B2;" Style="{StaticResource Icon}" FontSize="17"
+                                                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,6,0">
+                                                <TextBlock Text="{Binding DisplayTitle}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Subtitle}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis"
+                                                           Margin="0,2,0,0" Visibility="{Binding Subtitle, Converter={StaticResource NullToVis}}" />
+                                                <Grid x:Name="Track" Height="3" Margin="0,6,0,0" Background="#262A34"
+                                                      Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
+                                                    <Border HorizontalAlignment="Left" Background="{StaticResource BrandBrush}">
+                                                        <Border.Width>
+                                                            <MultiBinding Converter="{StaticResource ProgressWidth}">
+                                                                <Binding Path="Progress" />
+                                                                <Binding ElementName="Track" Path="ActualWidth" />
+                                                            </MultiBinding>
+                                                        </Border.Width>
+                                                    </Border>
+                                                </Grid>
+                                                <TextBlock x:Name="Status" Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" Margin="0,4,0,0" />
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE74D;" FontSize="12" VerticalAlignment="Center"
+                                                    ToolTip="Elimina o annulla" Command="{Binding DataContext.DeleteDownloadCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}" />
+                                        </Grid>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                <Setter TargetName="Glyph" Property="Text" Value="&#xE768;" />
+                                                <Setter TargetName="Glyph" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                <Setter TargetName="Glyph" Property="Text" Value="&#xE896;" />
+                                                <Setter TargetName="Glyph" Property="Foreground" Value="#3DDC97" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                                                <Setter TargetName="Glyph" Property="Text" Value="&#xE783;" />
+                                                <Setter TargetName="Glyph" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                                <Setter TargetName="Status" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Grid.Row="2" Margin="30,0" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Visibility="{Binding HasDownloads, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"
+                                       Text="Nessun download. Clic destro su un film, una serie o un episodio (oppure tasto D) e scegli Scarica: potrai guardarlo anche senza connessione." />
                         </Grid>
                     </Border>
                 </Grid>

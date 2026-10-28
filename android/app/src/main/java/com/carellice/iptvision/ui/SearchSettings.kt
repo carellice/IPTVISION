@@ -163,6 +163,14 @@ fun SettingsSection(vm: AppViewModel) {
             vm.refreshUi()
         }
 
+        if (!vm.isTv) {
+            Group("Download")
+            Toggle("Scarica solo con il Wi-Fi", "Film ed episodi pesano parecchio: con la rete mobile i download aspettano il Wi-Fi.", vm.downloads.wifiOnly) {
+                vm.downloads.wifiOnly = it
+                vm.refreshUi()
+            }
+        }
+
         Group("Dati")
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(vertical = 6.dp)) {
             ActionButton("Aggiorna liste e guida", Icons.Default.Refresh) { vm.refreshAll() }

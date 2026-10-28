@@ -5,6 +5,7 @@ import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -14,6 +15,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.carellice.iptvision.data.Category
 import com.carellice.iptvision.data.Channel
+import com.carellice.iptvision.data.Downloads
 import com.carellice.iptvision.data.EpgService
 import com.carellice.iptvision.data.Entry
 import com.carellice.iptvision.data.groupVariants
@@ -41,7 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-enum class Section(val title: String) { Live("TV in diretta"), Movies("Film"), Series("Serie TV"), Search("Cerca"), Settings("Impostazioni") }
+enum class Section(val title: String) { Live("TV in diretta"), Movies("Film"), Series("Serie TV"), Search("Cerca"), Downloads("Download"), Settings("Impostazioni") }
 
 enum class ListSort(val label: String) {
     Default("Predefinito"), Number("Numero"), NameAsc("Nome (A-Z)"), NameDesc("Nome (Z-A)"),
@@ -101,6 +103,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val positions = PositionStore(File(app.filesDir, "positions.json"))
     val epg = EpgService(cacheDir)
     val player = PlayerController(app)
+    val downloads = Downloads.get(app)
+
+    /** Sezioni del menu: i download ci sono solo su telefoni e tablet. */
+    val sections: List<Section> get() = Section.entries.filter { it != Section.Downloads || !isTv }
 
     var client: XtreamClient? = null; private set
 
@@ -110,6 +116,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var section by mutableStateOf(Section.Live)
 
     fun push(s: Screen) { stack.add(s) }
+
+    /** Chiude le schermate di dettaglio e torna all'elenco principale. */
+    fun backToHome() { while (stack.size > 1 && stack.last() != Screen.Player) stack.removeAt(stack.lastIndex) }
 
     /** Restituisce false se non c'è niente da chiudere (l'activity può uscire). */
     fun back(): Boolean {
@@ -240,6 +249,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 delay(30_000)
                 epgVersion++
                 savePosition()
+            }
+        }
+        viewModelScope.launch {
+            // Avanzamento dei download mentre l'app è aperta (ad app chiusa ci pensa DownloadReceiver).
+            downloads.refresh()
+            while (isActive) {
+                delay(1000)
+                if (downloads.items.any { it.state == Downloads.State.Running }) downloads.refresh()
             }
         }
     }
@@ -405,9 +422,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 Log.w("Aggiornamento $kind fallito, uso la cache", e)
             }
         }
-        return withContext(Dispatchers.Default) {
-            val cats = file("${kind}_cats", key).takeIf { it.exists() }?.let(XtreamClient::parseCategories) ?: emptyList()
-            library(cats, parse(f), catOf)
+        return try {
+            withContext(Dispatchers.Default) {
+                val cats = file("${kind}_cats", key).takeIf { it.exists() }?.let(XtreamClient::parseCategories) ?: emptyList()
+                library(cats, parse(f), catOf)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Copia salvata illeggibile (download interrotto a metà): senza questo restava "recente" per 12 ore
+            // e la sezione non si caricava più. Si cancella e si riscarica una volta.
+            if (!fresh) throw e
+            Log.w("Cache $kind illeggibile, la riscarico", e)
+            f.delete()
+            loadOrDownload(c, kind, catAction, action, parse, catOf)
         }
     }
 
@@ -553,12 +581,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Il file scaricato se c'è, altrimenti il flusso dal server. */
+    private fun localUrl(key: String): String? = downloads.localFile(key)?.let { Uri.fromFile(it).toString() }
+
     fun playMovie(m: Movie, fromStart: Boolean = false) {
-        val c = client ?: return
+        val url = localUrl(m.key) ?: client?.movieUrl(m.streamId, m.ext) ?: return
         savePosition()
         cancelCountdown()
         playing = Playing.Film(m)
-        player.play(c.movieUrl(m.streamId, m.ext), live = false, resumeMs = if (fromStart) 0 else positions.resumeMs(m.key))
+        player.play(url, live = false, resumeMs = if (fromStart) 0 else positions.resumeMs(m.key))
         if (screen != Screen.Player) push(Screen.Player)
     }
 
@@ -586,12 +617,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun playEpisode(s: Series, ep: Episode, episodes: List<Episode>, fromStart: Boolean = false) {
-        val c = client ?: return
+        val url = localUrl(ep.key) ?: client?.episodeUrl(ep.id, ep.extension) ?: return
         savePosition()
         cancelCountdown()
         playing = Playing.Ep(s, ep, episodes)
         positions.setLastEpisode(s.seriesId, ep.id)
-        player.play(c.episodeUrl(ep.id, ep.extension), live = false, resumeMs = if (fromStart) 0 else positions.resumeMs(ep.key))
+        player.play(url, live = false, resumeMs = if (fromStart) 0 else positions.resumeMs(ep.key))
         if (screen != Screen.Player) push(Screen.Player)
     }
 
@@ -657,6 +688,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onStop() {
         savePosition(force = true)
+    }
+
+    // ---------- Download ----------
+    fun downloadMovie(m: Movie) {
+        val c = client ?: return
+        downloads.add(Downloads.Item(
+            key = m.key, title = m.name, image = m.poster, url = c.movieUrl(m.streamId, m.ext),
+            fileName = Downloads.fileNameFor(m.name, m.key, m.ext), movieId = m.streamId, extension = m.ext,
+        ))
+    }
+
+    fun downloadEpisode(s: Series, ep: Episode) {
+        val c = client ?: return
+        downloads.add(Downloads.Item(
+            key = ep.key, title = "${s.name} · ${ep.label}", image = ep.image ?: s.cover, url = c.episodeUrl(ep.id, ep.extension),
+            fileName = Downloads.fileNameFor("${s.name} ${ep.label}", ep.key, ep.extension),
+            episodeId = ep.id, seriesId = s.seriesId, seriesName = s.name, seriesCover = s.cover,
+            season = ep.season, number = ep.number, episodeTitle = ep.displayTitle, extension = ep.extension,
+        ))
+    }
+
+    /** Apre un contenuto scaricato; funziona anche senza connessione. */
+    fun playDownload(d: Downloads.Item) {
+        if (d.state != Downloads.State.Done) return
+        if (!d.isEpisode) {
+            playMovie(Movie(d.movieId ?: 0, d.title, d.image, null, d.extension, null, 0.0, 0))
+            return
+        }
+        val s = Series(d.seriesId ?: 0, d.seriesName ?: d.title, d.seriesCover, null, null, 0.0, null, null)
+        // Episodio successivo e precedente: quelli della stessa serie già scaricati.
+        val eps = downloads.items.filter { it.isEpisode && it.seriesId == d.seriesId && it.state == Downloads.State.Done }
+            .sortedWith(compareBy({ it.season }, { it.number }))
+            .map { Episode(it.episodeId!!, s.seriesId, it.season, it.number, it.episodeTitle ?: "", it.extension, 0, null, it.image) }
+        val ep = eps.firstOrNull { it.id == d.episodeId } ?: return
+        playEpisode(s, ep, eps)
     }
 
     // ---------- Aggiornamenti ----------

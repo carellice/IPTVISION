@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -78,6 +79,7 @@ private fun Section.icon(): ImageVector = when (this) {
     Section.Movies -> Icons.Default.Movie
     Section.Series -> Icons.Default.ViewModule
     Section.Search -> Icons.Default.Search
+    Section.Downloads -> Icons.Default.Download
     Section.Settings -> Icons.Default.Settings
 }
 
@@ -104,7 +106,7 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                 Column(Modifier.fillMaxSize().statusBarsPadding()) {
                     Column(Modifier.weight(1f).padding(horizontal = 14.dp).padding(top = 12.dp)) { Content(vm, onVoiceSearch) }
                     NavigationBar(containerColor = C.Panel) {
-                        Section.entries.forEach { s ->
+                        vm.sections.forEach { s ->
                             NavigationBarItem(
                                 selected = vm.section == s,
                                 onClick = { vm.section = s },
@@ -131,6 +133,7 @@ private fun Content(vm: AppViewModel, onVoiceSearch: () -> Unit) {
         Section.Movies -> MoviesSection(vm)
         Section.Series -> SeriesSection(vm)
         Section.Search -> SearchSection(vm, onVoiceSearch)
+        Section.Downloads -> DownloadsSection(vm)
         Section.Settings -> SettingsSection(vm)
     }
 }
@@ -148,7 +151,7 @@ private fun SideNav(vm: AppViewModel) {
             HSpace(10.dp)
             Text("IPTVISION", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 19.sp)
         }
-        Section.entries.forEach { s ->
+        vm.sections.forEach { s ->
             val selected = vm.section == s
             Row(
                 Modifier.fillMaxWidth()

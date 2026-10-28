@@ -48,6 +48,13 @@ Molti guardano i canali del digitale terrestre in streaming perché non hanno l'
 - Per le serie: stagioni ed episodi, con quelli già visti segnati. Alla fine di un episodio parte il successivo dopo 10 secondi, e puoi annullarlo.
 - Se lo stesso titolo è pubblicato più volte (per esempio in FHD e in 4K), nelle liste compare una volta sola con l'indicazione "2 versioni". Quando lo apri scegli quale guardare: per ogni versione si vede la qualità letta dal titolo.
 
+### ⬇️ Download per guardare offline (Windows e telefoni Android)
+Film ed episodi si possono scaricare e guardare senza connessione, per esempio in viaggio.
+- **Android (telefoni e tablet):** nella scheda di un film premi **Scarica**; in una serie c'è il pulsante accanto a ogni episodio e **Scarica la stagione**. La sezione **Download** mostra avanzamento, spazio occupato e libero; da lì li guardi o li elimini. I download continuano anche ad app chiusa (con l'avanzamento nelle notifiche) e di base partono solo col Wi-Fi: si cambia in **Altro → Download**. Su Android TV la funzione non c'è.
+- **Windows:** clic destro su un film, una serie o un episodio (oppure tasto **D**) e **Scarica**; nel dettaglio di una serie c'è **Scarica la stagione**. Il pulsante ⬇ in alto apre il pannello **Download**, con il pulsante per aprire la cartella `Video\IPTVISION`. Se la connessione cade il download riprende da dove era arrivato, anche alla riapertura dell'app.
+- Si scarica un file alla volta, gli altri aspettano in coda: molti servizi IPTV accettano una sola connessione per account. Per lo stesso motivo, mentre scarichi la TV in diretta potrebbe non partire.
+- Un titolo scaricato si apre sempre dal file, anche dalle liste normali, e la posizione di ripresa è la stessa della versione in streaming.
+
 ### 🗂️ Elenco o griglia, in ordine
 Prima scegli la categoria, poi vedi canali, film o serie. Ogni sezione si può mostrare come **elenco** o come **griglia** e **ordinare** per nome (A-Z o Z-A), numero di canale, anno, voto o film aggiunti di recente. La scelta resta salvata per ogni sezione.
 
@@ -260,6 +267,8 @@ Il puntatore del Magic Remote funziona come un mouse: basta puntare e premere la
 | Ctrl+F / Ctrl+R | Cerca / aggiorna lista |
 | Ctrl+M | Ricerca vocale |
 | Ctrl+T | Entra/esci dalla modalità TV |
+| D | Scarica il film, la serie o l'episodio selezionato |
+| Canc | Nel pannello Download: elimina o annulla |
 
 ## Dati e privacy
 
@@ -267,6 +276,7 @@ Il puntatore del Magic Remote funziona come un mouse: basta puntare e premere la
 - Impostazioni: `%APPDATA%\IPTVISION\settings.json`
 - Posizioni di ripresa ed episodi visti: `%APPDATA%\IPTVISION\positions.json`
 - Cache di canali, film, serie, guida TV e loghi, e il log: `%LOCALAPPDATA%\IPTVISION\`
+- Film ed episodi scaricati: `Video\IPTVISION` (l'elenco in `%APPDATA%\IPTVISION\downloads.json`); su Android nella cartella privata dell'app, che si svuota disinstallandola
 - IPTVISION non raccoglie statistiche. Si collega solo al tuo server IPTV e a GitHub, per controllare se ci sono aggiornamenti.
 
 ## Sviluppo

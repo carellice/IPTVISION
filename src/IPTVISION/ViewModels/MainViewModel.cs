@@ -55,6 +55,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         InitLibrary();
         InitTv();
         InitUpdates();
+        InitDownloads();
     }
 
     public PlayerService Player { get; }
@@ -379,6 +380,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _suspendFilter = false;
         OpenSeries = null;
         IsSettingsOpen = false;
+        IsDownloadsOpen = false;
         OnPropertyChanged(nameof(IsLiveMode));
         OnPropertyChanged(nameof(IsMoviesMode));
         OnPropertyChanged(nameof(IsSeriesMode));
