@@ -5,8 +5,9 @@
     3. crea il setup con Inno Setup
     4. compila l'APK Android (telefoni e Android TV), con la stessa versione
     5. crea il pacchetto .ipk per i TV LG (webOS), con la stessa versione
-    6. commit + tag vX.Y.Z + push
-    7. crea la release su GitHub e carica setup, APK e .ipk
+    6. crea il pacchetto .wgt per i TV Samsung (Tizen), dalla stessa app dei TV LG
+    7. commit + tag vX.Y.Z + push
+    8. crea la release su GitHub e carica setup, APK, .ipk e .wgt
 
   Uso:  release.bat [patch|minor|major] ["note della versione"]
 #>
@@ -188,6 +189,14 @@ try {
     Remove-Item $ipkTmp -Recurse -Force -ErrorAction SilentlyContinue
     $ipkKb = '{0:N0}' -f ((Get-Item $ipk).Length / 1KB)
     Write-Host "IPK: $ipk ($ipkKb KB)"
+
+    # ---------- TV Samsung (Tizen) ----------
+    # Pacchetto non firmato: lo firma installa-tv.bat con il certificato di chi installa.
+    Step 'Pacchetto per TV Samsung (Tizen)'
+    $wgt = Join-Path $InstallerDir "IPTVISION-$version.wgt"
+    Run 'node' @((Join-Path $Root 'tizen\tools\build.js'), '--wgt', $wgt)
+    $wgtKb = '{0:N0}' -f ((Get-Item $wgt).Length / 1KB)
+    Write-Host "WGT: $wgt ($wgtKb KB)"
 }
 catch {
     [IO.File]::WriteAllText($Csproj, $originalXml, $Utf8)
@@ -213,6 +222,7 @@ $Notes
 **Windows:** scarica ``IPTVISION-Setup-$version.exe`` e avvialo (non servono permessi di amministratore).
 **Android e Android TV:** scarica ``IPTVISION-$version.apk`` sul dispositivo e aprilo (consenti l'installazione da origini sconosciute).
 **TV LG (webOS):** installa ``IPTVISION-$version.ipk`` dal PC con la modalità sviluppatore attiva (guida nel README).
+**TV Samsung (Tizen):** avvia ``tizen\installa-tv.bat``: scarica ``IPTVISION-$version.wgt``, lo firma e lo installa (guida nel README).
 Chi ha già IPTVISION riceve l'aggiornamento direttamente dall'app (Impostazioni → Aggiornamenti).
 "@
 [IO.File]::WriteAllText($notesFile, $body, $Utf8)
@@ -227,7 +237,7 @@ Run git @('push', 'origin', $tag)
 
 # ---------- Release GitHub ----------
 Step 'Pubblicazione release su GitHub'
-Run gh @('release', 'create', $tag, $setup, $apk, $ipk, '--title', "IPTVISION $version", '--notes-file', $notesFile, '--latest')
+Run gh @('release', 'create', $tag, $setup, $apk, $ipk, $wgt, '--title', "IPTVISION $version", '--notes-file', $notesFile, '--latest')
 Remove-Item $notesFile -ErrorAction SilentlyContinue
 
 $url = (gh release view $tag --json url -q .url)

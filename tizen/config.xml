@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- IPTVISION per TV Samsung (Tizen). L'app è la stessa dei TV LG (webos/app): tools/build.js la copia
+     qui accanto a questo file e crea il pacchetto .wgt. La versione la mette build.js, da webos/app/js/version.js. -->
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets"
+        id="https://github.com/carellice/IPTVISION" version="0.0.0" viewmodes="maximized">
+    <tizen:application id="IPTVISION1.IPTVISION" package="IPTVISION1" required_version="4.0"/>
+    <name>IPTVISION</name>
+    <author href="https://github.com/carellice">carellice</author>
+    <description>Canali in diretta, film e serie TV del tuo abbonamento IPTV (Xtream Codes).</description>
+    <content src="index.html"/>
+    <icon src="img/largeIcon.png"/>
+    <access origin="*" subdomains="true"/>
+    <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+    <tizen:profile name="tv-samsung"/>
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:allow-navigation>*</tizen:allow-navigation>
+    <tizen:metadata key="http://tizen.org/metadata/app_ui_type/base_screen_resolution" value="extensive"/>
+    <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable"
+                   encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>

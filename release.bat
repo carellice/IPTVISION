@@ -1,5 +1,5 @@
 @echo off
-rem Pubblica una nuova versione di IPTVISION su GitHub: setup per Windows, APK per Android/Android TV, .ipk per TV LG.
+rem Pubblica una nuova versione di IPTVISION su GitHub: setup per Windows, APK per Android/Android TV, .ipk per TV LG, .wgt per TV Samsung.
 rem   release.bat                      versione patch (1.2.3 -> 1.2.4), note dai commit
 rem   release.bat minor                1.2.3 -> 1.3.0
 rem   release.bat major "Note..."      2.0.0 con note personalizzate (\n per andare a capo)

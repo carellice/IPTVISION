@@ -1,4 +1,4 @@
-/* IPTVISION per TV LG (webOS): stato dell'app, schermate e telecomando. */
+/* IPTVISION per TV LG (webOS) e Samsung (Tizen): stato dell'app, schermate e telecomando. */
 (function () {
   'use strict';
   var u = IPTV.u, h = u.h, V = IPTV.V, Nav = IPTV.Nav, KEY = Nav.KEY;
@@ -468,7 +468,7 @@
     box.appendChild(h('div', { class: 'group-title', text: 'Versione' }));
     box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Installata' }), IPTV.VERSION]));
     if (A.update) {
-      box.appendChild(h('div', { class: 'info-line', style: 'color:var(--accent2)', text: 'Disponibile IPTVISION ' + A.update + '. Scarica il file .ipk dalle release su GitHub e installalo dal PC (vedi README).' }));
+      box.appendChild(h('div', { class: 'info-line', style: 'color:var(--accent2)', text: 'Disponibile IPTVISION ' + A.update + '. Scarica il file ' + IPTV.Platform.ext + ' dalle release su GitHub e installalo dal PC (vedi README).' }));
     }
     box.appendChild(h('div', { class: 'group-title', text: '' }));
     box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Esci dall\'account' }), function () {
@@ -989,7 +989,7 @@
       handled = back();
       if (!handled && (A.screen === 'home' || A.screen === 'login')) {
         // Per uscire serve un secondo Indietro: un tasto premuto per sbaglio non chiude l'app.
-        if (Date.now() - lastBackAt < 2500) window.close();
+        if (Date.now() - lastBackAt < 2500) IPTV.Platform.exit();
         else { lastBackAt = Date.now(); u.toast('Premi di nuovo Indietro per uscire'); }
         handled = true;
       }
@@ -1028,12 +1028,13 @@
     return false;
   }
 
-  /** Avvisa se su GitHub c'è una versione più recente: sul TV si aggiorna reinstallando il .ipk dal PC. */
+  /** Avvisa se su GitHub c'è una versione più recente: sul TV si aggiorna reinstallando il pacchetto (.ipk LG, .wgt Samsung) dal PC. */
   function checkUpdates() {
     u.fetchTimeout('https://api.github.com/repos/carellice/IPTVISION/releases/latest', 15000).then(function (r) { return r.json(); }).then(function (rel) {
       if (!rel || rel.draft || rel.prerelease || !isNewer(rel.tag_name, IPTV.VERSION)) return;
-      var hasIpk = (rel.assets || []).some(function (a) { return /\.ipk$/i.test(a.name); });
-      if (!hasIpk) return;
+      var ext = IPTV.Platform.ext;
+      var hasPackage = (rel.assets || []).some(function (a) { return a.name.toLowerCase().slice(-ext.length) === ext; });
+      if (!hasPackage) return;
       A.update = String(rel.tag_name).replace(/^v/i, '');
       u.toast('Disponibile IPTVISION ' + A.update + ': dettagli in Impostazioni');
     }).catch(function () { /* senza rete o GitHub non raggiungibile: si riprova al prossimo avvio */ });

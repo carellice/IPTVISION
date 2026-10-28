@@ -4,7 +4,7 @@
 
 # IPTVISION
 
-**Lettore IPTV per Windows, Android, Android TV e TV LG (webOS): leggero e veloce, pensato per guardare la TV dal PC, dal telefono o dal divano.**
+**Lettore IPTV per Windows, Android, Android TV, TV LG (webOS) e TV Samsung (Tizen): leggero e veloce, pensato per guardare la TV dal PC, dal telefono o dal divano.**
 
 TV in diretta, film e serie da un account Xtream Codes, con guida TV, ricerca vocale e una modalità TV da usare con controller o telecomando.
 
@@ -13,6 +13,7 @@ TV in diretta, film e serie da un account Xtream Codes, con guida TV, ricerca vo
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4)
 ![Android 7+](https://img.shields.io/badge/Android%20%2F%20TV-7%2B-3DDC84)
 ![LG webOS 4+](https://img.shields.io/badge/LG%20webOS-4%2B-A50034)
+![Samsung Tizen 4+](https://img.shields.io/badge/Samsung%20Tizen-4%2B-1428A0)
 ![.NET 8](https://img.shields.io/badge/.NET-8-512BD4)
 
 ### [⬇ Scarica l'ultima versione](https://github.com/carellice/IPTVISION/releases/latest)
@@ -59,7 +60,7 @@ Film ed episodi si possono scaricare e guardare senza connessione, per esempio i
 Prima scegli la categoria, poi vedi canali, film o serie. Ogni sezione si può mostrare come **elenco** o come **griglia** e **ordinare** per nome (A-Z o Z-A), numero di canale, anno, voto o film aggiunti di recente. La scelta resta salvata per ogni sezione.
 
 ### 🙈 Nascondi XXX
-Nelle impostazioni (su Windows, Android e TV LG) c'è **Nascondi XXX**: spariscono tutte le categorie che hanno "XXX" nel nome, in TV in diretta, film e serie, insieme al loro contenuto, che non compare più nemmeno in **Tutti** e nella ricerca. Non distingue maiuscole e minuscole ed è spenta di base; spegnendola torna tutto com'era.
+Nelle impostazioni (su Windows, Android, TV LG e TV Samsung) c'è **Nascondi XXX**: spariscono tutte le categorie che hanno "XXX" nel nome, in TV in diretta, film e serie, insieme al loro contenuto, che non compare più nemmeno in **Tutti** e nella ricerca. Non distingue maiuscole e minuscole ed è spenta di base; spegnendola torna tutto com'era.
 
 ### 🔎 Ricerca unica, anche a voce
 Cerca insieme tra canali, film e serie, oppure solo in uno dei tre (**Tutto**, **Canali**, **Film**, **Serie**): i risultati sono raggruppati per tipo e non serve scrivere gli accenti. Il pulsante 🎤 o **Ctrl+M** attiva la digitazione vocale di Windows, che capisce l'italiano.
@@ -247,6 +248,89 @@ Il puntatore del Magic Remote funziona come un mouse: basta puntare e premere la
 - **L'app è sparita:** la sessione è scaduta. Riattiva **Dev Mode Status**, rileggi il codice se hai ripristinato il TV e reinstalla l'`.ipk`.
 - **Tracce audio:** si possono scegliere solo con HLS, film ed episodi, cioè con il lettore del TV.
 
+### TV Samsung (Tizen)
+
+IPTVISION gira anche sui TV Samsung con Tizen 4.0 o successivo (modelli dal 2018 in poi). L'app è la stessa dei TV LG, con gli stessi menu e le stesse impostazioni. Samsung, come LG, non permette di installare app fuori dal suo store: si usa la **modalità sviluppatore** del TV, gratuita. Le app vanno però firmate con un certificato, e il file `IPTVISION-x.y.z.wgt` delle release non è firmato: lo firma la procedura qui sotto, con un certificato creato sul tuo PC. A differenza dei TV LG, non c'è nessuna sessione che scade: una volta installata, l'app resta.
+
+#### Installazione guidata (Windows)
+
+Il modo più semplice: scarica questa repository (**Code → Download ZIP** su GitHub, poi estrai lo ZIP) e fai doppio clic su `tizen\installa-tv.bat`. La procedura ti dice cosa fare sul TV, ti chiede l'IP del TV e il file da installare, e fa da sola il resto:
+
+- installa [Node.js](https://nodejs.org/) con `winget` se manca;
+- se mancano, scarica e installa gli strumenti di Samsung (Tizen Studio da riga di comando, circa 300 MB, in `C:\tizen-studio` o nella cartella che scegli);
+- ti mostra l'indirizzo di questo PC da scrivere nella modalità sviluppatore del TV;
+- controlla che il TV risponda e lo collega;
+- crea un certificato Tizen e il profilo di firma `IPTVISION`. Se il TV lo rifiuta, ti guida nel creare un certificato Samsung con il codice del TV (DUID) già pronto;
+- firma il file `.wgt` che indichi, oppure, se premi Invio, scarica e firma l'ultima versione dalle release, poi la installa e apre IPTVISION sul TV.
+
+Le impostazioni della procedura (IP del TV, profilo di firma, password del certificato Tizen) restano in `%USERPROFILE%\.iptvision-tizen`. Per aggiornare IPTVISION basta rilanciare `installa-tv.bat`: se il TV è già collegato, la procedura salta direttamente all'installazione e firma con lo stesso certificato. Non cancellare quella cartella: con un certificato diverso il TV non aggiorna l'app, e bisogna prima disinstallarla.
+
+#### Installazione a mano
+
+Se preferisci fare da te, o non usi Windows, servono:
+
+- [Tizen Studio](https://developer.tizen.org/development/tizen-studio/download) (basta la versione **CLI**, cioè da riga di comando);
+- il file `IPTVISION-x.y.z.wgt` dalle [release](https://github.com/carellice/IPTVISION/releases/latest), oppure questa repository e Node.js per creare il pacchetto da te con `node tizen/tools/build.js --dir C:\iptvision-tizen`.
+
+I comandi `tizen` e `sdb` stanno in `C:\tizen-studio\tools\ide\bin` e `C:\tizen-studio\tools`.
+
+**1. Attiva la modalità sviluppatore sul TV**
+
+1. Sul TV apri **Apps**.
+2. Con il telecomando scrivi **1 2 3 4 5**. Sui telecomandi senza numeri usa il tasto **123** o i numeri a schermo. Si apre la finestra **Developer Mode**.
+3. Metti **Developer mode** su **On** e in **Host PC IP** scrivi l'indirizzo IP del PC (lo vedi con `ipconfig`).
+4. Premi **OK** e riavvia il TV: tieni premuto il tasto di accensione finché non si spegne e si riaccende. In **Apps** ora c'è la scritta **Developer Mode**.
+
+**2. Collega il PC al TV**
+
+L'IP del TV si trova in **Impostazioni → Generali → Rete → Stato rete → Impostazioni IP**.
+
+```bash
+sdb connect 192.168.1.50
+sdb devices
+```
+
+`sdb devices` deve mostrare il TV come `device`. Nell'ultima colonna c'è il suo nome (per esempio `UE55TU7000`), che serve nei comandi seguenti.
+
+**3. Crea il certificato**
+
+```bash
+tizen certificate -a IPTVISION -p unapassword -c IT -n IPTVISION -f iptvision
+tizen security-profiles add -n IPTVISION -a C:\tizen-studio-data\keystore\author\iptvision.p12 -p unapassword
+```
+
+Il primo comando scrive dove ha salvato `iptvision.p12`: se è un altro percorso, usa quello nel secondo. Su alcuni TV, di solito i più recenti, il certificato Tizen non basta e l'installazione fallisce con un errore sul certificato. In quel caso serve un **certificato Samsung**:
+
+1. installa **Certificate Manager** e **Samsung Certificate Extension** con il Package Manager di Tizen Studio;
+2. in Certificate Manager premi **+**, scegli **Samsung** e poi **TV**, crea un nuovo certificato autore e accedi con un account Samsung (gratis);
+3. nel certificato distributore lascia **Public** e aggiungi il DUID del TV. Con il TV collegato compare da solo; altrimenti si legge con `sdb shell 0 getduid`;
+4. dai il permesso di installare: `tizen install-permit -t UE55TU7000`.
+
+**4. Firma e installa IPTVISION**
+
+Il `.wgt` è un file zip: estrailo in una cartella, per esempio `C:\iptvision-tizen`, che deve contenere `config.xml`. Poi:
+
+```bash
+tizen package -t wgt -s IPTVISION -o C:\iptvision-firmato -- C:\iptvision-tizen
+tizen install -n IPTVISION.wgt -t UE55TU7000 -- C:\iptvision-firmato
+tizen run -p IPTVISION1.IPTVISION -t UE55TU7000
+```
+
+Al posto di `IPTVISION` dopo `-s` metti il nome del profilo Samsung, se hai creato quello. IPTVISION compare tra le app del TV.
+
+**Aggiornare:** quando esce una nuova versione, IPTVISION te lo dice all'avvio e in **Impostazioni**. Firma il nuovo `.wgt` con lo **stesso profilo** e installalo allo stesso modo: account, preferiti e posizioni di visione restano dove sono.
+
+#### Il telecomando
+
+I tasti sono gli stessi dei TV LG (vedi la tabella sopra): **Indietro** (↩) torna indietro ed esce, **CH+ / CH−** cambia canale, i numeri scelgono il canale, il tasto **rosso** aggiunge ai preferiti, e play, pausa, avanti e indietro funzionano come sui TV LG. Sui telecomandi Smart senza numeri e senza tasti colorati usa le frecce e OK: canali, comandi e preferiti sono anche nei menu.
+
+#### Se qualcosa non va
+
+- **Il TV non risponde o `sdb connect` fallisce:** TV e PC devono essere sulla stessa rete. In **Developer Mode** sul TV, **Host PC IP** deve essere proprio l'indirizzo di questo PC. Dopo averlo cambiato, riavvia il TV.
+- **L'installazione fallisce con un errore sul certificato (per esempio `-11` o `Check certificate error`):** serve il certificato Samsung, vedi il punto 3. La procedura guidata te lo propone da sola.
+- **L'installazione fallisce dicendo che l'app c'è già:** la versione installata è firmata con un altro certificato. Disinstallala dal TV (in **Apps**, tieni premuto OK sull'icona) e reinstalla.
+- **Un canale non parte:** in **Impostazioni** attiva **Formato HLS (m3u8)**, come sui TV LG.
+
 ## Scorciatoie da tastiera
 
 | Tasto | Azione |
@@ -300,6 +384,8 @@ La versione Android si legge da `IPTVISION.csproj`, così Windows e Android esco
 
 L'app per i TV LG sta in `webos/app`. È HTML, CSS e JavaScript senza passaggi di compilazione, scritta per girare anche sui TV del 2018 (Chromium 53: niente `async/await`, CSS grid e `gap`). Per provarla nel browser del PC basta servire la cartella, per esempio con `python -m http.server` dentro `webos/app`. Il server IPTV però deve permettere le richieste da un'altra origine (CORS); sul TV questo limite non c'è.
 
+La stessa cartella diventa l'app per i TV Samsung: `tizen/tools/build.js` la copia insieme a `tizen/config.xml` e crea il `.wgt`. Le poche differenze (codici di alcuni tasti, come si chiude l'app, estensione del pacchetto) stanno in `webos/app/js/platform.js`.
+
 Struttura del progetto:
 
 ```
@@ -310,6 +396,7 @@ src/IPTVISION/
   MainWindow    finestra, comandi sovrapposti al video, modalità TV
 android/        app Android e Android TV (data/ client Xtream e guida TV, player/ ExoPlayer, ui/ schermate Compose)
 webos/          app per TV LG (app/ HTML, CSS e JS; installa-tv.bat installazione guidata; tools/devmode.js rinnovo della modalità sviluppatore)
+tizen/          app per TV Samsung (config.xml; installa-tv.bat installazione guidata; tools/build.js crea il .wgt da webos/app)
 installer/      script Inno Setup
 scripts/        script di rilascio
 ```
@@ -329,14 +416,15 @@ Lo script fa tutto da solo:
 3. crea il setup con Inno Setup, e se Inno Setup manca lo installa con winget;
 4. compila l'APK Android firmato, con la stessa versione;
 5. crea il pacchetto `.ipk` per i TV LG, con la stessa versione;
-6. fa il commit, crea il tag `vX.Y.Z` e fa il push;
-7. crea la release su GitHub, carica setup, APK e `.ipk` e scrive le note prendendole dai commit.
+6. crea il pacchetto `.wgt` non firmato per i TV Samsung, con la stessa versione;
+7. fa il commit, crea il tag `vX.Y.Z` e fa il push;
+8. crea la release su GitHub, carica setup, APK, `.ipk` e `.wgt` e scrive le note prendendole dai commit.
 
 Altre varianti:
 - `release.bat minor` aumenta la versione minore (`1.3.0`);
 - `release.bat major "Note della versione"` aumenta la versione principale e usa le note che scrivi tu; con `\n` vai a capo.
 
-Serve la [GitHub CLI](https://cli.github.com/) già autenticata (`gh auth login`), più JDK e Android SDK per l'APK e Node.js per il pacchetto webOS.
+Serve la [GitHub CLI](https://cli.github.com/) già autenticata (`gh auth login`), più JDK e Android SDK per l'APK e Node.js per i pacchetti webOS e Tizen.
 
 L'APK è firmato con una chiave che sta fuori dal progetto, in `%USERPROFILE%\.android\iptvision-signing\`: al primo rilascio lo script la crea da solo. Conservane una copia: senza quella chiave chi ha già l'app Android non può più aggiornarla.
 
@@ -344,7 +432,7 @@ L'APK è firmato con una chiave che sta fuori dal progetto, in `%USERPROFILE%\.a
 
 [WPF / .NET 8](https://github.com/dotnet/wpf) · [LibVLCSharp](https://github.com/videolan/libvlcsharp) · [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) · [Inno Setup](https://jrsoftware.org/isinfo.php)
 Android: [Jetpack Compose](https://developer.android.com/compose) · [Media3 ExoPlayer](https://github.com/androidx/media) · [OkHttp](https://square.github.io/okhttp/) · [Coil](https://coil-kt.github.io/coil/)
-TV LG: [webOS CLI](https://github.com/webos-tools/cli) · [mpegts.js](https://github.com/xqq/mpegts.js) (licenza Apache 2.0)
+TV LG e Samsung: [webOS CLI](https://github.com/webos-tools/cli) · [Tizen Studio](https://developer.tizen.org/development/tizen-studio) · [mpegts.js](https://github.com/xqq/mpegts.js) (licenza Apache 2.0)
 
 ## Licenza
 

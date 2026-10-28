@@ -11,6 +11,14 @@
     CH_UP: 33, CH_DOWN: 34, PLAY: 415, PAUSE: 19, PLAY_PAUSE: 179, STOP: 413, FF: 417, REW: 412, INFO: 457,
     RED: 403, GREEN: 404, YELLOW: 405, BLUE: 406,
   };
+  // Telecomando Samsung (Tizen): Indietro, canale su/giù e play/pausa hanno codici diversi da LG.
+  var P = IPTV.Platform;
+  if (P && P.tizen) {
+    KEY.BACK = 10009;
+    KEY.CH_UP = P.code('ChannelUp', 427);
+    KEY.CH_DOWN = P.code('ChannelDown', 428);
+    KEY.PLAY_PAUSE = P.code('MediaPlayPause', 10252);
+  }
 
   var current = null;
   var scope = document.body;
