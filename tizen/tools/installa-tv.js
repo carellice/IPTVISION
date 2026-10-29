@@ -251,12 +251,90 @@ async function stepConnect(knownHost) {
 /** Codice univoco del TV: serve per il certificato Samsung. */
 function duid(serial) {
   const r = sdb(['-s', serial, 'shell', '0', 'getduid']);
-  return output(r).split(/\r?\n/).map((l) => l.trim()).filter(Boolean).pop() || '';
+  const last = output(r).split(/\r?\n/).map((l) => l.trim()).filter(Boolean).pop() || '';
+  return /^[A-Z0-9]{8,}$/i.test(last) ? last : '';
 }
 
-// ---------- 4. Certificato ----------
+// ---------- 4. Certificati ----------
+
+/** Codice del TV collegato (DUID), letto una volta dopo il collegamento. */
+let tvDuid = '';
+
+function heading(text) {
+  console.log('\n' + '='.repeat(64) + '\n  ' + text + '\n' + '='.repeat(64));
+}
+
+function profilesXml() {
+  const m = output(tizen(['security-profiles', 'list'])).match(/Loaded in '([^']+)'/);
+  try { return fs.readFileSync(m ? m[1] : path.join(studio + '-data', 'profile', 'profiles.xml'), 'utf8'); } catch (e) { return ''; }
+}
+
+/** Profili di firma di Tizen Studio: nome e file dei certificati autore e distributore. */
+function profiles() {
+  const list = [];
+  const re = /<profile name="([^"]*)">([\s\S]*?)<\/profile>/g;
+  const xml = profilesXml();
+  let m;
+  while ((m = re.exec(xml))) {
+    const body = m[2];
+    const key = (d) => {
+      const item = body.match(new RegExp('<profileitem\\b[^>]*\\bdistributor="' + d + '"[^>]*>'));
+      return (item && (item[0].match(/\bkey="([^"]*)"/) || [])[1]) || '';
+    };
+    list.push({ name: m[1], author: key(0), distributor: key(1) });
+  }
+  return list;
+}
+
+function findProfile(name) {
+  return profiles().find((p) => p.name === name);
+}
+
 function hasProfile(name) {
-  return new RegExp('(^|\\s)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s|$)', 'm').test(output(tizen(['security-profiles', 'list'])));
+  return !!findProfile(name);
+}
+
+function readCert(file) {
+  try { return new crypto.X509Certificate(fs.readFileSync(file)); } catch (e) { return null; }
+}
+
+function date(d) {
+  return d.toLocaleDateString('it-IT');
+}
+
+/** Tipo, scadenza, TV per cui vale e problemi di un profilo, rispetto al TV collegato. */
+function check(p) {
+  const samsung = !!p.distributor && !/tizen-distributor-signer/i.test(p.distributor);
+  const info = { samsung, duids: [], until: null, problems: [] };
+  if (!p.author || !fs.existsSync(p.author)) info.problems.push('manca il certificato autore' + (p.author ? ' (' + p.author + ')' : ''));
+  if (samsung) {
+    if (!fs.existsSync(p.distributor)) info.problems.push('manca il certificato distributore (' + p.distributor + ')');
+    // Certificate Manager salva accanto ai .p12 anche i certificati in chiaro: lì si legge per quale TV valgono.
+    const dist = readCert(path.join(path.dirname(p.distributor), 'distributor.crt'));
+    const auth = readCert(path.join(path.dirname(p.author), 'author.crt'));
+    if (!dist) info.problems.push('non trovo distributor.crt accanto a distributor.p12: non posso controllare per quale TV vale');
+    else {
+      info.duids = String(dist.subjectAltName || '').split(/,\s*/).map((s) => (s.match(/deviceid=(.*)$/) || [])[1]).filter(Boolean);
+      info.until = new Date(dist.validTo);
+      if (!info.duids.length) info.problems.push('non contiene il codice di nessun TV (DUID)');
+      else if (tvDuid && info.duids.indexOf(tvDuid) < 0) {
+        info.problems.push('vale per ' + info.duids.join(', ') + ', ma il codice di questo TV (DUID) è ' + tvDuid);
+      }
+    }
+    if (auth && (!info.until || new Date(auth.validTo) < info.until)) info.until = new Date(auth.validTo);
+  }
+  if (info.until && info.until < new Date()) info.problems.push('è scaduto il ' + date(info.until));
+  return info;
+}
+
+function describe(p, n, inUse) {
+  const c = check(p);
+  let line = (n ? n + '. ' : '') + p.name + ' (' + (c.samsung ? 'Samsung' : 'Tizen');
+  if (c.until) line += ', valido fino al ' + date(c.until);
+  if (c.duids.length) line += ', per il TV ' + c.duids.join(', ');
+  console.log(line + ')' + (inUse ? '  <- usato per firmare' : ''));
+  c.problems.forEach((x) => console.log('     PROBLEMA: ' + x));
+  return c;
 }
 
 function makeTizenProfile() {
@@ -274,41 +352,26 @@ function makeTizenProfile() {
   if (!hasProfile(PROFILE)) throw new Error('profilo di firma non creato:\n' + output(add));
 }
 
-async function samsungProfile(serial) {
+/** Toglie il profilo da Tizen e, se stanno in una cartella tutta sua, anche i file dei certificati. */
+async function removeProfile(p) {
+  tizen(['security-profiles', 'remove', '-n', p.name]);
+  const ours = path.join(STATE_DIR, 'certificato');
+  const dir = p.author ? path.dirname(p.author) : '';
+  const own = dir && (path.resolve(dir) === path.resolve(ours) || /^samsungcertificate$/i.test(path.basename(path.dirname(dir))));
   const state = loadState();
-  const known = state.samsungProfile || (state.profile && state.profile !== PROFILE ? state.profile : '');
-  if (known && hasProfile(known)) {
-    console.log('Uso il certificato Samsung già pronto "' + known + '".');
-    return known;
+  if (own && fs.existsSync(dir)) {
+    // Il certificato Tizen senza la sua password non serve più: si cancella sempre insieme al profilo.
+    const tizenCert = path.resolve(dir) === path.resolve(ours);
+    if (tizenCert || (await yes('Cancello anche i file del certificato in ' + dir + '?', true))) {
+      fs.rmSync(dir, { recursive: true, force: true });
+      if (tizenCert) delete state.certPassword;
+      console.log('File cancellati.');
+    }
   }
-  const name = await createSamsungProfile(serial);
-  saveState(Object.assign(loadState(), { samsungProfile: name }));
-  return name;
-}
-
-async function createSamsungProfile(serial) {
-  console.log('\nIl certificato Samsung si crea con Certificate Manager e un account Samsung (gratis).');
-  const pm = path.join(studio, 'package-manager', WIN ? 'package-manager-cli.exe' : 'package-manager-cli.bin');
-  const cm = path.join(studio, 'tools', 'certificate-manager', WIN ? 'certificate-manager.exe' : 'certificate-manager');
-  if (!fs.existsSync(cm) && fs.existsSync(pm)) {
-    console.log('Installo Certificate Manager e l\'estensione per i certificati Samsung (qualche minuto)...');
-    spawnSync(pm, ['install', '--accept-license', 'Certificate-Manager', 'cert-add-on'], { stdio: ['pipe', 'inherit', 'inherit'], input: '\n', env: AS_USER });
-  }
-  const id = duid(serial);
-  console.log('\nIn Certificate Manager:');
-  console.log('  1. premi "+", scegli "Samsung" e poi "TV";');
-  console.log('  2. come nome del profilo scrivi IPTVISION-Samsung;');
-  console.log('  3. "Create a new author certificate": nome e password a piacere (segnateli), poi accedi con l\'account Samsung;');
-  console.log('  4. nel certificato distributore lascia "Public" e controlla che ci sia il codice del TV (DUID):');
-  console.log('       ' + (id || '(non letto: lo trovi in Device Manager di Tizen Studio)'));
-  console.log('  5. premi Finish.');
-  if (fs.existsSync(cm)) spawnSync('cmd', ['/c', 'start', '""', cm], { stdio: 'ignore', env: AS_USER });
-  else console.log('Certificate Manager non trovato: installalo da Package Manager (Extension SDK > Samsung Certificate Extension).');
-  for (;;) {
-    const name = await ask('Nome del profilo che hai creato', 'IPTVISION-Samsung');
-    if (hasProfile(name)) return name;
-    console.log('Non trovo il profilo "' + name + '" tra quelli di Tizen. Controlla il nome in Certificate Manager.');
-  }
+  if (state.profile === p.name) delete state.profile;
+  if (state.samsungProfile === p.name) delete state.samsungProfile;
+  saveState(state);
+  console.log('Profilo "' + p.name + '" cancellato.');
 }
 
 /** Con il certificato Samsung il TV deve conoscerlo prima dell'installazione: install-permit usa il profilo attivo. */
@@ -317,19 +380,184 @@ function permit(serial, profile) {
   console.log(output(tizen(['install-permit', '-s', serial])));
 }
 
+function useProfile(serial, name) {
+  saveState(Object.assign(loadState(), { profile: name }));
+  const p = findProfile(name);
+  if (p && check(p).samsung) {
+    saveState(Object.assign(loadState(), { samsungProfile: name }));
+    console.log('Mando il certificato al TV...');
+    permit(serial, name);
+  }
+  console.log('Per firmare uso "' + name + '".');
+}
+
+function certificateManager() {
+  const pm = path.join(studio, 'package-manager', WIN ? 'package-manager-cli.exe' : 'package-manager-cli.bin');
+  const cm = path.join(studio, 'tools', 'certificate-manager', WIN ? 'certificate-manager.exe' : 'certificate-manager');
+  if (!fs.existsSync(cm) && fs.existsSync(pm)) {
+    console.log('Installo Certificate Manager e l\'estensione per i certificati Samsung (qualche minuto)...');
+    spawnSync(pm, ['install', '--accept-license', 'Certificate-Manager', 'cert-add-on'], { stdio: ['pipe', 'inherit', 'inherit'], input: '\n', env: AS_USER });
+  }
+  return fs.existsSync(cm) ? cm : '';
+}
+
+/** Creazione guidata del certificato Samsung, con controllo finale del codice del TV. Restituisce il nome o ''. */
+async function createSamsungProfile(serial) {
+  heading('Nuovo certificato Samsung');
+  const id = tvDuid || duid(serial);
+  if (!id) {
+    console.log('Non riesco a leggere il codice del TV (DUID): controlla che il TV sia acceso e collegato, poi riprova.');
+    return '';
+  }
+  console.log('Serve un account Samsung, gratis: se non ce l\'hai, lo crei durante l\'accesso.');
+  console.log('Il certificato vale solo per i TV indicati con il loro codice (DUID). Quello di questo TV è:');
+  console.log('\n       ' + id + '\n');
+  if (WIN && spawnSync('clip', [], { input: id }).status === 0) console.log('(L\'ho copiato negli appunti: quando serve basta Ctrl+V.)');
+
+  let name;
+  for (;;) {
+    name = await ask('Nome del nuovo profilo (lettere, numeri e trattini)', 'IPTVISION-Samsung');
+    if (!/^[A-Za-z0-9_.-]+$/.test(name)) {
+      console.log('Usa solo lettere, numeri, punti e trattini, senza spazi.');
+      continue;
+    }
+    const old = findProfile(name);
+    if (!old) break;
+    console.log('Esiste già un profilo con questo nome:');
+    describe(old);
+    if (await yes('Lo cancello e lo ricreo?', true)) {
+      await removeProfile(old);
+      break;
+    }
+  }
+
+  const cm = certificateManager();
+  if (!cm) {
+    console.log('Certificate Manager non trovato. Installalo da Package Manager di Tizen Studio');
+    console.log('(Extension SDK > Samsung Certificate Extension) e riprova.');
+    return '';
+  }
+  console.log('\nApro Certificate Manager. Fai così (se una schermata è un po\' diversa, conta solo quello che è in maiuscolo):');
+  console.log('  1. premi il pulsante "+" in alto a destra;');
+  console.log('  2. scegli il tipo SAMSUNG, poi Next;');
+  console.log('  3. scegli il dispositivo TV, poi Next;');
+  console.log('  4. in "Certificate profile name" scrivi ESATTAMENTE ' + name + ', poi Next;');
+  console.log('  5. scegli "Create a new author certificate", poi Next. In "Author name" scrivi il tuo nome e una');
+  console.log('     password a piacere, due volte (non devi ricordarla: la conserva Tizen). Next, poi accedi con');
+  console.log('     l\'account Samsung nella pagina che si apre;');
+  console.log('  6. certificato distributore: lascia "Create a new distributor certificate" e il privilegio "Public".');
+  console.log('     Nella lista dei DUID deve esserci SOLO ' + id + '.');
+  console.log('     Se c\'è altro (per esempio un indirizzo come ' + serial + ') selezionalo e rimuovilo;');
+  console.log('     se manca, aggiungilo con "Add individual DUID" (o "+") e incolla con Ctrl+V. Poi Next;');
+  console.log('  7. premi Finish (se lo chiede, accedi di nuovo) e chiudi Certificate Manager.');
+  spawnSync('cmd', ['/c', 'start', '""', cm], { stdio: 'ignore', env: AS_USER });
+
+  for (;;) {
+    await pause('Premi Invio quando hai premuto Finish');
+    const p = findProfile(name);
+    if (!p) {
+      console.log('Non trovo il profilo "' + name + '". Profili presenti: ' + (profiles().map((x) => x.name).join(', ') || 'nessuno') + '.');
+      console.log('Se l\'hai chiamato in un altro modo, cancellalo dal menu dei certificati e ricrealo con questo nome.');
+      if (!(await yes('Vuoi ricontrollare?', true))) return '';
+      continue;
+    }
+    console.log('\nControllo il certificato:');
+    const c = describe(p);
+    if (!c.samsung) {
+      console.log('     PROBLEMA: è un certificato Tizen, non Samsung (al passo 2 va scelto Samsung).');
+      c.problems.push('tipo');
+    }
+    if (!c.problems.length) {
+      console.log('Tutto giusto: il certificato vale per questo TV.');
+      return name;
+    }
+    if (await yes('Il certificato non va bene. Lo cancello e lo rifacciamo?', true)) {
+      await removeProfile(p);
+      return createSamsungProfile(serial);
+    }
+    return name;
+  }
+}
+
+/** Elenco dei profili da cui sceglierne uno per numero. */
+async function pickProfile(question) {
+  const list = profiles();
+  if (!list.length) {
+    console.log('Non ci sono profili.');
+    return null;
+  }
+  for (;;) {
+    const a = await ask(question + ' (numero, Invio per annullare)');
+    if (!a) return null;
+    const p = list[parseInt(a, 10) - 1];
+    if (p) return p;
+  }
+}
+
+async function manageCertificates(serial) {
+  for (;;) {
+    heading('Gestione dei certificati');
+    if (tvDuid) console.log('TV collegato: ' + serial + ', codice (DUID) ' + tvDuid + '\n');
+    const inUse = loadState().profile;
+    const list = profiles();
+    if (!list.length) console.log('Non ci sono ancora profili di firma.');
+    list.forEach((p, i) => describe(p, i + 1, p.name === inUse));
+    console.log('\n  U. usa un profilo per firmare');
+    console.log('  T. crea il certificato Tizen (o ricrealo)');
+    console.log('  S. crea un certificato Samsung, passo per passo');
+    console.log('  C. cancella un profilo');
+    console.log('  P. rimanda al TV il certificato Samsung in uso');
+    console.log('  I. torna indietro');
+    const c = (await ask('Scelta', 'I')).toUpperCase();
+    if (c === 'I') return;
+    if (c === 'U') {
+      const p = await pickProfile('Quale profilo usare');
+      if (p) useProfile(serial, p.name);
+    } else if (c === 'T') {
+      const old = findProfile(PROFILE);
+      if (old) {
+        if (!(await yes('Il certificato Tizen c\'è già. Lo cancello e lo ricreo?', false))) continue;
+        await removeProfile(old);
+      }
+      console.log('Creo il certificato Tizen...');
+      makeTizenProfile();
+      console.log('Fatto.');
+      if (await yes('Lo uso per firmare?', true)) useProfile(serial, PROFILE);
+    } else if (c === 'S') {
+      const name = await createSamsungProfile(serial);
+      if (name && (await yes('Lo uso per firmare?', true))) useProfile(serial, name);
+    } else if (c === 'C') {
+      const p = await pickProfile('Quale profilo cancellare');
+      if (p && (await yes('Cancello il profilo "' + p.name + '"? Non si può annullare', false))) await removeProfile(p);
+    } else if (c === 'P') {
+      const p = inUse && findProfile(inUse);
+      if (p && check(p).samsung) permit(serial, p.name);
+      else console.log('Il profilo in uso non è Samsung: con il certificato Tizen non serve.');
+    }
+  }
+}
+
 async function stepCertificate(serial, wanted) {
   title(4, 'Certificato per firmare l\'app');
   const state = loadState();
-  if (!wanted && state.profile && hasProfile(state.profile)) {
-    console.log('Uso il profilo già pronto "' + state.profile + '".');
-    return state.profile;
+  const current = !wanted && state.profile && findProfile(state.profile);
+  if (current) {
+    console.log('Uso il profilo "' + current.name + '":');
+    const c = describe(current);
+    if (!c.problems.length) return current.name;
+    console.log('\nCosì il TV lo rifiuterà.');
+    if (await yes('Apro la gestione dei certificati per sistemarlo?', true)) {
+      await manageCertificates(serial);
+      const now = loadState().profile;
+      if (now && hasProfile(now)) return now;
+    } else return current.name;
   }
   let choice = wanted;
   if (!choice) {
     console.log('I TV Samsung installano solo app firmate. Due possibilità:');
     console.log('  A. certificato Tizen: lo creo io adesso, senza account (va bene su molti TV)');
-    console.log('  B. certificato Samsung: serve un account Samsung, è legato a questo TV');
-    console.log('     (necessario se con il certificato Tizen il TV rifiuta l\'installazione)');
+    console.log('  B. certificato Samsung: serve un account Samsung, vale solo per questo TV');
+    console.log('     (se con uno dei due il TV rifiuta l\'installazione, prova l\'altro)');
     do choice = (await ask('Scelta', 'A')).toUpperCase();
     while (!/^[AB]$/.test(choice));
   }
@@ -341,11 +569,11 @@ async function stepCertificate(serial, wanted) {
     }
     profile = PROFILE;
   } else {
-    profile = await samsungProfile(serial);
-    permit(serial, profile);
+    const known = state.samsungProfile && findProfile(state.samsungProfile);
+    profile = known && !check(known).problems.length ? known.name : await createSamsungProfile(serial);
+    if (!profile) return stepCertificate(serial);
   }
-  saveState(Object.assign(loadState(), { profile }));
-  console.log('Profilo di firma "' + profile + '" pronto.');
+  useProfile(serial, profile);
   return profile;
 }
 
@@ -442,28 +670,47 @@ async function stepInstall(serial, profile) {
   }
 }
 
-/** Il TV ha rifiutato la firma: consigli, poi stesso certificato, l'altro tipo, oppure uscita. */
+/** Il TV ha rifiutato la firma: causa probabile, poi riprovare, sistemare i certificati o uscire. */
 async function certificateRejected(serial, profile) {
-  const samsung = profile !== PROFILE;
-  console.log('\nIl TV ha rifiutato il certificato. Di solito si risolve così:');
-  console.log('  - il TV deve essere connesso a internet durante l\'installazione: controlla il certificato online.');
-  console.log('    Verifica in Impostazioni > Generali > Rete > Stato rete;');
-  console.log('  - data e ora del TV devono essere giuste;');
-  console.log('  - a volte basta riprovare.');
+  const p = findProfile(profile);
+  const c = p ? check(p) : null;
+  if (c && c.problems.length) {
+    console.log('\nIl TV ha rifiutato il certificato. Il motivo è nel profilo "' + profile + '":');
+    c.problems.forEach((x) => console.log('  - ' + x));
+  } else {
+    console.log('\nIl TV ha rifiutato il certificato. Il profilo "' + profile + '" sembra giusto; di solito si risolve così:');
+    console.log('  - il TV deve essere connesso a internet durante l\'installazione: controlla il certificato online.');
+    console.log('    Verifica in Impostazioni > Generali > Rete > Stato rete;');
+    console.log('  - data e ora del TV devono essere giuste;');
+    console.log('  - a volte basta riprovare;');
+    console.log('  - se no, prova l\'altro tipo di certificato (Tizen o Samsung) dalla gestione dei certificati.');
+  }
   console.log('\n  R. riprova con lo stesso certificato');
-  if (samsung) console.log('  T. prova con il certificato Tizen (su molti TV recenti funziona questo, anche se il Samsung no)');
-  else console.log('  S. prova con il certificato Samsung (serve un account Samsung)');
+  console.log('  G. gestisci i certificati (ricrea, cambia, cancella)');
   console.log('  N. esci');
-  let c;
-  do c = (await ask('Scelta', 'R')).toUpperCase();
-  while (!(c === 'R' || c === 'N' || c === (samsung ? 'T' : 'S')));
-  if (c === 'N') return '';
-  if (c === 'R') {
-    if (samsung) permit(serial, profile);
+  let k;
+  do k = (await ask('Scelta', c && c.problems.length ? 'G' : 'R')).toUpperCase();
+  while (!/^[RGN]$/.test(k));
+  if (k === 'N') return '';
+  if (k === 'R') {
+    if (c && c.samsung) permit(serial, profile);
     return profile;
   }
-  if (samsung) saveState(Object.assign(loadState(), { samsungProfile: profile }));
-  return stepCertificate(serial, samsung ? 'A' : 'B');
+  await manageCertificates(serial);
+  const now = loadState().profile;
+  return now && hasProfile(now) ? now : stepCertificate(serial);
+}
+
+function uninstall(serial) {
+  // Alcuni TV vogliono l'id del pacchetto, altri quello dell'app.
+  for (const id of [APP_ID.split('.')[0], APP_ID]) {
+    const text = output(tizen(['uninstall', '-p', id, '-s', serial]));
+    if (!/fail|error/i.test(text)) {
+      console.log('IPTVISION è stato disinstallato.');
+      return;
+    }
+    console.log(text);
+  }
 }
 
 async function main() {
@@ -476,7 +723,7 @@ async function main() {
   if (state.host) {
     const known = state.host + ':' + PORT;
     console.log('\nQuesto PC è già stato collegato a un TV (' + state.host + ').');
-    if (await yes('Vuoi saltare la configurazione e installare o aggiornare IPTVISION?', true)) {
+    if (await yes('Vuoi saltare la configurazione del TV?', true)) {
       process.stdout.write('Verifico il collegamento... ');
       sdb(['connect', known]);
       serial = connected(known) ? known : '';
@@ -491,10 +738,28 @@ async function main() {
     }
     serial = await stepConnect(state.host);
   }
-  const profile = await stepCertificate(serial);
-  if (await stepInstall(serial, profile)) {
-    console.log('\nFatto. Per aggiornare IPTVISION in futuro basta rilanciare installa-tv.bat:');
-    console.log('usa sempre lo stesso certificato, altrimenti il TV chiede di disinstallare prima la vecchia versione.');
+  tvDuid = duid(serial);
+  if (tvDuid) console.log('Codice del TV (DUID): ' + tvDuid);
+
+  for (;;) {
+    heading('Cosa vuoi fare?');
+    console.log('  1. installa o aggiorna IPTVISION');
+    console.log('  2. gestisci i certificati (controlla, crea, ricrea, cancella)');
+    console.log('  3. disinstalla IPTVISION dal TV');
+    console.log('  0. esci');
+    const c = await ask('Scelta', '1');
+    if (c === '0') return;
+    if (c === '2') await manageCertificates(serial);
+    else if (c === '3') {
+      if (await yes('Disinstallo IPTVISION dal TV? Account e preferiti salvati sul TV si perdono', false)) uninstall(serial);
+    } else if (c === '1') {
+      const profile = await stepCertificate(serial);
+      if (await stepInstall(serial, profile)) {
+        console.log('\nFatto. Per aggiornare IPTVISION in futuro basta rilanciare installa-tv.bat:');
+        console.log('usa sempre lo stesso certificato, altrimenti il TV chiede di disinstallare prima la vecchia versione.');
+        return;
+      }
+    }
   }
 }
 

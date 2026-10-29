@@ -260,8 +260,17 @@ Il modo più semplice: scarica questa repository (**Code → Download ZIP** su G
 - se mancano, scarica e installa gli strumenti di Samsung (Tizen Studio da riga di comando, circa 300 MB, in `C:\tizen-studio` o nella cartella che scegli);
 - ti mostra l'indirizzo di questo PC da scrivere nella modalità sviluppatore del TV;
 - controlla che il TV risponda e lo collega;
-- crea un certificato Tizen e il profilo di firma `IPTVISION`. Se il TV lo rifiuta, ti guida nel creare un certificato Samsung con il codice del TV (DUID) già pronto;
+- crea un certificato Tizen e il profilo di firma `IPTVISION`. Se preferisci, o se il TV lo rifiuta, ti guida passo per passo nel creare un certificato Samsung: legge dal TV il suo codice (DUID) e lo copia negli appunti. Alla fine controlla che il certificato valga proprio per quel TV;
 - firma il file `.wgt` che indichi, oppure, se premi Invio, scarica e firma l'ultima versione dalle release, poi la installa e apre IPTVISION sul TV.
+
+Dal menu iniziale c'è anche **Gestisci i certificati**. Mostra i profili di firma con tipo, scadenza e TV per cui valgono, e segnala i problemi, per esempio un certificato Samsung fatto per un altro codice. Da lì puoi:
+
+- scegliere quale profilo usare;
+- creare o ricreare il certificato Tizen o quello Samsung;
+- cancellare un profilo insieme ai suoi file;
+- rimandare il certificato Samsung al TV.
+
+Dal menu iniziale puoi anche disinstallare IPTVISION dal TV.
 
 Le impostazioni della procedura (IP del TV, profilo di firma, password del certificato Tizen) restano in `%USERPROFILE%\.iptvision-tizen`. Per aggiornare IPTVISION basta rilanciare `installa-tv.bat`: se il TV è già collegato, la procedura salta direttamente all'installazione e firma con lo stesso certificato. Non cancellare quella cartella: con un certificato diverso il TV non aggiorna l'app, e bisogna prima disinstallarla.
 
@@ -312,7 +321,7 @@ Il primo comando scrive dove ha salvato `iptvision.p12`: se è un altro percorso
 
 1. installa **Certificate Manager** e **Samsung Certificate Extension** con il Package Manager di Tizen Studio;
 2. in Certificate Manager premi **+**, scegli **Samsung** e poi **TV**, crea un nuovo certificato autore e accedi con un account Samsung (gratis);
-3. nel certificato distributore lascia **Public** e aggiungi il DUID del TV. Con il TV collegato compare da solo; altrimenti si legge con `sdb shell 0 getduid`;
+3. nel certificato distributore lascia **Public** e metti nella lista **solo** il DUID del TV, che si legge con `sdb shell 0 getduid` (una sigla di lettere e numeri, per esempio `ABCD1234EFGHI`). Certificate Manager a volte propone l'indirizzo del TV (`192.168.1.50:26101`): non è il DUID, toglilo, altrimenti il TV rifiuta l'installazione con `Invalid format of certificate in signature`;
 4. dai il permesso di installare: `tizen install-permit -t UE55TU7000`.
 
 **4. Firma e installa IPTVISION**
