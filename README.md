@@ -336,7 +336,10 @@ I tasti sono gli stessi dei TV LG (vedi la tabella sopra): **Indietro** (↩) to
 #### Se qualcosa non va
 
 - **Il TV non risponde o `sdb connect` fallisce:** TV e PC devono essere sulla stessa rete. In **Developer Mode** sul TV, **Host PC IP** deve essere proprio l'indirizzo di questo PC. Dopo averlo cambiato, riavvia il TV.
-- **L'installazione fallisce con un errore sul certificato (per esempio `-11` o `Check certificate error`):** serve il certificato Samsung, vedi il punto 3. La procedura guidata te lo propone da sola.
+- **L'installazione fallisce con un errore sul certificato (per esempio `install failed[118, -12]`, `Invalid format of certificate in signature` o `Check certificate error`):**
+  1. Il TV deve essere connesso a internet durante l'installazione, perché controlla il certificato online. Verifica anche che data e ora del TV siano giuste. A volte basta riprovare.
+  2. Se l'errore resta, prova l'altro tipo di certificato. Sui TV più vecchi di solito serve quello Samsung (punto 3). Su molti TV recenti invece il Samsung viene rifiutato e funziona quello Tizen.
+  3. La procedura guidata propone da sola di riprovare o di cambiare certificato, e se ne hai già creato uno lo riusa.
 - **L'installazione fallisce dicendo che l'app c'è già:** la versione installata è firmata con un altro certificato. Disinstallala dal TV (in **Apps**, tieni premuto OK sull'icona) e reinstalla.
 - **Un canale non parte:** in **Impostazioni** attiva **Formato HLS (m3u8)**, come sui TV LG.
 

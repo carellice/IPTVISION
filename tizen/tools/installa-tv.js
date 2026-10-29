@@ -275,6 +275,18 @@ function makeTizenProfile() {
 }
 
 async function samsungProfile(serial) {
+  const state = loadState();
+  const known = state.samsungProfile || (state.profile && state.profile !== PROFILE ? state.profile : '');
+  if (known && hasProfile(known)) {
+    console.log('Uso il certificato Samsung già pronto "' + known + '".');
+    return known;
+  }
+  const name = await createSamsungProfile(serial);
+  saveState(Object.assign(loadState(), { samsungProfile: name }));
+  return name;
+}
+
+async function createSamsungProfile(serial) {
   console.log('\nIl certificato Samsung si crea con Certificate Manager e un account Samsung (gratis).');
   const pm = path.join(studio, 'package-manager', WIN ? 'package-manager-cli.exe' : 'package-manager-cli.bin');
   const cm = path.join(studio, 'tools', 'certificate-manager', WIN ? 'certificate-manager.exe' : 'certificate-manager');
@@ -299,6 +311,12 @@ async function samsungProfile(serial) {
   }
 }
 
+/** Con il certificato Samsung il TV deve conoscerlo prima dell'installazione: install-permit usa il profilo attivo. */
+function permit(serial, profile) {
+  tizen(['security-profiles', 'set-active', '-n', profile]);
+  console.log(output(tizen(['install-permit', '-s', serial])));
+}
+
 async function stepCertificate(serial, wanted) {
   title(4, 'Certificato per firmare l\'app');
   const state = loadState();
@@ -317,13 +335,14 @@ async function stepCertificate(serial, wanted) {
   }
   let profile;
   if (choice === 'A') {
-    console.log('Creo il certificato...');
-    makeTizenProfile();
+    if (!hasProfile(PROFILE)) {
+      console.log('Creo il certificato...');
+      makeTizenProfile();
+    }
     profile = PROFILE;
   } else {
     profile = await samsungProfile(serial);
-    // Con il certificato Samsung il TV deve conoscerlo prima dell'installazione.
-    console.log(output(tizen(['install-permit', '-s', serial])));
+    permit(serial, profile);
   }
   saveState(Object.assign(loadState(), { profile }));
   console.log('Profilo di firma "' + profile + '" pronto.');
@@ -379,13 +398,16 @@ async function stepInstall(serial, profile) {
   if (fs.existsSync(path.join(ROOT, '..', 'webos', 'app', 'index.html'))) {
     console.log('(Scrivi "locale" per installare la versione di questa cartella del progetto.)');
   }
+  let answer = null;
   for (;;) {
-    const answer = (await ask('Percorso del file .wgt (Invio per scaricare l\'ultima versione da GitHub)')).replace(/^"(.*)"$/, '$1');
+    // Nei nuovi tentativi si riusa il file scelto, senza chiederlo di nuovo.
+    if (answer === null) answer = (await ask('Percorso del file .wgt (Invio per scaricare l\'ultima versione da GitHub)')).replace(/^"(.*)"$/, '$1');
     let pkg;
     try {
       pkg = await source(answer);
     } catch (e) {
       console.log('Problema: ' + e.message);
+      answer = null;
       continue;
     }
     console.log('Firmo il pacchetto con il profilo "' + profile + '"...');
@@ -411,15 +433,37 @@ async function stepInstall(serial, profile) {
       console.log('\nIPTVISION è installato e si sta aprendo sul TV. Lo trovi anche tra le app.');
       return true;
     }
-    if (certificateProblem(text) && profile === PROFILE) {
-      console.log('\nIl TV non accetta il certificato Tizen: serve quello Samsung.');
-      if (await yes('Lo creiamo adesso?', true)) {
-        profile = await stepCertificate(serial, 'B');
-        continue;
-      }
+    if (certificateProblem(text)) {
+      profile = await certificateRejected(serial, profile);
+      if (!profile) return false;
+      continue;
     }
     if (!(await yes('Installazione non riuscita. Vuoi riprovare?', true))) return false;
   }
+}
+
+/** Il TV ha rifiutato la firma: consigli, poi stesso certificato, l'altro tipo, oppure uscita. */
+async function certificateRejected(serial, profile) {
+  const samsung = profile !== PROFILE;
+  console.log('\nIl TV ha rifiutato il certificato. Di solito si risolve così:');
+  console.log('  - il TV deve essere connesso a internet durante l\'installazione: controlla il certificato online.');
+  console.log('    Verifica in Impostazioni > Generali > Rete > Stato rete;');
+  console.log('  - data e ora del TV devono essere giuste;');
+  console.log('  - a volte basta riprovare.');
+  console.log('\n  R. riprova con lo stesso certificato');
+  if (samsung) console.log('  T. prova con il certificato Tizen (su molti TV recenti funziona questo, anche se il Samsung no)');
+  else console.log('  S. prova con il certificato Samsung (serve un account Samsung)');
+  console.log('  N. esci');
+  let c;
+  do c = (await ask('Scelta', 'R')).toUpperCase();
+  while (!(c === 'R' || c === 'N' || c === (samsung ? 'T' : 'S')));
+  if (c === 'N') return '';
+  if (c === 'R') {
+    if (samsung) permit(serial, profile);
+    return profile;
+  }
+  if (samsung) saveState(Object.assign(loadState(), { samsungProfile: profile }));
+  return stepCertificate(serial, samsung ? 'A' : 'B');
 }
 
 async function main() {
