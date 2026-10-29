@@ -1,8 +1,10 @@
 /*
  * Riproduzione con riconnessione automatica.
- * TV in diretta in MPEG-TS: mpegts.js (Media Source Extensions); HLS, film ed episodi: lettore del TV.
+ * TV in diretta in MPEG-TS sui TV LG: mpegts.js (Media Source Extensions); HLS, film ed episodi, e tutta
+ * la diretta sui TV Samsung: lettore del TV.
  * Un controllo ogni secondo verifica che il video avanzi davvero: se si blocca, il flusso si riapre
- * aspettando un po' di più a ogni tentativo.
+ * aspettando un po' di più a ogni tentativo. Un canale che non è mai partito si riprova nell'altro
+ * formato (.ts / .m3u8): molti fornitori ne servono bene solo uno.
  */
 (function () {
   'use strict';
@@ -12,6 +14,9 @@
   var url = null, live = true, resumeMs = 0;
   var attempt = 0, lastTime = -1, lastProgressAt = 0, startedAt = 0, everPlayed = false, userPaused = false;
   var retryTimer = null;
+  // Sui TV Samsung (Tizen) le richieste di mpegts.js al flusso restavano appese senza risposta,
+  // mentre il lettore del TV, lo stesso dei film, apre la diretta senza problemi.
+  var nativeLive = !!(IPTV.Platform && IPTV.Platform.tizen);
 
   var P = {
     state: 'idle', // idle | connecting | buffering | playing | paused | reconnecting
@@ -47,7 +52,7 @@
     startedAt = lastProgressAt = Date.now();
 
     var isTs = /\.ts(\?|$)/i.test(url);
-    if (live && isTs && canUseMse()) {
+    if (live && isTs && !nativeLive && canUseMse()) {
       // Sui TV di fascia media:
       // - la conversione del flusso gira in un worker, così menu e telecomando non la rallentano;
       // - si tengono solo 30 s già visti: con i 3 minuti predefiniti la memoria del TV si riempiva
@@ -72,9 +77,20 @@
     }
   }
 
+  /** Lo stesso canale nell'altro formato, o null se l'indirizzo non è né .ts né .m3u8. */
+  function otherFormat(u) {
+    if (/\.ts(\?|$)/i.test(u)) return u.replace(/\.ts(\?|$)/i, '.m3u8$1');
+    if (/\.m3u8(\?|$)/i.test(u)) return u.replace(/\.m3u8(\?|$)/i, '.ts$1');
+    return null;
+  }
+
   function scheduleRetry(reason) {
     if (!url) return;
     clearTimeout(retryTimer);
+    if (live && !everPlayed && otherFormat(url)) {
+      url = otherFormat(url);
+      console.log('Il canale non parte: provo il formato ' + (/\.m3u8/i.test(url) ? 'HLS (m3u8)' : 'MPEG-TS'));
+    }
     if (!live) {
       if (video.currentTime > 0) resumeMs = video.currentTime * 1000;
       if (attempt >= 6) { P.stop(); if (P.onFailed) P.onFailed(); return; }
@@ -84,13 +100,18 @@
     var wait = Math.min(15000, 1000 * Math.pow(2, Math.min(attempt - 1, 4)));
     console.log('Riconnessione (' + reason + '), tentativo ' + attempt + ' tra ' + wait + ' ms');
     destroyTs();
-    retryTimer = setTimeout(start, wait);
+    // Si chiude anche il lettore del TV: molti fornitori accettano una sola connessione, e quella
+    // vecchia, rimasta aperta, faceva fallire il tentativo successivo.
+    video.pause();
+    video.removeAttribute('src');
+    try { video.load(); } catch (e) { /* già fermo */ }
+    retryTimer = setTimeout(function () { retryTimer = null; start(); }, wait);
   }
 
   video.addEventListener('playing', function () { everPlayed = true; setState('playing'); lastProgressAt = Date.now(); });
   video.addEventListener('waiting', function () { if (P.state !== 'reconnecting') setState(everPlayed ? 'buffering' : 'connecting'); });
   video.addEventListener('pause', function () { if (url && userPaused) setState('paused'); });
-  video.addEventListener('error', function () { scheduleRetry('errore di riproduzione'); });
+  video.addEventListener('error', function () { if (!retryTimer && video.getAttribute('src')) scheduleRetry('errore di riproduzione'); });
   video.addEventListener('ended', function () {
     if (!url) return;
     // Un canale in diretta che "finisce" è un flusso caduto: si riapre.
@@ -100,7 +121,8 @@
 
   setInterval(function () {
     if (!url || userPaused) { lastProgressAt = Date.now(); return; }
-    if (P.state === 'reconnecting' && video.paused) return;
+    // In attesa del prossimo tentativo non si controlla nulla: prima si riprovava ogni secondo.
+    if (retryTimer) { lastProgressAt = Date.now(); return; }
     var t = video.currentTime;
     if (!video.paused && t !== lastTime) {
       lastTime = t;
@@ -119,6 +141,7 @@
 
   P.play = function (newUrl, isLive, startMs) {
     clearTimeout(retryTimer);
+    retryTimer = null;
     url = newUrl; live = isLive; resumeMs = startMs || 0;
     attempt = 0; everPlayed = false; userPaused = false;
     start();
@@ -126,6 +149,7 @@
 
   P.stop = function () {
     clearTimeout(retryTimer);
+    retryTimer = null;
     url = null;
     destroyTs();
     video.pause();
