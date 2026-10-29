@@ -26,6 +26,9 @@ const CLI_URL = 'https://download.tizen.org/sdk/Installer/tizen-studio_6.1/web-c
 const STATE_DIR = path.join(os.homedir(), '.iptvision-tizen');
 const STATE_FILE = path.join(STATE_DIR, 'impostazioni.json');
 const WIN = process.platform === 'win32';
+// Windows scambia gli strumenti Tizen per programmi di installazione e chiederebbe i permessi di
+// amministratore: senza RunAsInvoker l'avvio fallisce in silenzio (errore 740).
+const AS_USER = Object.assign({}, process.env, { __COMPAT_LAYER: 'RunAsInvoker' });
 
 // Le righe arrivano in coda, così non si perde niente se qualcuno scrive prima della domanda.
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
@@ -157,7 +160,9 @@ async function stepTools() {
       fs.renameSync(exe + '.part', exe);
     }
     console.log('Installo in ' + dir + ' (qualche minuto: accetto io la licenza di Tizen Studio)...');
-    spawnSync(exe, ['--accept-license', dir], { stdio: 'inherit' });
+    // Alla fine l'installazione aspetta Invio: glielo diamo noi.
+    const run = spawnSync(exe, ['--accept-license', dir], { stdio: ['pipe', 'inherit', 'inherit'], input: '\n', env: AS_USER });
+    if (run.error) console.log('Avvio non riuscito: ' + run.error.message);
     studio = findStudio(dir);
     if (studio) {
       saveState(Object.assign(loadState(), { studio }));
@@ -275,7 +280,7 @@ async function samsungProfile(serial) {
   const cm = path.join(studio, 'tools', 'certificate-manager', WIN ? 'certificate-manager.exe' : 'certificate-manager');
   if (!fs.existsSync(cm) && fs.existsSync(pm)) {
     console.log('Installo Certificate Manager e l\'estensione per i certificati Samsung (qualche minuto)...');
-    spawnSync(pm, ['install', '--accept-license', 'Certificate-Manager', 'cert-add-on'], { stdio: 'inherit' });
+    spawnSync(pm, ['install', '--accept-license', 'Certificate-Manager', 'cert-add-on'], { stdio: ['pipe', 'inherit', 'inherit'], input: '\n', env: AS_USER });
   }
   const id = duid(serial);
   console.log('\nIn Certificate Manager:');
@@ -285,7 +290,7 @@ async function samsungProfile(serial) {
   console.log('  4. nel certificato distributore lascia "Public" e controlla che ci sia il codice del TV (DUID):');
   console.log('       ' + (id || '(non letto: lo trovi in Device Manager di Tizen Studio)'));
   console.log('  5. premi Finish.');
-  if (fs.existsSync(cm)) spawnSync('cmd', ['/c', 'start', '""', cm], { stdio: 'ignore' });
+  if (fs.existsSync(cm)) spawnSync('cmd', ['/c', 'start', '""', cm], { stdio: 'ignore', env: AS_USER });
   else console.log('Certificate Manager non trovato: installalo da Package Manager (Extension SDK > Samsung Certificate Extension).');
   for (;;) {
     const name = await ask('Nome del profilo che hai creato', 'IPTVISION-Samsung');

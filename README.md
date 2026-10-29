@@ -272,6 +272,15 @@ Se preferisci fare da te, o non usi Windows, servono:
 - [Tizen Studio](https://developer.tizen.org/development/tizen-studio/download) (basta la versione **CLI**, cioè da riga di comando);
 - il file `IPTVISION-x.y.z.wgt` dalle [release](https://github.com/carellice/IPTVISION/releases/latest), oppure questa repository e Node.js per creare il pacchetto da te con `node tizen/tools/build.js --dir C:\iptvision-tizen`.
 
+Per installare la versione CLI senza permessi di amministratore, da un Prompt dei comandi nella cartella dove hai scaricato `web-cli_Tizen_Studio_6.1_windows-64.exe`:
+
+```bash
+set __COMPAT_LAYER=RunAsInvoker
+web-cli_Tizen_Studio_6.1_windows-64.exe --accept-license C:\tizen-studio
+```
+
+Senza la prima riga Windows lo scambia per un programma di installazione e lo blocca (errore 740, "è necessaria l'esecuzione con privilegi elevati"). Lo stesso vale per `package-manager-cli.exe`.
+
 I comandi `tizen` e `sdb` stanno in `C:\tizen-studio\tools\ide\bin` e `C:\tizen-studio\tools`.
 
 **1. Attiva la modalità sviluppatore sul TV**
