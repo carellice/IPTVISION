@@ -13,6 +13,9 @@
   var ts = null;
   var url = null, live = true, resumeMs = 0;
   var attempt = 0, lastTime = -1, lastProgressAt = 0, startedAt = 0, everPlayed = false, userPaused = false;
+  // Sui TV Samsung, in diretta, il lettore del TV lascia currentTime fermo a 0 anche mentre il video scorre:
+  // l'unico segno che avanza sono gli eventi timeupdate, che smettono di arrivare quando il flusso si blocca.
+  var ticks = 0, lastTicks = 0;
   var retryTimer = null;
   // Sui TV Samsung (Tizen) le richieste di mpegts.js al flusso restavano appese senza risposta,
   // mentre il lettore del TV, lo stesso dei film, apre la diretta senza problemi.
@@ -49,6 +52,7 @@
     try { video.load(); } catch (e) { /* niente da scaricare */ }
     setState(attempt > 0 ? 'reconnecting' : 'connecting');
     lastTime = -1;
+    lastTicks = ticks;
     startedAt = lastProgressAt = Date.now();
 
     var isTs = /\.ts(\?|$)/i.test(url);
@@ -98,6 +102,8 @@
     attempt++;
     setState('reconnecting');
     var wait = Math.min(15000, 1000 * Math.pow(2, Math.min(attempt - 1, 4)));
+    // Una diretta che andava e cade una volta si riapre subito: di solito è il fornitore che ha chiuso la connessione.
+    if (live && everPlayed && attempt === 1) wait = 300;
     console.log('Riconnessione (' + reason + '), tentativo ' + attempt + ' tra ' + wait + ' ms');
     destroyTs();
     // Si chiude anche il lettore del TV: molti fornitori accettano una sola connessione, e quella
@@ -108,6 +114,7 @@
     retryTimer = setTimeout(function () { retryTimer = null; start(); }, wait);
   }
 
+  video.addEventListener('timeupdate', function () { ticks++; });
   video.addEventListener('playing', function () { everPlayed = true; setState('playing'); lastProgressAt = Date.now(); });
   video.addEventListener('waiting', function () { if (P.state !== 'reconnecting') setState(everPlayed ? 'buffering' : 'connecting'); });
   video.addEventListener('pause', function () { if (url && userPaused) setState('paused'); });
@@ -124,8 +131,10 @@
     // In attesa del prossimo tentativo non si controlla nulla: prima si riprovava ogni secondo.
     if (retryTimer) { lastProgressAt = Date.now(); return; }
     var t = video.currentTime;
-    if (!video.paused && t !== lastTime) {
+    var ticked = nativeLive && live && ticks !== lastTicks;
+    if (!video.paused && (t !== lastTime || ticked)) {
       lastTime = t;
+      lastTicks = ticks;
       lastProgressAt = Date.now();
       if (P.state !== 'playing' && video.readyState >= 3) setState('playing');
       // Dopo un minuto di visione regolare i tentativi ripartono da capo.

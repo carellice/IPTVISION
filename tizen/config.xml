@@ -15,6 +15,8 @@
     <tizen:privilege name="http://tizen.org/privilege/internet"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
     <tizen:allow-navigation>*</tizen:allow-navigation>
+    <!-- Senza questa riga il TV applica style-src 'self' e scarta gli stili che l'app imposta dal codice. -->
+    <tizen:content-security-policy>default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; img-src * data: blob:; media-src * data: blob:; connect-src *; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; worker-src 'self' blob:</tizen:content-security-policy>
     <tizen:metadata key="http://tizen.org/metadata/app_ui_type/base_screen_resolution" value="extensive"/>
     <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable"
                    encryption="disable" install-location="auto" hwkey-event="enable"/>
