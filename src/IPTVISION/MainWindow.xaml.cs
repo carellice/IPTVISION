@@ -167,6 +167,8 @@ public partial class MainWindow : Window
     private void OnMediaStarted(object item)
     {
         ShowBanner();
+        // Film ed episodi partiti dalla griglia: le frecce passano al lettore (±10 s) invece di muovere i riquadri.
+        if (item is Movie or Episode && GridList.IsKeyboardFocusWithin) Keyboard.Focus(this);
         ListBox? list = item switch
         {
             Channel => ChannelList,
@@ -529,11 +531,12 @@ public partial class MainWindow : Window
         if (Keyboard.FocusedElement is TextBox or System.Windows.Controls.PasswordBox) return false;
         if (mods != ModifierKeys.None && mods != ModifierKeys.Shift) return false;
 
-        var inList = ActiveList().IsKeyboardFocusWithin;
+        // Con l'elenco nascosto (o a schermo intero) il focus rimasto nell'elenco non conta: le frecce vanno al lettore.
+        var inList = _panelVisible && ActiveList().IsKeyboardFocusWithin;
         var vod = _vm.IsVod;
 
         // Griglia del pannello: le frecce spostano la selezione tra i riquadri.
-        if (GridList.IsKeyboardFocusWithin && mods == ModifierKeys.None)
+        if (_panelVisible && GridList.IsKeyboardFocusWithin && mods == ModifierKeys.None)
         {
             switch (key)
             {
