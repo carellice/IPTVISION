@@ -23,7 +23,36 @@
     try { return tz.tvinputdevice.getKey(name).code || fallback; } catch (e) { return fallback; }
   }
 
+  /*
+   * Ricerca vocale sui TV Samsung (Tizen 6.0 e successivi): tenendo premuto il tasto microfono e
+   * dicendo il titolo, il TV passa all'app il testo riconosciuto (VoiceInteraction API).
+   * L'app imposta voice.onSearch e voice.state; sugli altri TV non succede nulla.
+   */
+  var voice = { onSearch: null, state: function () { return 'Home'; }, samsung: false };
+  var vi = tizen && window.webapis && window.webapis.voiceinteraction;
+  if (vi) {
+    var field = function (term, name) {
+      try { return (vi.getDataFromSearchTerm(term, name) || '').trim(); } catch (e) { return ''; }
+    };
+    try {
+      vi.setCallback({
+        onupdatestate: function () { return voice.state(); },
+        onsearch: function (term) {
+          var text = field(term, 'SEARCH_TERM_TITLE') || field(term, 'SEARCH_TERM_UTTERANCE');
+          // "Cerca Matrix" → "Matrix"
+          text = text.replace(/^(cerca|trova|search)\s+/i, '');
+          if (!text || !voice.onSearch) return false;
+          voice.onSearch(text);
+          return true;
+        },
+      });
+      vi.listen();
+      voice.samsung = true;
+    } catch (e) { /* TV precedente a Tizen 6.0 o permesso mancante: resta la dettatura della tastiera */ }
+  }
+
   IPTV.Platform = {
+    voice: voice,
     tizen: tizen,
     /** Marca del TV, per i testi. */
     brand: tizen ? 'Samsung' : 'LG',

@@ -400,7 +400,7 @@
       A.search = input.value;
       results.innerHTML = '';
       var tokens = u.normalize(A.search).split(' ').filter(function (t) { return t; });
-      if (!tokens.length) { info.textContent = 'Canali, film e serie insieme. Premi OK sulla casella per scrivere o dettare.'; return; }
+      if (!tokens.length) { info.textContent = 'Canali, film e serie insieme. Premi OK sulla casella per scrivere, oppure 🎤 Voce per dettare.'; return; }
       if (A.scope !== 'Channels') { ensure('movies'); ensure('series'); }
       function ok(key) { return tokens.every(function (t) { return key.indexOf(t) >= 0; }); }
       var total = 0;
@@ -432,13 +432,73 @@
     input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(run, 300); });
     input.onSubmit = function () { run(); Nav.move('down'); };
     A.rerunSearch = run;
+    var mic = V.focusable(h('div', { class: 'btn mic', data: { key: 'search-mic' }, text: '🎤  Voce' }), function () { startVoice(input, run); });
     content.appendChild(h('div', { class: 'page-title', text: 'Cerca' }));
     content.appendChild(info);
-    content.appendChild(h('div', { class: 'search-row' }, input));
+    content.appendChild(h('div', { class: 'search-row' }, [input, mic]));
     content.appendChild(chips);
     content.appendChild(h('div', { class: 'scroll' }, results));
     run();
   }
+
+  /**
+   * Ricerca vocale dal pulsante 🎤: se il TV riconosce la voce nel browser la si usa, altrimenti
+   * si apre la tastiera del TV sulla casella, che ha la dettatura (tasto microfono del telecomando).
+   */
+  function startVoice(input, run) {
+    var Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    function keyboard() {
+      Nav.focus(input);
+      input.focus();
+      u.toast(IPTV.Platform.voice.samsung
+        ? 'Tieni premuto il tasto microfono del telecomando e di\' il titolo'
+        : 'Premi il tasto microfono del telecomando (o della tastiera) e parla');
+    }
+    if (!Rec) { keyboard(); return; }
+    var rec, got = false;
+    try {
+      rec = new Rec();
+      rec.lang = 'it-IT';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.onresult = function (ev) {
+        var text = ev.results && ev.results[0] && ev.results[0][0] ? ev.results[0][0].transcript : '';
+        if (!text) return;
+        got = true;
+        input.value = text.trim();
+        run();
+      };
+      rec.onerror = function () { if (!got) keyboard(); };
+      rec.onend = function () { if (!got) keyboard(); got = true; };
+      rec.start();
+      u.toast('Parla ora…');
+    } catch (e) { keyboard(); }
+  }
+
+  /** Testo arrivato dalla voce (tasto microfono sui TV Samsung): apre Cerca con quel testo. */
+  function voiceSearch(text) {
+    if (!A.client) return;
+    if (modal.classList.contains('open')) closeModal();
+    if (A.screen === 'player') leavePlayer();
+    A.stack = [];
+    A.screen = 'home';
+    A.section = 'Search';
+    A.search = text;
+    render();
+    var first = root.querySelector('.list .f');
+    if (first) Nav.focus(first);
+    u.toast('Cerco "' + text + '"');
+  }
+
+  IPTV.Platform.voice.onSearch = voiceSearch;
+  IPTV.Platform.voice.state = function () {
+    if (A.screen === 'player') return 'Player';
+    if (A.screen === 'login') return 'None';
+    if (A.screen !== 'home') return 'List';
+    if (A.section === 'Search') return 'Search';
+    if (A.section === 'Settings') return 'Setting';
+    return A.openCat[A.section] ? 'List' : 'Home';
+  };
 
   function settingRow(title, sub, on, toggle) {
     return V.focusable(h('div', { class: 'setting', data: { key: 'set-' + title } }, [

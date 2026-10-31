@@ -14,6 +14,8 @@
     <tizen:profile name="tv-samsung"/>
     <tizen:privilege name="http://tizen.org/privilege/internet"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <!-- Ricerca vocale (tasto microfono del telecomando) dai TV con Tizen 6.0. -->
+    <tizen:privilege name="http://developer.samsung.com/privilege/voicecontrol"/>
     <tizen:allow-navigation>*</tizen:allow-navigation>
     <!-- Senza questa riga il TV applica style-src 'self' e scarta gli stili che l'app imposta dal codice. -->
     <tizen:content-security-policy>default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; img-src * data: blob:; media-src * data: blob:; connect-src *; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; worker-src 'self' blob:</tizen:content-security-policy>

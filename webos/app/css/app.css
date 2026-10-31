@@ -178,6 +178,7 @@ body.playing #root { display: none; }
 .search-row { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-bottom: 0.8rem; }
 .search-row input { -webkit-flex: 1; flex: 1; font-size: 1.15rem; padding: 0.8rem 1rem; border-radius: 0.8rem; background: var(--panel); color: var(--text); border: 0.15rem solid var(--stroke); outline: none; }
 .search-row input.focused { border-color: var(--accent); }
+.search-row .mic { margin: 0 0 0 0.8rem; white-space: nowrap; }
 .group-title { color: var(--text2); font-weight: 700; font-size: 0.85rem; margin: 1rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05rem; }
 .setting { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; background: var(--surface); padding: 0.8rem 1rem; margin-bottom: 0.5rem; max-width: 52rem; }
 .setting .grow span { display: block; color: var(--text3); font-size: 0.8rem; margin-top: 0.15rem; }
