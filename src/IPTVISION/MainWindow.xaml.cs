@@ -366,13 +366,34 @@ public partial class MainWindow : Window
 
     private void Overlay_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // Clic sulla barra dei comandi o sulla proposta del prossimo episodio: non è un clic sul video.
+        var onVideo = !IsWithin(e.OriginalSource as DependencyObject, ControlBar) && !IsWithin(e.OriginalSource as DependencyObject, NextEpisodeCard);
+        // Le frecce devono arrivare al lettore, non all'elenco rimasto con il focus.
+        if (onVideo && !_vm.IsTvMode) Keyboard.Focus(this);
         if (e.ClickCount == 2)
         {
+            // Come su YouTube: il primo clic ha già messo in pausa, il secondo riprende e va a schermo intero.
+            if (onVideo && _vm.IsVod && _vm.Player.IsActive) _vm.TogglePlayCommand.Execute(null);
             ToggleFullscreen();
             e.Handled = true;
             return;
         }
+        if (onVideo && _vm.IsVod && _vm.Player.IsActive)
+        {
+            _vm.TogglePlayCommand.Execute(null);
+            e.Handled = true;
+        }
         ShowControls();
+    }
+
+    private static bool IsWithin(DependencyObject? dep, DependencyObject ancestor)
+    {
+        while (dep != null)
+        {
+            if (dep == ancestor) return true;
+            dep = dep is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(dep) : LogicalTreeHelper.GetParent(dep);
+        }
+        return false;
     }
 
     private void Overlay_MouseWheel(object sender, MouseWheelEventArgs e)
@@ -1156,7 +1177,7 @@ public partial class MainWindow : Window
             ("↑ / ↓", "TV: cambia canale · Film: volume"),
             ("← / →", "TV: volume · Film: −/+ 10 s"),
             ("Shift+← / →", "Film: −/+ 1 minuto"),
-            ("Spazio", "Pausa (film) · stop (TV)"),
+            ("Spazio · clic sul video", "Pausa (film) · stop (TV)"),
             ("0 – 9", "Vai al canale per numero"),
             ("PagSu / PagGiù", "Episodio successivo / precedente"),
             ("Home", "Film: ricomincia dall'inizio"),

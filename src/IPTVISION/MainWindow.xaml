@@ -1287,7 +1287,7 @@
                         </Border>
 
                         <!-- Prossimo episodio -->
-                        <Border VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,24,140" Width="320"
+                        <Border x:Name="NextEpisodeCard" VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,24,140" Width="320"
                                 Background="#F0181B22" BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="14" Padding="16,14"
                                 Visibility="{Binding NextEpisodeOffer, Converter={StaticResource NullToVis}}">
                             <StackPanel>
