@@ -636,6 +636,9 @@ public partial class MainWindow : Window
             case Key.F5:
                 _vm.ReloadCommand.Execute(null);
                 return true;
+            case Key.S when vod:
+                _vm.StopVodCommand.Execute(null);
+                return true;
             case Key.Space:
                 _vm.TogglePlayCommand.Execute(null);
                 ShowControls();
@@ -1184,6 +1187,7 @@ public partial class MainWindow : Window
             ("0 – 9", "Vai al canale per numero"),
             ("PagSu / PagGiù", "Episodio successivo / precedente"),
             ("Home", "Film: ricomincia dall'inizio"),
+            ("S", "Film: stop"),
             ("Backspace", "Canale precedente · torna alla TV"),
             ("M", "Muto"),
             ("F · doppio clic", "Schermo intero"),

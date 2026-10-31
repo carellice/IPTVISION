@@ -494,6 +494,20 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void SkipForward() => SeekBy(30_000);
 
+    /// <summary>Ferma il film o l'episodio: la posizione resta salvata per riprendere da lì.</summary>
+    [RelayCommand]
+    private void StopVod()
+    {
+        if (!IsVod) return;
+        var mode = Mode;
+        LeaveVod();
+        Player.Stop();
+        NowPlayingTitle = NowPlayingSubtitle = null;
+        if (mode != LibraryMode.Live) RefreshContinueCount();
+        ShowToast("Riproduzione interrotta");
+        if (IsTvMode) ShowTvBrowser();
+    }
+
     [RelayCommand]
     private void Restart()
     {

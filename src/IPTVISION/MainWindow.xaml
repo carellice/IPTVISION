@@ -1364,6 +1364,8 @@
                                         <StackPanel Orientation="Horizontal" Visibility="{Binding IsVod, Converter={StaticResource BoolToVis}}">
                                             <Button Style="{StaticResource OverlayButton}" Content="&#xED3D;" Command="{Binding SkipForwardCommand}"
                                                     ToolTip="Avanti 30 s (→: 10 s)" />
+                                            <Button Style="{StaticResource OverlayButton}" Content="&#xE71A;" FontSize="14" Command="{Binding StopVodCommand}"
+                                                    ToolTip="Stop (S)" />
                                             <Button Style="{StaticResource OverlayButton}" Content="&#xE893;" Command="{Binding NextEpisodeCommand}"
                                                     ToolTip="Episodio successivo (PagSu)"
                                                     Visibility="{Binding HasNextEpisode, Converter={StaticResource BoolToVis}}" />
