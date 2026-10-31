@@ -127,6 +127,9 @@ public sealed partial class SeasonItem(int number, string name, int count) : Obs
 public sealed record SearchHeader(string Title, int Count);
 
 /// <summary>Un risultato della ricerca unica: canale, film o serie.</summary>
+/// <summary>Una categoria trovata dalla ricerca: aprendola si va alla sezione con quella categoria.</summary>
+public sealed record CategoryHit(LibraryMode Mode, string Id, string Name, int Count);
+
 public sealed partial class SearchHit(object item, string kind, string title, string? subtitle) : ObservableObject
 {
     public object Item { get; } = item;

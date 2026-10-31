@@ -410,6 +410,31 @@
         results.appendChild(h('div', { class: 'group-title', text: title + ' · ' + list.length }));
         list.forEach(function (x) { results.appendChild(build(x)); });
       }
+      // Anche le categorie: "azione", "sport", "bambini"...
+      var catHits = [];
+      [['Live', 'Channels', A.live, ' canali'], ['Movies', 'Movies', A.movies, ' titoli'], ['Series', 'Series', A.series, ' serie']].forEach(function (x) {
+        var l = x[2];
+        if (!l || (A.scope !== 'All' && A.scope !== x[1])) return;
+        l.cats.forEach(function (c) {
+          if ((l.by[c.id] || []).length && ok(u.normalize(c.name))) catHits.push({ section: x[0], cat: c, count: l.by[c.id].length, unit: x[3] });
+        });
+      });
+      group('Categorie', catHits.slice(0, 60), function (x) {
+        var where = x.section === 'Live' ? 'TV in diretta' : x.section === 'Movies' ? 'Film' : 'Serie TV';
+        return V.focusable(h('div', { class: 'item flat' }, [
+          h('div', { class: 'thumb' }, u.art(null, '▢')),
+          h('div', { class: 'grow' }, [
+            h('div', { class: 't ellipsis', text: x.cat.name }),
+            h('div', { class: 's ellipsis', text: 'Categoria · ' + where + ' · ' + x.count + x.unit }),
+          ]),
+        ]), function () {
+          A.section = x.section;
+          A.openCat[x.section] = x.cat.id;
+          A.lastCat[x.section] = x.cat.id;
+          if (x.section === 'Live') S.set('lastCategoryId', x.cat.id);
+          render();
+        });
+      });
       if ((A.scope === 'All' || A.scope === 'Channels') && A.live) {
         var chs = A.live.items.filter(function (c) { return ok(c.key); }).slice(0, 60);
         group('Canali', chs, function (c) { return V.channelRow(c, { onOpen: function () { playChannel(c, chs); }, favorite: S.isFavorite(c.streamId) }); });

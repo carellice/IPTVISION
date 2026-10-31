@@ -464,6 +464,9 @@ public sealed partial class MainViewModel
             case SearchHit { Item: Series s }:
                 OpenSeriesItem(s);
                 break;
+            case SearchHit { Item: CategoryHit ch }:
+                TvOpenCategoryHit(ch);
+                break;
             case SearchHit { Item: Movie { HasVariants: true } vm }:
                 OpenMovie(vm);
                 break;
@@ -484,6 +487,24 @@ public sealed partial class MainViewModel
                 IsTvBrowsing = false;
                 break;
         }
+    }
+
+    /// <summary>Categoria trovata con la ricerca: si passa alla sua sezione con i riquadri della categoria.</summary>
+    private void TvOpenCategoryHit(CategoryHit hit)
+    {
+        TvSelectSection(hit.Mode switch
+        {
+            LibraryMode.Movies => TvSection.Movies,
+            LibraryMode.Series => TvSection.Series,
+            _ => TvSection.Live,
+        });
+        if (Categories.FirstOrDefault(x => x.Id == hit.Id) is { } cat)
+        {
+            _tvCategoryIndex = Categories.IndexOf(cat);
+            ShowTvItems(cat, 0);
+        }
+        TvZone = TvZone.Grid;
+        FocusCurrent();
     }
 
     public void TvBack()

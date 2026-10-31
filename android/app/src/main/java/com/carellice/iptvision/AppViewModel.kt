@@ -540,8 +540,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- Ricerca ----------
-    data class SearchResults(val channels: List<Channel>, val movies: List<Entry<Movie>>, val series: List<Entry<Series>>) {
-        val total get() = channels.size + movies.size + series.size
+    /** Una categoria trovata dalla ricerca: aprendola si va alla sezione con quella categoria. */
+    data class CategoryHit(val section: Section, val id: String, val name: String, val count: Int)
+
+    data class SearchResults(
+        val channels: List<Channel>, val movies: List<Entry<Movie>>, val series: List<Entry<Series>>,
+        val categories: List<CategoryHit> = emptyList(),
+    ) {
+        val total get() = channels.size + movies.size + series.size + categories.size
+    }
+
+    fun openCategoryHit(c: CategoryHit) {
+        section = c.section
+        openCategory(c.section, c.id)
     }
 
     var searchScope by mutableStateOf(SearchScope.All)
@@ -561,11 +572,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (tokens.isEmpty()) return SearchResults(emptyList(), emptyList(), emptyList())
         fun ok(key: String) = tokens.all { key.contains(it) }
         fun wants(s: SearchScope) = scope == SearchScope.All || scope == s
+        // Anche le categorie con almeno un contenuto: "azione", "sport", "bambini"...
+        fun <T> cats(sec: Section, l: Library<T>?) = l?.categories?.mapNotNull { c ->
+            val n = l.byCategory[c.id]?.size ?: 0
+            if (n > 0 && ok(TextHelpers.normalize(c.name))) CategoryHit(sec, c.id, c.name, n) else null
+        } ?: emptyList()
+        val categories = buildList {
+            if (wants(SearchScope.Channels)) addAll(cats(Section.Live, live))
+            if (wants(SearchScope.Movies)) addAll(cats(Section.Movies, movies))
+            if (wants(SearchScope.Series)) addAll(cats(Section.Series, series))
+        }.take(60)
         // Le copie dello stesso titolo diventano un solo risultato.
         return SearchResults(
             if (wants(SearchScope.Channels)) live?.items?.filter { ok(it.searchKey) }?.take(60) ?: emptyList() else emptyList(),
             if (wants(SearchScope.Movies)) groupVariants(movies?.items?.filter { ok(it.searchKey) } ?: emptyList()) { it.name }.take(60) else emptyList(),
             if (wants(SearchScope.Series)) groupVariants(series?.items?.filter { ok(it.searchKey) } ?: emptyList()) { it.name }.take(60) else emptyList(),
+            categories,
         )
     }
 

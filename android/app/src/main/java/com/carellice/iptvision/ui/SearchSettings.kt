@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.carellice.iptvision.AppViewModel
 import com.carellice.iptvision.SearchScope
+import com.carellice.iptvision.Section
 import com.carellice.iptvision.data.TextHelpers
 import com.carellice.iptvision.data.UpdateService
 
@@ -96,6 +97,17 @@ fun SearchSection(vm: AppViewModel, onVoiceSearch: () -> Unit) {
         VSpace(8.dp)
         if ((vm.moviesLoading || vm.seriesLoading) && scope != SearchScope.Channels) Text("Carico anche film e serie…", color = C.Text3, fontSize = 12.sp)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+            if (results.categories.isNotEmpty()) {
+                item { Header("Categorie", results.categories.size) }
+                items(results.categories, key = { "k${it.section}${it.id}" }) { c ->
+                    val where = when (c.section) {
+                        Section.Movies -> "Film · ${c.count} titoli"
+                        Section.Series -> "Serie TV · ${c.count} serie"
+                        else -> "TV in diretta · ${c.count} canali"
+                    }
+                    Hit(c.name, where, "Categoria", null, TextHelpers.initials(c.name)) { vm.openCategoryHit(c) }
+                }
+            }
             if (results.channels.isNotEmpty()) {
                 item { Header("Canali", results.channels.size) }
                 items(results.channels, key = { "c${it.streamId}" }) { ch -> ChannelRow(vm, ch, results.channels, false) }
