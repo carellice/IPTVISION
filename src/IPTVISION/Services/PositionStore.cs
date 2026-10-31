@@ -94,6 +94,12 @@ public sealed class PositionStore
 
     public LastEpisodeEntry? GetLastEpisode(int seriesId) => _data.LastEpisode.GetValueOrDefault(seriesId);
 
+    /// <summary>Toglie un film da "Continua a guardare": dimentica il punto raggiunto.</summary>
+    public void ForgetPosition(string key) => _dirty |= _data.Positions.Remove(key);
+
+    /// <summary>Toglie una serie da "Continua a guardare". Gli episodi restano segnati come visti.</summary>
+    public void ForgetSeries(int seriesId) => _dirty |= _data.LastEpisode.Remove(seriesId);
+
     public void Save(bool force = false)
     {
         if (!_dirty) return;

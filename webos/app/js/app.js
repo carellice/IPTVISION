@@ -374,9 +374,11 @@
         };
         var el = (grid ? V.mediaCard : V.mediaRow)(it, opts);
         el.dataset.key = (section === 'Movies' ? 'm-' + it.streamId : 's-' + it.seriesId);
+        if (open === CONT) el.continueEntry = e;
         return el;
       });
     }
+    if (open === CONT) content.appendChild(h('div', { class: 'dim', style: 'margin-top:0.6rem;font-size:0.85rem', text: 'Tasto rosso del telecomando: rimuovi il titolo da Continua a guardare.' }));
     var target = lazy.ensure(start);
     if (!focusAfterRender || (focusAfterRender.dataset && /^nav-/.test(focusAfterRender.dataset.key || ''))) focusAfterRender = target;
   }
@@ -614,6 +616,26 @@
       box.appendChild(el);
     });
     openModal(box, pref);
+  }
+
+  /** Toglie un film o una serie da "Continua a guardare" (tutte le versioni), dopo conferma. */
+  function confirmRemoveContinue(e) {
+    A.modalReturn = Nav.current();
+    var it = e.item;
+    var box = h('div', { class: 'dialog' }, [h('h3', { text: 'Rimuovere da Continua a guardare?' }), h('div', { class: 'sub ellipsis', text: it.name })]);
+    var remove = V.focusable(h('div', { class: 'opt' }, '✕  Rimuovi'), function () {
+      e.variants.forEach(function (v) {
+        if (v.kind === 'movie') Pos.forgetPosition(v.posKey); else Pos.forgetSeries(v.seriesId);
+      });
+      Pos.save();
+      A.modalReturn = null;
+      closeModal();
+      u.toast(it.name + ' tolto da Continua a guardare');
+      render();
+    });
+    box.appendChild(remove);
+    box.appendChild(V.focusable(h('div', { class: 'opt' }, '     Annulla'), closeModal));
+    openModal(box, remove);
   }
 
   /** Titolo pubblicato più volte (per esempio in FHD e in 4K): si sceglie quale versione aprire. */
@@ -1000,6 +1022,10 @@
         S.toggleFavorite(cur.channel.streamId);
         u.toast(S.isFavorite(cur.channel.streamId) ? cur.channel.name + ' aggiunto ai preferiti' : cur.channel.name + ' tolto dai preferiti');
         render(true);
+        handled = true;
+      } else if (cur && cur.continueEntry) {
+        // Tasto rosso in "Continua a guardare": toglie il titolo dall'elenco.
+        confirmRemoveContinue(cur.continueEntry);
         handled = true;
       }
     } else handled = Nav.handleDefault(e);

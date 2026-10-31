@@ -511,6 +511,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return groupVariants(sorted) { it.name }
     }
 
+    /** Toglie un film da "Continua a guardare" (tutte le versioni dello stesso titolo). */
+    fun removeMovieFromContinue(e: Entry<Movie>) {
+        e.variants.forEach { positions.forgetPosition(it.key) }
+        positions.save(force = true)
+        positionsVersion++
+    }
+
+    /** Toglie una serie da "Continua a guardare" (tutte le versioni dello stesso titolo). */
+    fun removeSeriesFromContinue(e: Entry<Series>) {
+        e.variants.forEach { positions.forgetSeries(it.seriesId) }
+        positions.save(force = true)
+        positionsVersion++
+    }
+
     /** Avanzamento di un titolo raggruppato: il più avanti tra le sue versioni. */
     fun progressOf(e: Entry<Movie>): Float = e.variants.maxOf { positions.progress(it.key) }
 

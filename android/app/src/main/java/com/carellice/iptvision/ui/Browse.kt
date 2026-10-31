@@ -33,12 +33,14 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -355,11 +357,15 @@ fun MoviesSection(vm: AppViewModel) {
     }
     LibrarySection(vm, Section.Movies, entries, { if (it == 1) "1 film" else "$it film" }, { vm.moviesFor(it).size }) { catId, grid ->
         val list = remember(lib, catId, vm.positionsVersion, vm.sortOf(Section.Movies)) { vm.moviesFor(catId) }
+        var remove by remember { mutableStateOf<Entry<Movie>?>(null) }
         EntryList(vm, list, grid, key = { it.streamId }) { e, mod, g ->
             val m = e.item
-            if (g) Poster(m.name, m.meta, m.poster, m.initials, vm.progressOf(e), e.variantsText.takeIf { e.hasVariants }, mod) { vm.openMovieEntry(e) }
-            else MediaRow(m.name, m.meta, m.poster, m.initials, vm.progressOf(e), e.variantsText.takeIf { e.hasVariants }, mod) { vm.openMovieEntry(e) }
+            // In "Continua a guardare" la pressione lunga (o il tasto Menu) toglie il titolo dall'elenco.
+            val long: (() -> Unit)? = if (catId == CONTINUE_ID) ({ remove = e }) else null
+            if (g) Poster(m.name, m.meta, m.poster, m.initials, vm.progressOf(e), e.variantsText.takeIf { e.hasVariants }, mod, long) { vm.openMovieEntry(e) }
+            else MediaRow(m.name, m.meta, m.poster, m.initials, vm.progressOf(e), e.variantsText.takeIf { e.hasVariants }, mod, long) { vm.openMovieEntry(e) }
         }
+        remove?.let { e -> RemoveContinueDialog(e.item.name, { remove = null }) { vm.removeMovieFromContinue(e); remove = null } }
     }
 }
 
@@ -376,12 +382,27 @@ fun SeriesSection(vm: AppViewModel) {
     }
     LibrarySection(vm, Section.Series, entries, { if (it == 1) "1 serie" else "$it serie" }, { vm.seriesFor(it).size }) { catId, grid ->
         val list = remember(lib, catId, vm.positionsVersion, vm.sortOf(Section.Series)) { vm.seriesFor(catId) }
+        var remove by remember { mutableStateOf<Entry<Series>?>(null) }
         EntryList(vm, list, grid, key = { it.seriesId }) { e, mod, g ->
             val s = e.item
-            if (g) Poster(s.name, s.meta, s.cover, s.initials, 0f, e.variantsText.takeIf { e.hasVariants }, mod) { vm.openSeriesEntry(e) }
-            else MediaRow(s.name, s.meta, s.cover, s.initials, 0f, e.variantsText.takeIf { e.hasVariants }, mod) { vm.openSeriesEntry(e) }
+            val long: (() -> Unit)? = if (catId == CONTINUE_ID) ({ remove = e }) else null
+            if (g) Poster(s.name, s.meta, s.cover, s.initials, 0f, e.variantsText.takeIf { e.hasVariants }, mod, long) { vm.openSeriesEntry(e) }
+            else MediaRow(s.name, s.meta, s.cover, s.initials, 0f, e.variantsText.takeIf { e.hasVariants }, mod, long) { vm.openSeriesEntry(e) }
         }
+        remove?.let { e -> RemoveContinueDialog(e.item.name, { remove = null }) { vm.removeSeriesFromContinue(e); remove = null } }
     }
+}
+
+@Composable
+private fun RemoveContinueDialog(title: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = C.Panel,
+        title = { Text("Rimuovere da Continua a guardare?", color = C.Text) },
+        text = { Text(title, color = C.Text2) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Rimuovi", color = C.Danger) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Indietro", color = C.Text2) } },
+    )
 }
 
 @Composable
@@ -415,9 +436,9 @@ private fun <T> EntryList(
 @Composable
 fun Poster(
     title: String, meta: String, url: String?, initials: String, progress: Float, badge: String? = null,
-    modifier: Modifier = Modifier, onClick: () -> Unit,
+    modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
 ) {
-    Column(modifier.tvClickable(focusScale = 1.06f, background = Color.Transparent, focusedBackground = C.Surface, onClick = onClick).padding(4.dp)) {
+    Column(modifier.tvClickable(focusScale = 1.06f, background = Color.Transparent, focusedBackground = C.Surface, onLongClick = onLongClick, onClick = onClick).padding(4.dp)) {
         Box {
             Artwork(url, initials, Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)), fontSize = 22)
             if (progress > 0f && progress < 1f) ProgressLine(progress, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(6.dp))
@@ -437,9 +458,9 @@ fun Poster(
 @Composable
 fun MediaRow(
     title: String, meta: String, url: String?, initials: String, progress: Float, badge: String?,
-    modifier: Modifier = Modifier, onClick: () -> Unit,
+    modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
 ) {
-    Row(modifier.fillMaxWidth().tvClickable(focusScale = 1.02f, onClick = onClick).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.fillMaxWidth().tvClickable(focusScale = 1.02f, onLongClick = onLongClick, onClick = onClick).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
         Artwork(url, initials, Modifier.width(52.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)), ContentScale.Crop, 14)
         HSpace(14.dp)
         Column(Modifier.weight(1f)) {

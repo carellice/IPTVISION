@@ -157,6 +157,18 @@ class PositionStore(private val file: File) {
     @Synchronized
     fun lastEpisode(seriesId: Int): Pair<String, Long>? = lastEpisode[seriesId]
 
+    /** Toglie un film da "Continua a guardare": dimentica il punto raggiunto. */
+    @Synchronized
+    fun forgetPosition(key: String) {
+        if (positions.remove(key) != null) dirty = true
+    }
+
+    /** Toglie una serie da "Continua a guardare". Gli episodi restano segnati come visti. */
+    @Synchronized
+    fun forgetSeries(seriesId: Int) {
+        if (lastEpisode.remove(seriesId) != null) dirty = true
+    }
+
     @Synchronized
     fun save(force: Boolean = false) {
         if (!dirty) return

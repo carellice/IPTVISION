@@ -911,6 +911,13 @@ public partial class MainWindow : Window
             _vm.DeleteDownloadCommand.Execute(d);
             e.Handled = true;
         }
+        else if (e.Key == Key.Delete && sender is ListBox { SelectedItem: { } picked }
+                 && (picked is SearchHit sh ? sh.Item : picked) is ArtworkItem { HasProgress: true } art and (Movie or Series))
+        {
+            // Canc: toglie il film o la serie da "Continua a guardare".
+            _vm.RemoveFromContinue(art);
+            e.Handled = true;
+        }
     }
 
     /// <summary>Tasto destro su film, serie ed episodi (anche in griglia e nella ricerca): Scarica.</summary>
@@ -926,10 +933,10 @@ public partial class MainWindow : Window
         }
         if (item is SearchHit h) item = h.Item;
         if (item is not (Movie or Series or Episode)) return;
+        var menu = new ContextMenu { PlacementTarget = (UIElement)sender };
 
         var key = item switch { Movie m => m.Key, Episode ep => ep.Key, _ => null };
         var existing = key != null ? _vm.DownloadService.Get(key) : null;
-        var menu = new ContextMenu { PlacementTarget = (UIElement)sender };
         var mi = new MenuItem
         {
             Header = existing != null ? (existing.IsDone ? "Scaricato · mostra i download" : "Tra i download · mostra")
@@ -942,6 +949,12 @@ public partial class MainWindow : Window
             else _vm.IsDownloadsOpen = true;
         };
         menu.Items.Add(mi);
+        if (item is Movie or Series && ((ArtworkItem)item).HasProgress)
+        {
+            var remove = new MenuItem { Header = "Rimuovi da Continua a guardare", InputGestureText = "Canc" };
+            remove.Click += (_, _) => _vm.RemoveFromContinue((ArtworkItem)item);
+            menu.Items.Add(remove);
+        }
         menu.IsOpen = true;
     }
 

@@ -87,6 +87,14 @@
       dirty = true;
     },
     lastEpisode: function (seriesId) { return pos.lastEpisode[seriesId] || null; },
+    /** Toglie un film da "Continua a guardare": dimentica il punto raggiunto. */
+    forgetPosition: function (key) {
+      if (pos.positions[key]) { delete pos.positions[key]; dirty = true; }
+    },
+    /** Toglie una serie da "Continua a guardare". Gli episodi restano segnati come visti. */
+    forgetSeries: function (seriesId) {
+      if (pos.lastEpisode[seriesId]) { delete pos.lastEpisode[seriesId]; dirty = true; }
+    },
     save: function () {
       if (!dirty) return;
       var keys = Object.keys(pos.positions);

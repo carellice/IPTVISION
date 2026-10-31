@@ -218,6 +218,35 @@ public sealed partial class MainViewModel
         else if (n > 0 && Mode != LibraryMode.Live) RebuildCategories();
     }
 
+    /// <summary>Toglie un film o una serie da "Continua a guardare" (tutte le versioni dello stesso titolo).</summary>
+    public void RemoveFromContinue(ArtworkItem item)
+    {
+        var all = item.Variants.Count > 1 ? item.Variants : [item];
+        foreach (var v in all)
+        {
+            switch (v)
+            {
+                case Movie m:
+                    _positions.ForgetPosition(m.Key);
+                    if (m.Progress < 1) m.Progress = 0;
+                    break;
+                case Series s:
+                    _positions.ForgetSeries(s.SeriesId);
+                    s.Progress = 0;
+                    break;
+            }
+        }
+        if (item.Progress < 1) item.Progress = 0;
+        _positions.Save(force: true);
+        RefreshContinueCount();
+        if (SelectedCategory?.IsContinue == true)
+        {
+            ApplyFilter();
+            if (Categories.FirstOrDefault(c => c.IsContinue) is { Count: 0 }) RebuildCategories();
+        }
+        ShowToast($"{item.ItemName} tolto da Continua a guardare");
+    }
+
     // ---------- Dettaglio serie ----------
 
     [RelayCommand]
