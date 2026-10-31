@@ -34,6 +34,16 @@ Molti guardano i canali del digitale terrestre in streaming perché non hanno l'
 
 > IPTVISION è solo un lettore e non contiene canali. Va usato con un servizio IPTV a cui si ha diritto di accedere.
 
+## IPTVISION nel browser (server di casa)
+
+C'è anche una versione web, uguale all'app Android, da installare sul proprio server di casa (CasaOS, Raspberry Pi o qualsiasi Linux con Docker): ogni persona di casa ha il suo account e la usa dal telefono o dal PC come un'app.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/carellice/IPTVISION/main/PWA/casaos/installa.sh | sudo bash
+```
+
+Dettagli in [PWA/README.md](PWA/README.md).
+
 ## Funzioni
 
 ### 📺 TV in diretta
