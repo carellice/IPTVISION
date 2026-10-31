@@ -80,7 +80,7 @@ private fun cats(categories: List<Category>, counts: (String) -> Int, extra: Lis
 
 /** Il riquadro da cui riprendere il focus col telecomando (categoria appena chiusa, canale in onda…). */
 @Composable
-private fun Modifier.initialFocus(enabled: Boolean, tv: Boolean): Modifier {
+internal fun Modifier.initialFocus(enabled: Boolean, tv: Boolean): Modifier {
     if (!enabled || !tv) return this
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { delay(80); runCatching { fr.requestFocus() } }

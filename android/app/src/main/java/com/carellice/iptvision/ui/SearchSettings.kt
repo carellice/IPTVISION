@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -88,6 +89,10 @@ fun SearchSection(vm: AppViewModel, onVoiceSearch: () -> Unit) {
             Row(
                 Modifier.tvClickable(shape = RoundedCornerShape(14.dp), background = C.AccentSoft, onClick = onVoiceSearch).padding(16.dp),
             ) { Icon(Icons.Default.Mic, "Ricerca vocale", tint = C.Accent) }
+            HSpace(10.dp)
+            Row(
+                Modifier.tvClickable(shape = RoundedCornerShape(14.dp), background = C.AccentSoft, onClick = vm::openQuiz).padding(16.dp),
+            ) { Icon(Icons.Default.Lightbulb, "Cosa guardo?", tint = C.Accent) }
         }
         VSpace(10.dp)
         // Dove cercare: tutto insieme oppure solo canali, film o serie.

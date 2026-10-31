@@ -204,7 +204,7 @@
 
                     <!-- Ricerca unica: canali, film e serie -->
                     <Grid Margin="14,6,14,10">
-                        <TextBox x:Name="SearchBox" Style="{StaticResource InputBox}" Height="40" FontSize="13.5" Padding="34,0,62,0"
+                        <TextBox x:Name="SearchBox" Style="{StaticResource InputBox}" Height="40" FontSize="13.5" Padding="34,0,92,0"
                                  Tag="{Binding SearchPlaceholder}"
                                  Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
                         <TextBlock Text="&#xE721;" Style="{StaticResource Icon}" FontSize="13" HorizontalAlignment="Left" Margin="13,0,0,0"
@@ -215,6 +215,8 @@
                                     Visibility="{Binding SearchText, Converter={StaticResource NullToVis}}" ToolTip="Cancella ricerca (Esc)" />
                             <Button x:Name="MicButton" Style="{StaticResource IconButton}" Width="28" Height="28" FontSize="13" Content="&#xE720;"
                                     Click="Mic_Click" ToolTip="Cerca con la voce (Ctrl+M)" />
+                            <Button Style="{StaticResource IconButton}" Width="28" Height="28" FontSize="13" Content="&#xE82F;"
+                                    Command="{Binding OpenQuizCommand}" ToolTip="Non sai cosa guardare? Rispondi a poche domande (Ctrl+G)" />
                         </StackPanel>
                     </Grid>
 
@@ -830,6 +832,94 @@
                                  PreviewMouseLeftButtonUp="VariantList_PreviewMouseLeftButtonUp" />
                         <TextBlock Grid.Row="2" Text="Invio per guardare  ·  Esc per annullare" Foreground="{StaticResource TextTertiaryBrush}"
                                    FontSize="12" Margin="16,8,16,12" />
+                    </Grid>
+
+                    <!-- Cosa guardo? Domande a risposta multipla e consigli -->
+                    <Grid Grid.Row="0" Grid.RowSpan="5" Background="{StaticResource PanelBrush}" Panel.ZIndex="9"
+                          Visibility="{Binding IsQuizOpen, Converter={StaticResource BoolToVis}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Margin="8,8,14,8">
+                            <Button Style="{StaticResource IconButton}" Content="&#xE72B;" FontSize="13" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Command="{Binding CloseQuizCommand}" ToolTip="Chiudi (Esc)" />
+                            <StackPanel Margin="44,4,0,0">
+                                <TextBlock Text="Cosa guardo?" FontFamily="{StaticResource DisplayFont}" FontSize="17" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding QuizStep}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,3,0,0" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Domanda -->
+                        <ScrollViewer x:Name="QuizQuestionView" Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                      Visibility="{Binding IsQuizAsking, Converter={StaticResource BoolToVis}}">
+                            <StackPanel Margin="16,6,16,16">
+                                <TextBlock Text="{Binding QuizQuestion.Text}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,14" />
+                                <ItemsControl ItemsSource="{Binding QuizQuestion.Options}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource SecondaryButton}" Height="42" Margin="0,0,0,8" HorizontalContentAlignment="Left"
+                                                    Padding="16,0" Content="{Binding Label}"
+                                                    Command="{Binding DataContext.AnswerQuizCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Consigli -->
+                        <Grid Grid.Row="1" Visibility="{Binding IsQuizDone, Converter={StaticResource BoolToVis}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="{Binding QuizNote}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap"
+                                       Margin="16,0,16,8" Visibility="{Binding QuizNote, Converter={StaticResource NullToVis}}" />
+                            <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                        Visibility="{Binding IsQuizLoading, Converter={StaticResource BoolToVis}}">
+                                <ContentControl Style="{StaticResource Spinner}" />
+                                <TextBlock Text="Cerco qualcosa per te…" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,14,0,0" HorizontalAlignment="Center" />
+                            </StackPanel>
+                            <ScrollViewer x:Name="QuizResultsView" Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding QuizResults}" Margin="8,0,8,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource SecondaryButton}" Height="Auto" Margin="0,0,0,8" Padding="8"
+                                                    HorizontalContentAlignment="Stretch"
+                                                    Command="{Binding DataContext.QuizOpenResultCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    CommandParameter="{Binding}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Width="46" Height="68" CornerRadius="7" Background="#1C1F27" ClipToBounds="True">
+                                                        <Grid>
+                                                            <TextBlock Text="{Binding Initials}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            <Image Source="{Binding Item.Art}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                                        </Grid>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                                        <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold" TextWrapping="Wrap" MaxHeight="40" />
+                                                        <TextBlock Text="{Binding Subtitle}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                            <UniformGrid Grid.Row="2" Columns="2" Margin="16,8,16,14">
+                                <Button Style="{StaticResource PrimaryButton}" Height="38" Margin="0,0,6,0" Content="Altri consigli"
+                                        Command="{Binding QuizMoreCommand}" />
+                                <Button Style="{StaticResource SecondaryButton}" Height="38" Margin="6,0,0,0" Content="Ricomincia"
+                                        Command="{Binding QuizRestartCommand}" />
+                            </UniformGrid>
+                        </Grid>
                     </Grid>
 
                     <!-- Stati vuoti / caricamento -->

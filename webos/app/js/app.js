@@ -458,9 +458,10 @@
     input.onSubmit = function () { run(); Nav.move('down'); };
     A.rerunSearch = run;
     var mic = V.focusable(h('div', { class: 'btn mic', data: { key: 'search-mic' }, text: '🎤  Voce' }), function () { startVoice(input, run); });
+    var quiz = V.focusable(h('div', { class: 'btn mic', data: { key: 'search-quiz' }, text: '💡  Cosa guardo?' }), openQuiz);
     content.appendChild(h('div', { class: 'page-title', text: 'Cerca' }));
     content.appendChild(info);
-    content.appendChild(h('div', { class: 'search-row' }, [input, mic]));
+    content.appendChild(h('div', { class: 'search-row' }, [input, mic, quiz]));
     content.appendChild(chips);
     content.appendChild(h('div', { class: 'scroll' }, results));
     run();
@@ -742,6 +743,131 @@
     box.appendChild(list);
     box.appendChild(h('div', { class: 'hint', text: 'OK per scegliere · Indietro per annullare' }));
     openModal(box);
+  }
+
+  // ---------- Cosa guardo? ----------
+  // Poche domande a risposta multipla e qualche film o serie consigliati: stesse domande e regole di Windows e Android.
+
+  var QUIZ = [
+    { key: 'type', text: 'Cosa ti va di guardare?', options: [['Un film', 'movie'], ['Una serie TV', 'series'], ['Fa lo stesso', 'any']] },
+    { key: 'mood', text: 'Che emozioni cerchi?', options: [
+      ['Ridere', 'comedy'], ['Azione e adrenalina', 'action'], ['Paura e brividi', 'horror'], ['Emozioni e amore', 'drama'],
+      ['Fantascienza e fantasy', 'fantasy'], ['Gialli, crimini e storie vere', 'crime'], ['Animazione e famiglia', 'family'], ['Sorprendimi', 'any']] },
+    { key: 'period', text: 'Di che periodo?', options: [['Uscito di recente', 'recent'], ['Anni 2000 e 2010', '2000s'], ['Un classico', 'classic'], ['Fa lo stesso', 'any']] },
+    { key: 'rating', text: 'Vuoi andare sul sicuro?', options: [['Sì, solo titoli molto votati', 'top'], ['Fa lo stesso', 'any']] },
+  ];
+  // Parole (già normalizzate) che riconoscono il genere nel nome della categoria o nel genere della serie.
+  var MOOD_WORDS = {
+    comedy: ['commedi', 'comed', 'comic', 'umor', 'sitcom', 'parodi'],
+    action: ['azion', 'action', 'avventur', 'adventur', 'thriller', 'guerra', 'war', 'western', 'spionag', 'marzial', 'martial'],
+    horror: ['horror', 'terror', 'paura', 'brivid', 'zombi', 'slasher', 'soprannatural', 'supernatural'],
+    drama: ['dramm', 'drama', 'romant', 'romanc', 'amore', 'love', 'sentiment'],
+    fantasy: ['fantasy', 'fantasc', 'sci fi', 'scifi', 'science fiction', 'fantastic', 'supereroi', 'superhero', 'marvel'],
+    crime: ['crime', 'crimin', 'giall', 'poliz', 'mister', 'myster', 'document', 'docu', 'biograf', 'true story', 'storic'],
+    family: ['animaz', 'animat', 'cartoon', 'cartoni', 'bambin', 'kids', 'famigl', 'family', 'disney', 'ragazz'],
+  };
+
+  function openQuiz() {
+    A.modalReturn = Nav.current();
+    ensure('movies');
+    ensure('series');
+    quizStep(0, {});
+  }
+
+  function quizStep(i, answers) {
+    if (i >= QUIZ.length) { quizResults(answers); return; }
+    var q = QUIZ[i];
+    var box = h('div', { class: 'dialog' }, [h('h3', { text: 'Cosa guardo?' }), h('div', { class: 'sub', text: 'Domanda ' + (i + 1) + ' di ' + QUIZ.length })]);
+    box.appendChild(h('div', { style: 'font-size:1.25rem;font-weight:600;margin:0.4rem 0 0.8rem', text: q.text }));
+    var first = null;
+    q.options.forEach(function (o) {
+      var el = V.focusable(h('div', { class: 'opt', text: o[0] }), function () {
+        answers[q.key] = o[1];
+        quizStep(i + 1, answers);
+      });
+      if (!first) first = el;
+      box.appendChild(el);
+    });
+    box.appendChild(h('div', { class: 'hint', text: 'OK per scegliere · Indietro per chiudere' }));
+    openModal(box, first);
+  }
+
+  function quizResults(answers) {
+    var box = h('div', { class: 'dialog' }, [h('h3', { text: 'Cosa guardo?' }), h('div', { class: 'sub', text: 'I nostri consigli' })]);
+    if (A.loading.movies || A.loading.series) {
+      box.appendChild(h('div', { class: 'muted', style: 'margin:1rem 0', text: 'Cerco qualcosa per te…' }));
+      openModal(box);
+      setTimeout(function () { if (modal.classList.contains('open') && modal.contains(box)) quizResults(answers); }, 700);
+      return;
+    }
+    var r = recommend(answers);
+    if (r.note) box.appendChild(h('div', { class: 'muted', style: 'margin-bottom:0.6rem', text: r.note }));
+    var list = h('div', { class: 'scroll', style: 'max-height:28rem' });
+    var first = null;
+    r.picks.forEach(function (it) {
+      var el = V.focusable(h('div', { class: 'opt' }, [
+        h('div', { class: 'thumb poster' }, u.art(it.poster || it.cover, it.initials)),
+        h('div', { class: 'grow' }, [
+          h('div', { class: 't ellipsis', style: 'font-weight:600', text: it.name }),
+          h('div', { class: 'dim', text: u.joinMeta(it.kind === 'movie' ? 'Film' : 'Serie TV', it.meta) }),
+        ]),
+      ]), function () { A.modalReturn = null; closeModal(); openItem(it); });
+      if (!first) first = el;
+      list.appendChild(el);
+    });
+    box.appendChild(list);
+    var more = V.focusable(h('div', { class: 'btn primary small', text: 'Altri consigli' }), function () { quizResults(answers); });
+    box.appendChild(h('div', { style: 'margin-top:0.8rem' }, [
+      more,
+      V.focusable(h('div', { class: 'btn small', text: 'Ricomincia' }), function () { quizStep(0, {}); }),
+    ]));
+    openModal(box, first || more);
+  }
+
+  function recommend(answers) {
+    var type = answers.type || 'any', mood = answers.mood || 'any', period = answers.period || 'any', top = answers.rating === 'top';
+    function names(l) { var o = {}; if (l) l.cats.forEach(function (c) { o[c.id] = c.name; }); return o; }
+    function yearOf(y) { return parseInt(String(y || '').slice(0, 4), 10) || 0; }
+    var vodNames = names(A.movies), seriesNames = names(A.series);
+    var pool = [];
+    // Solo titoli nuovi: niente film già visti o iniziati, niente serie già aperte.
+    if (type !== 'series' && A.movies) A.movies.items.forEach(function (m) {
+      if (Pos.progress(m.posKey) === 0) pool.push({ it: m, text: u.normalize(vodNames[m.categoryId] || ''), year: yearOf(m.year), rating: m.rating || 0 });
+    });
+    if (type !== 'movie' && A.series) A.series.items.forEach(function (s) {
+      if (!Pos.lastEpisode(s.seriesId)) pool.push({ it: s, text: u.normalize((seriesNames[s.categoryId] || '') + ' ' + (s.genre || '')), year: yearOf(s.year), rating: s.rating || 0 });
+    });
+    if (!pool.length) return { picks: [], note: 'Il catalogo non è ancora disponibile: riprova tra poco.' };
+
+    var now = new Date().getFullYear();
+    var maxRating = Math.max.apply(null, pool.map(function (c) { return c.rating; }));
+    function moodOk(c) { return mood === 'any' || MOOD_WORDS[mood].some(function (w) { return c.text.indexOf(w) >= 0; }); }
+    function periodOk(c) {
+      if (period === 'recent') return c.year >= now - 3;
+      if (period === '2000s') return c.year >= 2000 && c.year < now - 3;
+      if (period === 'classic') return c.year > 1900 && c.year < 2000;
+      return true;
+    }
+    function ratingOk(c) { return !top || maxRating <= 0 || c.rating >= maxRating * 0.7; }
+
+    // Se nessun titolo soddisfa tutte le risposte si rinuncia prima al voto, poi al periodo, poi al genere.
+    var note = null;
+    var picks = pool.filter(function (c) { return moodOk(c) && periodOk(c) && ratingOk(c); });
+    if (!picks.length) { picks = pool.filter(function (c) { return moodOk(c) && periodOk(c); }); note = 'Nessun titolo con tutte le risposte: ecco i più vicini.'; }
+    if (!picks.length) picks = pool.filter(moodOk);
+    if (!picks.length) { picks = pool; note = 'Nel catalogo non ho trovato quel genere: ecco qualcosa da scoprire.'; }
+
+    // Un po' di caso, ma i titoli più votati hanno più probabilità di uscire.
+    picks = picks.map(function (c) { return { c: c, s: (c.rating > 0 ? c.rating : maxRating * 0.4) * (0.5 + Math.random()) }; })
+      .sort(function (a, b) { return b.s - a.s; });
+    var seen = {}, out = [];
+    for (var i = 0; i < picks.length && out.length < 6; i++) {
+      var k = u.variantKey(picks[i].c.it.name);
+      if (seen[k]) continue;
+      seen[k] = true;
+      out.push(picks[i].c.it);
+    }
+    return { picks: out, note: note };
   }
 
   // ---------- Riproduzione ----------

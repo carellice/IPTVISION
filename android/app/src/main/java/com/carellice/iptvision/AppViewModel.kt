@@ -23,6 +23,7 @@ import com.carellice.iptvision.data.Episode
 import com.carellice.iptvision.data.Log
 import com.carellice.iptvision.data.Movie
 import com.carellice.iptvision.data.PositionStore
+import com.carellice.iptvision.data.Quiz
 import com.carellice.iptvision.data.Series
 import com.carellice.iptvision.data.SeriesInfo
 import com.carellice.iptvision.data.Settings
@@ -523,6 +524,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         e.variants.forEach { positions.forgetSeries(it.seriesId) }
         positions.save(force = true)
         positionsVersion++
+    }
+
+    // ---------- Cosa guardo? ----------
+    var quizOpen by mutableStateOf(false)
+
+    fun openQuiz() {
+        quizOpen = true
+        // Il catalogo serve alla fine: si carica mentre si risponde.
+        ensureMovies()
+        ensureSeries()
+    }
+
+    /** Consigli per le risposte date; solo titoli nuovi (film non iniziati, serie mai aperte). */
+    fun recommend(answers: Map<String, String>): Quiz.Result = Quiz.recommend(
+        answers,
+        movies?.items.orEmpty(), movies?.categories.orEmpty(),
+        series?.items.orEmpty(), series?.categories.orEmpty(),
+        isNew = { p ->
+            when (p) {
+                is Quiz.Pick.Film -> positions.progress(p.movie.key) == 0f
+                is Quiz.Pick.Show -> positions.lastEpisode(p.series.seriesId) == null
+            }
+        },
+    )
+
+    fun openPick(p: Quiz.Pick) {
+        quizOpen = false
+        when (p) {
+            is Quiz.Pick.Film -> openMovie(p.movie)
+            is Quiz.Pick.Show -> openSeries(p.series)
+        }
     }
 
     /** Avanzamento di un titolo raggruppato: il più avanti tra le sue versioni. */

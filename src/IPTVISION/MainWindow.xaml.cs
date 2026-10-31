@@ -127,6 +127,14 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.IsSettingsOpen):
                 if (_vm.IsSettingsOpen && !_panelVisible) SetPanel(true, save: false);
                 break;
+            case nameof(MainViewModel.IsQuizOpen):
+                if (_vm.IsQuizOpen) { if (!_panelVisible) SetPanel(true, save: false); FocusQuiz(); }
+                else Focus();
+                break;
+            case nameof(MainViewModel.QuizQuestion):
+            case nameof(MainViewModel.QuizResults):
+                if (_vm.IsQuizOpen) FocusQuiz();
+                break;
             case nameof(MainViewModel.IsDownloadsOpen):
                 if (_vm.IsDownloadsOpen && !_panelVisible) SetPanel(true, save: false);
                 break;
@@ -471,9 +479,11 @@ public partial class MainWindow : Window
         var ctrl = mods.HasFlag(ModifierKeys.Control);
 
         if (_vm.IsVariantChooserOpen) return HandleVariantKey(key);
+        if (_vm.IsQuizOpen && !_vm.IsTvMode) return HandleQuizKey(key);
 
         if (ctrl && key == Key.T) { ToggleTvMode(); return true; }
         if (ctrl && key == Key.M) { StartVoiceSearch(); return true; }
+        if (ctrl && key == Key.G && !_vm.IsTvMode) { _vm.OpenQuizCommand.Execute(null); return true; }
         if (HandleTvKey(key)) return true;
 
         // LB/RB del controller e tasti multimediali del telecomando.
@@ -1030,6 +1040,53 @@ public partial class MainWindow : Window
         return true;
     }
 
+    // ---------- Cosa guardo? ----------
+
+    /// <summary>Con le domande aperte: frecce tra le risposte, Invio sceglie, Esc chiude.</summary>
+    private bool HandleQuizKey(Key key)
+    {
+        switch (key)
+        {
+            case Key.Escape:
+            case Key.BrowserBack:
+                _vm.CloseQuizCommand.Execute(null);
+                return true;
+            case Key.Up:
+                (Keyboard.FocusedElement as UIElement)?.MoveFocus(new TraversalRequest(FocusNavigationDirection.Previous));
+                return true;
+            case Key.Down:
+                (Keyboard.FocusedElement as UIElement)?.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+                return true;
+            case Key.Enter:
+            case Key.Space:
+            case Key.Tab:
+                return false; // al pulsante con il focus
+            default:
+                return true; // le domande restano in primo piano: gli altri tasti non agiscono sotto
+        }
+    }
+
+    /// <summary>Focus sulla prima risposta (o sul primo consiglio) appena compare.</summary>
+    private void FocusQuiz()
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            var view = _vm.IsQuizAsking ? (FrameworkElement)QuizQuestionView : QuizResultsView;
+            if (FindFirst<Button>(view) is { } b) b.Focus();
+        }, DispatcherPriority.Loaded);
+    }
+
+    private static T? FindFirst<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T t) return t;
+            if (FindFirst<T>(child) is { } found) return found;
+        }
+        return null;
+    }
+
     private void FocusVariantList()
     {
         if (!_vm.ShowVariantOverlay && !_panelVisible) SetPanel(true, save: false);
@@ -1087,6 +1144,7 @@ public partial class MainWindow : Window
         Panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         if (!visible && _vm.IsSettingsOpen) _vm.IsSettingsOpen = false;
         if (!visible && _vm.IsDownloadsOpen) _vm.IsDownloadsOpen = false;
+        if (!visible && _vm.IsQuizOpen) _vm.IsQuizOpen = false;
         if (save)
         {
             _vm.Settings.PanelVisible = visible;
@@ -1209,6 +1267,7 @@ public partial class MainWindow : Window
             ("P", "Canale preferito"),
             ("R", "Ricarica"),
             ("Ctrl+F", "Cerca"),
+            ("Ctrl+G", "Cosa guardo? Consigli"),
         ];
         for (var i = 0; i < rows.Length; i++)
         {
