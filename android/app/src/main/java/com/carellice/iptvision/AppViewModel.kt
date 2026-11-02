@@ -26,6 +26,8 @@ import com.carellice.iptvision.data.PositionStore
 import com.carellice.iptvision.data.Quiz
 import com.carellice.iptvision.data.Series
 import com.carellice.iptvision.data.SeriesInfo
+import com.carellice.iptvision.data.ServerApi
+import com.carellice.iptvision.data.ServerException
 import com.carellice.iptvision.data.Settings
 import com.carellice.iptvision.data.TextHelpers
 import com.carellice.iptvision.data.UpdateInfo
@@ -42,6 +44,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 enum class Section(val title: String) { Live("TV in diretta"), Movies("Film"), Series("Serie TV"), Search("Cerca"), Downloads("Download"), Settings("Impostazioni") }
@@ -240,6 +244,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var countdownJob: Job? = null
 
     init {
+        positions.onChange = { op -> queueServerOp(op) }
         player.onEnded = { onPlaybackEnded() }
         player.onFailed = { playError = "Impossibile riprodurre il contenuto."; back() }
         settings.account?.let { openAccount(it, autoPlay = settings.autoPlayLastChannel) }
@@ -250,6 +255,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 delay(30_000)
                 epgVersion++
                 savePosition()
+                // Server di casa: le modifiche fatte qui partono, quelle degli altri dispositivi arrivano.
+                if (settings.homeServer != null) { flushServerOps(); pullServer() }
             }
         }
         viewModelScope.launch {
@@ -291,6 +298,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun logout() {
+        settings.homeServer?.let { url ->
+            val token = settings.password ?: ""
+            viewModelScope.launch { ServerApi.logout(url, token) }
+            settings.restoreOwnAccount()
+        }
         player.stop()
         playing = null
         refreshJob?.cancel()
@@ -561,8 +573,150 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun progressOf(e: Entry<Movie>): Float = e.variants.maxOf { positions.progress(it.key) }
 
     fun toggleFavorite(ch: Channel) {
-        favorites = if (ch.streamId in favorites) favorites - ch.streamId else favorites + ch.streamId
+        val on = ch.streamId !in favorites
+        favorites = if (on) favorites + ch.streamId else favorites - ch.streamId
         settings.favorites = favorites
+        queueServerOp(JSONObject().put("op", "favorite").put("streamId", ch.streamId).put("on", on), now = true)
+    }
+
+    // ---------- Server di casa (IPTVISION su CasaOS) ----------
+    var serverBusy by mutableStateOf(false); private set
+    var serverError by mutableStateOf<String?>(null)
+    var serverDialog by mutableStateOf(false)
+    var serverSyncedAt by mutableStateOf<Long?>(null); private set
+
+    private val pendingOps = ArrayList<JSONObject>()
+
+    private fun queueServerOp(op: JSONObject, now: Boolean = false) {
+        if (settings.homeServer == null) return
+        synchronized(pendingOps) { pendingOps += op }
+        if (now) flushServerOps()
+    }
+
+    /** Manda al server le modifiche fatte qui; se non risponde restano in coda e ripartono dopo. */
+    private fun flushServerOps() {
+        val url = settings.homeServer ?: return
+        val token = settings.password ?: return
+        val ops = synchronized(pendingOps) { pendingOps.toList().also { pendingOps.clear() } }
+        if (ops.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                applyServerState(ServerApi.ops(url, token, JSONArray(ops)))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                synchronized(pendingOps) { pendingOps.addAll(0, ops) }
+                Log.w("Server di casa non raggiungibile, riprovo più tardi", e)
+            }
+        }
+    }
+
+    /** Preferiti e posizioni cambiati da un altro dispositivo dello stesso account. */
+    fun pullServer(force: Boolean = false) {
+        val url = settings.homeServer ?: return
+        val token = settings.password ?: return
+        viewModelScope.launch {
+            try {
+                ServerApi.state(url, token, if (force) null else settings.homeRevision)?.let(::applyServerState)
+                serverSyncedAt = System.currentTimeMillis()
+                serverError = null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ServerException) {
+                serverError = e.message
+            }
+        }
+    }
+
+    private fun applyServerState(o: JSONObject) {
+        serverSyncedAt = System.currentTimeMillis()
+        if (synchronized(pendingOps) { pendingOps.isNotEmpty() }) return // prima partono le nostre
+        settings.homeRevision = o.optInt("revision", -1)
+        val favs = o.optJSONArray("favorites")
+        favorites = (0 until (favs?.length() ?: 0)).map { favs!!.getInt(it) }.toSet()
+        settings.favorites = favorites
+        positions.replaceWith(o)
+        positionsVersion++
+    }
+
+    /**
+     * Collega il server di casa: accede (o crea l'account), porta sul server l'account IPTV di questo
+     * dispositivo se lì manca, unisce preferiti e posizioni di qui a quelli del server, poi usa il server
+     * come server Xtream. Se qualcosa va storto l'app resta com'era.
+     */
+    fun connectServer(address: String, user: String, pass: String, register: Boolean, invite: String) {
+        val url = ServerApi.normalizeUrl(address)
+        if (url.isEmpty() || user.isBlank() || pass.isEmpty()) {
+            serverError = "Inserisci indirizzo del server, nome utente e password."
+            return
+        }
+        serverBusy = true
+        serverError = null
+        viewModelScope.launch {
+            var token: String? = null
+            try {
+                val login = ServerApi.login(url, user.trim(), pass, register, invite)
+                token = login.token
+                val own = if (settings.homeServer == null) settings.account else null
+                if (!login.hasXtream) {
+                    if (own == null) throw ServerException("Questo account non ha ancora un account IPTV: aggiungilo da IPTVISION nel browser, poi riprova.")
+                    ServerApi.sendXtream(url, login.token, own)
+                }
+                val mine = positions.toJson().put("favorites", JSONArray(favorites.toList()))
+                val state = ServerApi.importNative(url, login.token, mine)
+                val old = settings.homeServer
+                if (old != null) ServerApi.logout(old, settings.password ?: "") else settings.stashOwnAccount()
+                player.stop()
+                playing = null
+                synchronized(pendingOps) { pendingOps.clear() }
+                settings.server = url
+                settings.username = login.username
+                settings.password = login.token
+                settings.homeServer = url
+                settings.lastStreamId = null
+                settings.lastCategoryId = null
+                applyServerState(state)
+                serverDialog = false
+                reopen()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (token != null && settings.password != token) ServerApi.logout(url, token)
+                serverError = (e as? ServerException)?.message ?: (e as? XtreamException)?.message ?: "Collegamento non riuscito."
+            } finally {
+                serverBusy = false
+            }
+        }
+    }
+
+    /** Torna a usare l'account IPTV di prima direttamente dal provider. Preferiti e posizioni restano quelli di adesso. */
+    fun disconnectServer() {
+        val url = settings.homeServer ?: return
+        val token = settings.password ?: ""
+        viewModelScope.launch { ServerApi.logout(url, token) }
+        player.stop()
+        playing = null
+        synchronized(pendingOps) { pendingOps.clear() }
+        settings.restoreOwnAccount()
+        serverSyncedAt = null
+        reopen()
+    }
+
+    private fun reopen() {
+        refreshJob?.cancel()
+        live = null; movies = null; series = null
+        liveOpen = null; moviesOpen = null; seriesOpen = null
+        error = null
+        stack.clear()
+        val account = settings.account
+        if (account == null) {
+            client = null
+            stack.add(Screen.Login)
+            return
+        }
+        stack.add(Screen.Home)
+        section = Section.Live
+        openAccount(account, autoPlay = false)
     }
 
 
@@ -762,6 +916,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (positions.update(key, player.currentPosition(), player.currentDuration())) positionsVersion++
         }
         positions.save(force)
+        if (force) flushServerOps()
     }
 
     private fun leavePlayer() {

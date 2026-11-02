@@ -58,6 +58,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         InitTv();
         InitUpdates();
         InitDownloads();
+        InitServer();
     }
 
     public PlayerService Player { get; }
@@ -278,6 +279,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Logout()
     {
+        // Collegato al server di casa: si scollega e torna l'account IPTV di prima (da reinserire la password).
+        if (_settings.HomeServer is { } url)
+        {
+            _ = ServerApi.LogoutAsync(url, SettingsService.Unprotect(_settings.ProtectedPassword) ?? "");
+            _pendingOps.Clear();
+            RestoreOwnAccount();
+            _restoredPassword = null;
+        }
+        ResetSession();
+    }
+
+    /// <summary>Chiude l'account aperto: niente riproduzione, liste vuote, schermata di accesso.</summary>
+    private void ResetSession()
+    {
         _refreshCts?.Cancel();
         ExitTvMode();
         _modeCategory.Clear();
@@ -343,7 +358,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             if (_all.Count == 0)
             {
-                if (ex.IsAuthError) { Logout(); LoginError = ex.Message; }
+                if (ex.IsAuthError) { ResetSession(); LoginError = ex.Message; }
                 else ShowToast(ex.Message);
             }
             else
@@ -550,6 +565,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (ch.IsFavorite) _settings.Favorites.Add(ch.StreamId);
         else _settings.Favorites.Remove(ch.StreamId);
         ScheduleSave();
+        QueueServerOp(new System.Text.Json.Nodes.JsonObject { ["op"] = "favorite", ["streamId"] = ch.StreamId, ["on"] = ch.IsFavorite }, now: true);
 
         if (Mode == LibraryMode.Live)
         {

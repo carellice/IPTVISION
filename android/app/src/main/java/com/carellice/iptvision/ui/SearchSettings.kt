@@ -18,6 +18,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Mic
@@ -170,6 +172,8 @@ fun SettingsSection(vm: AppViewModel) {
         Info("Server", vm.settings.server ?: "")
         Info("Utente", vm.settings.username ?: "")
 
+        ServerGroup(vm)
+
         Group("Riproduzione")
         Toggle("Formato HLS (m3u8) per la TV in diretta", "Di solito MPEG-TS è più stabile; prova HLS se un canale non parte.", vm.settings.outputFormat == "m3u8") {
             vm.settings.outputFormat = if (it) "m3u8" else "ts"
@@ -226,6 +230,31 @@ fun SettingsSection(vm: AppViewModel) {
             color = C.Text3, fontSize = 12.sp,
         )
         VSpace(24.dp)
+    }
+}
+
+/** Server di casa: acceso, l'app passa da IPTVISION su CasaOS; spento, parla direttamente col provider. */
+@Composable
+private fun ServerGroup(vm: AppViewModel) {
+    Group("Server di casa")
+    val url = vm.settings.homeServer
+    if (url == null) {
+        Text("Spento: l'app si collega direttamente al provider IPTV.", color = C.Text3, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+            ActionButton("Collega il server", Icons.Default.Dns) { vm.serverError = null; vm.serverDialog = true }
+        }
+        return
+    }
+    Info("Indirizzo", url)
+    val synced = vm.serverSyncedAt
+    Text(
+        vm.serverError ?: if (synced != null) "Canali, film e serie passano dal server. Aggiornato alle ${TextHelpers.clock(synced / 1000)}."
+        else "Canali, film e serie passano dal server.",
+        color = if (vm.serverError != null) C.Danger else C.Text3, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+        ActionButton("Aggiorna ora", Icons.Default.Refresh) { vm.pullServer(force = true) }
+        ActionButton("Scollega il server", Icons.Default.LinkOff) { vm.disconnectServer() }
     }
 }
 

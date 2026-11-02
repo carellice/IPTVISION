@@ -30,6 +30,7 @@ import com.carellice.iptvision.ui.MovieDetailScreen
 import com.carellice.iptvision.ui.PlayerScreen
 import com.carellice.iptvision.ui.QuizDialog
 import com.carellice.iptvision.ui.SeriesDetailScreen
+import com.carellice.iptvision.ui.ServerDialog
 import com.carellice.iptvision.ui.VariantDialog
 
 class MainActivity : ComponentActivity() {
@@ -82,6 +83,7 @@ class MainActivity : ComponentActivity() {
                     }
                     VariantDialog(vm)
                     QuizDialog(vm)
+                    ServerDialog(vm)
                 }
             }
         }

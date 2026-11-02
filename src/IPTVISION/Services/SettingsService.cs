@@ -40,6 +40,15 @@ public sealed class AppSettings
     public bool WinMaximized { get; set; }
     public bool PanelVisible { get; set; } = true;
 
+    /// <summary>Indirizzo del server di casa (IPTVISION su CasaOS); null = il programma parla direttamente col provider.</summary>
+    public string? HomeServer { get; set; }
+    /// <summary>Ultima revisione di preferiti e posizioni avuta dal server di casa.</summary>
+    public int HomeRevision { get; set; } = -1;
+    /// <summary>L'account IPTV del PC prima di collegare il server di casa: torna quando lo si scollega.</summary>
+    public string? OwnServer { get; set; }
+    public string? OwnUsername { get; set; }
+    public string? OwnProtectedPassword { get; set; }
+
     public bool HasAccount => !string.IsNullOrWhiteSpace(Server) && !string.IsNullOrWhiteSpace(Username) && ProtectedPassword != null;
 }
 

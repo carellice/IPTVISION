@@ -1,0 +1,102 @@
+/* IPTVISION: the colors of ui/Components.kt (object C), dark only like the app. */
+@font-face {
+  font-family: 'Roboto';
+  src: url('/roboto.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  --accent: #3d7bff;
+  --accent2: #00c2ff;
+  --bg: #0a0b0f;
+  --panel: #111318;
+  --surface: #191c23;
+  --surfaceHover: #21252e;
+  --surfacePressed: #2a2f3a;
+  --stroke: #20242d;
+  --strokeStrong: #2e3340;
+  --text: #f1f3f7;
+  --text2: #9099a8;
+  --text3: #5c6473;
+  --accentSoft: #3d7bff22;
+  --danger: #ff5d6c;
+  --star: #ffc94d;
+  --live: #ff4d5e;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Roboto', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  letter-spacing: 0.03125em;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input, textarea { user-select: text; -webkit-user-select: text; font-family: inherit; }
+button { font-family: inherit; color: inherit; }
+
+.app { position: relative; height: 100%; overflow: clip; }
+
+.status-pad { padding-top: env(safe-area-inset-top); }
+.nav-pad { padding-bottom: env(safe-area-inset-bottom); }
+.safe { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; min-height: 0; }
+.scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll::-webkit-scrollbar-thumb { background: var(--strokeStrong); border-radius: 4px; }
+.scroll::-webkit-scrollbar-track { background: transparent; }
+
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.clamp4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.clamp6 { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* tvClickable: the ripple of Compose and the focus look of the TV (scale, white border). */
+.click {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  text-align: left;
+  font: inherit;
+  transition: background-color 120ms;
+}
+.click::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 150ms;
+  pointer-events: none;
+}
+.click:active::after { opacity: 0.12; }
+@media (hover: hover) { .click:hover::after { opacity: 0.06; } }
+.click:focus-visible { box-shadow: inset 0 0 0 2px #fff; }
+
+.ripple-dark { color: #000; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes dash {
+  0% { stroke-dasharray: 1 150; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 90 150; stroke-dashoffset: -35; }
+  100% { stroke-dasharray: 90 150; stroke-dashoffset: -124; }
+}
+
+video { background: #000; }

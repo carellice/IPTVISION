@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   var u = IPTV.u, h = u.h, V = IPTV.V, Nav = IPTV.Nav, KEY = Nav.KEY;
-  var S = IPTV.Settings, Pos = IPTV.Positions, Player = IPTV.Player, X = IPTV.Xtream;
+  var S = IPTV.Settings, Pos = IPTV.Positions, Player = IPTV.Player, X = IPTV.Xtream, Server = IPTV.Server;
 
   var ALL = '__all', FAV = '__fav', CONT = '__continue';
   var SECTIONS = [
@@ -224,6 +224,7 @@
     root.innerHTML = '';
     focusAfterRender = preferred || null;
     if (A.screen === 'login') renderLogin();
+    else if (A.screen === 'server') renderServer(A.data || {});
     else if (A.screen === 'home') renderHome();
     else if (A.screen === 'movie') renderMovie(A.data);
     else if (A.screen === 'series') renderSeries(A.data);
@@ -257,8 +258,96 @@
       h('label', { class: 'field' }, [h('span', { text: 'Nome utente' }), user]),
       h('label', { class: 'field' }, [h('span', { text: 'Password' }), pass]),
       err, btn,
+      // Senza account IPTV sul TV: si può usare quello del server di casa.
+      V.focusable(h('div', { class: 'btn', style: 'margin-top:0.6rem', text: 'Usa il server di casa' }), function () { push('server', {}); }),
       h('div', { class: 'dim', style: 'margin-top:1rem;font-size:0.85rem', text: 'Se incolli il link M3U completo, nome utente e password si compilano da soli. IPTVISION è solo un lettore e non contiene canali.' }),
     ])));
+  }
+
+  /**
+   * Server di casa: accede (o crea l'account), porta sul server l'account IPTV del TV se lì manca,
+   * unisce preferiti e posizioni del TV a quelli del server, poi usa il server come server Xtream.
+   * Se qualcosa va storto il TV resta com'era.
+   */
+  function renderServer(d) {
+    var address = h('input', { type: 'url', placeholder: 'http://192.168.1.10:8765', value: d.address || S.get('homeServer') || '' });
+    var user = h('input', { type: 'text', value: d.user || '' });
+    var pass = h('input', { type: 'password' });
+    var invite = h('input', { type: 'text', placeholder: 'se il server lo chiede' });
+    var err = h('div', { class: 'error' }, '');
+    [address, user, pass, invite].forEach(function (i) { i.classList.add('f'); i.onSubmit = function () { Nav.move('down'); }; });
+    var mode = V.focusable(h('div', { class: 'btn', text: d.register ? 'Crea un nuovo account: sì' : 'Crea un nuovo account: no' }), function () {
+      d.address = address.value; d.user = user.value; d.register = !d.register;
+      render(false, root.querySelector('[data-key="srv-mode"]'));
+    });
+    mode.dataset.key = 'srv-mode';
+    var busy = false;
+    var btn = V.focusable(h('div', { class: 'btn primary', text: 'Collega il server' }), function () {
+      if (busy) return;
+      var url = Server.normalize(address.value);
+      if (!url || !user.value.trim() || !pass.value) { err.textContent = 'Inserisci indirizzo del server, nome utente e password.'; return; }
+      busy = true;
+      err.textContent = 'Collegamento in corso…';
+      var token = null;
+      var own = Server.active() ? null : S.account();
+      Server.login(url, user.value.trim(), pass.value, !!d.register, invite.value.trim()).then(function (login) {
+        token = login.token;
+        if (!login.hasXtream) {
+          if (!own) throw new Error('Questo account non ha ancora un account IPTV: aggiungilo da IPTVISION nel browser, poi riprova.');
+          return Server.sendXtream(url, token, own).then(function () { return login; });
+        }
+        return login;
+      }).then(function (login) {
+        var mine = Pos.toJson();
+        mine.favorites = S.get('favorites');
+        return Server.importNative(url, token, mine).then(function (state) { return [login, state]; });
+      }).then(function (r) {
+        var login = r[0], state = r[1];
+        if (Server.active()) Server.logout(Server.url(), S.get('password'));
+        else S.stashOwnAccount();
+        Player.stop();
+        Server.clearQueue();
+        S.set('server', url); S.set('username', login.username); S.set('password', login.token);
+        S.set('homeServer', url); S.set('lastStreamId', null); S.set('lastCategoryId', null);
+        Server.apply(state);
+        IPTV.Cache.clear();
+        A.stack = []; A.openCat = {}; A.epg = {};
+        u.toast('Server di casa collegato');
+        openAccount(S.account(), false);
+      }).catch(function (e) {
+        busy = false;
+        if (token && S.get('password') !== token) Server.logout(url, token);
+        err.textContent = e.message || 'Collegamento non riuscito.';
+      });
+    });
+    pass.onSubmit = function () { if (d.register) Nav.move('down'); else btn.onActivate(); };
+    invite.onSubmit = function () { btn.onActivate(); };
+    var fields = [
+      h('label', { class: 'field' }, [h('span', { text: 'Indirizzo del server' }), address]),
+      mode,
+      h('label', { class: 'field' }, [h('span', { text: 'Nome utente' }), user]),
+      h('label', { class: 'field' }, [h('span', { text: 'Password' }), pass]),
+    ];
+    if (d.register) fields.push(h('label', { class: 'field' }, [h('span', { text: 'Codice invito' }), invite]));
+    root.appendChild(h('div', { class: 'login' }, h('div', { class: 'login-box' }, [
+      h('div', { class: 'brand' }, [h('img', { src: 'img/largeIcon.png', alt: '' }), h('div', null, [h('h1', { text: 'Server di casa' }), h('div', { class: 'muted', text: 'IPTVISION sul tuo server CasaOS' })])]),
+    ].concat(fields, [
+      err, btn,
+      h('div', { class: 'dim', style: 'margin-top:1rem;font-size:0.85rem', text: 'Canali, film e serie passano dal server; preferiti e Continua a guardare sono gli stessi su ogni dispositivo. Dentro casa basta l\'indirizzo IP del server con la porta: lo trovi in IPTVISION nel browser, in Impostazioni → Server di casa.' }),
+    ]))));
+  }
+
+  /** Torna all'account IPTV di prima, direttamente dal provider. Preferiti e posizioni restano quelli di adesso. */
+  function disconnectServer() {
+    Server.logout(Server.url(), S.get('password'));
+    Server.clearQueue();
+    Player.stop();
+    S.restoreOwnAccount();
+    IPTV.Cache.clear();
+    A.client = null; A.live = A.movies = A.series = null; A.stack = []; A.openCat = {}; A.epg = {};
+    var account = S.account();
+    if (account) openAccount(account, false);
+    else { A.screen = 'login'; render(); }
   }
 
   function renderHome() {
@@ -540,6 +629,18 @@
     box.appendChild(h('div', { class: 'group-title', text: 'Account' }));
     box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Server' }), S.get('server') || '']));
     box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Utente' }), S.get('username') || '']));
+    box.appendChild(h('div', { class: 'group-title', text: 'Server di casa' }));
+    if (Server.active()) {
+      box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Indirizzo' }), Server.url()]));
+      box.appendChild(h('div', { class: 'dim', style: 'margin:0.3rem 0', text: Server.error || ('Canali, film e serie passano dal server.' + (Server.syncedAt ? ' Aggiornato alle ' + u.clock(Server.syncedAt / 1000) + '.' : '')) }));
+      box.appendChild(V.focusable(h('div', { class: 'btn', text: '↻  Aggiorna ora' }), function () {
+        Server.pull(true).then(function () { render(true); });
+      }));
+      box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Scollega il server' }), disconnectServer));
+    } else {
+      box.appendChild(h('div', { class: 'dim', style: 'margin:0.3rem 0', text: 'Spento: il TV si collega direttamente al provider IPTV.' }));
+      box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Collega il server' }), function () { push('server', {}); }));
+    }
     box.appendChild(h('div', { class: 'group-title', text: 'Riproduzione' }));
     box.appendChild(settingRow('Formato HLS (m3u8) per la TV in diretta', 'Di solito MPEG-TS è più stabile; prova HLS se un canale non parte.',
       S.get('outputFormat') === 'm3u8', function () { S.set('outputFormat', S.get('outputFormat') === 'm3u8' ? 'ts' : 'm3u8'); }));
@@ -561,6 +662,7 @@
     box.appendChild(h('div', { class: 'group-title', text: '' }));
     box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Esci dall\'account' }), function () {
       Player.stop();
+      if (Server.active()) { Server.logout(Server.url(), S.get('password')); Server.clearQueue(); S.restoreOwnAccount(); }
       S.clearAccount();
       IPTV.Cache.clear();
       A.client = null; A.live = A.movies = A.series = null; A.stack = []; A.openCat = {};
@@ -1206,7 +1308,15 @@
   setInterval(function () {
     if (A.screen === 'player' && overlay !== 'none' && playerTick) playerTick();
     if (++ticks % 15 === 0) savePosition();
+    // Server di casa: le modifiche fatte qui partono, quelle degli altri dispositivi arrivano.
+    if (ticks % 30 === 0 && Server.active()) Server.flush().then(function () { return Server.pull(); });
   }, 1000);
+
+  // Preferiti e posizioni arrivati dal server: si ridisegna, tranne durante la visione e la scrittura.
+  Server.onState = function () {
+    var typing = document.activeElement && document.activeElement.tagName === 'INPUT';
+    if (A.screen !== 'player' && A.screen !== 'server' && A.screen !== 'login' && !typing) render(true);
+  };
 
   // ---------- Tasti ----------
 
@@ -1282,5 +1392,6 @@
   var account = S.account();
   if (account) openAccount(account, S.get('autoPlayLast'));
   else render();
+  if (Server.active()) Server.pull(true);
   if (S.get('autoCheckUpdates')) setTimeout(checkUpdates, 8000);
 })();

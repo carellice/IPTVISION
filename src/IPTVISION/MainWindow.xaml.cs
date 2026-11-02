@@ -1131,8 +1131,16 @@ public partial class MainWindow : Window
 
     private async void Login_Click(object sender, RoutedEventArgs e)
     {
-        await _vm.LoginAsync(PasswordBox.Password);
+        if (_vm.IsServerLogin) await _vm.ConnectServerAsync(PasswordBox.Password);
+        else await _vm.LoginAsync(PasswordBox.Password);
         if (_vm.IsLoggedIn) PasswordBox.Clear();
+    }
+
+    /// <summary>Server di casa collegato dalle impostazioni, con un account IPTV già aperto.</summary>
+    private async void ConnectServer_Click(object sender, RoutedEventArgs e)
+    {
+        await _vm.ConnectServerAsync(ServerPasswordBox.Password);
+        if (_vm.IsHomeServer) ServerPasswordBox.Clear();
     }
 
     // ======================= Finestra =======================

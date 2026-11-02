@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -72,6 +73,8 @@ fun LoginScreen(vm: AppViewModel) {
             vm.loginError?.let { Text(it, color = C.Danger, fontSize = 14.sp) }
             if (vm.loginBusy) Loading("Accesso in corso…", Modifier.fillMaxWidth().padding(8.dp))
             else ActionButton("Accedi", Icons.Default.Login, primary = true, modifier = Modifier.fillMaxWidth()) { vm.login(server, user, pass) }
+            // Senza account IPTV sul dispositivo: si può usare quello del server di casa.
+            ActionButton("Usa il server di casa", Icons.Default.Dns, modifier = Modifier.fillMaxWidth()) { vm.serverError = null; vm.serverDialog = true }
             Text(
                 "Se incolli il link M3U completo, nome utente e password si compilano da soli. " +
                     "IPTVISION è solo un lettore e non contiene canali.",
@@ -82,7 +85,7 @@ fun LoginScreen(vm: AppViewModel) {
 }
 
 @Composable
-private fun Field(
+internal fun Field(
     value: String, onChange: (String) -> Unit, label: String, hint: String?, type: KeyboardType,
     password: Boolean = false, done: (() -> Unit)? = null,
 ) {

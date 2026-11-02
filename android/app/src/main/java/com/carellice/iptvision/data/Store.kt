@@ -66,6 +66,29 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
     fun isGrid(section: String): Boolean = p.getBoolean("grid_$section", section != "Live")
     fun setGrid(section: String, value: Boolean) = p.edit().putBoolean("grid_$section", value).apply()
 
+    // ---------- Server di casa (IPTVISION su CasaOS) ----------
+
+    /** Indirizzo del server di casa; null = l'app parla direttamente col provider IPTV. */
+    var homeServer: String?
+        get() = p.getString("homeServer", null)
+        set(v) = p.edit().putString("homeServer", v).apply()
+
+    /** Ultima revisione di preferiti e posizioni avuta dal server. */
+    var homeRevision: Int
+        get() = p.getInt("homeRevision", -1)
+        set(v) = p.edit().putInt("homeRevision", v).apply()
+
+    /** L'account IPTV del dispositivo prima di collegare il server: torna quando lo si scollega. */
+    fun stashOwnAccount() {
+        p.edit().putString("own_server", server).putString("own_username", username).putString("own_password", password).apply()
+    }
+
+    fun restoreOwnAccount() {
+        p.edit().putString("server", p.getString("own_server", null)).putString("username", p.getString("own_username", null))
+            .putString("password", p.getString("own_password", null)).remove("own_server").remove("own_username").remove("own_password")
+            .remove("lastStreamId").remove("lastCategoryId").remove("homeServer").remove("homeRevision").apply()
+    }
+
     fun clearAccount() {
         p.edit().remove("server").remove("username").remove("password").remove("lastStreamId").remove("lastCategoryId").apply()
     }
@@ -77,6 +100,9 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
  */
 class PositionStore(private val file: File) {
     data class Entry(val positionMs: Long, val durationMs: Long, val updatedAt: Long)
+
+    /** Ogni modifica, nel formato delle operazioni del server di casa (POST /api/ops). */
+    var onChange: ((JSONObject) -> Unit)? = null
 
     private val positions = HashMap<String, Entry>()
     private val watched = HashSet<String>()
@@ -139,6 +165,7 @@ class PositionStore(private val file: File) {
         positions[key] = Entry(positionMs, durationMs, System.currentTimeMillis())
         watched.remove(key)
         dirty = true
+        onChange?.invoke(JSONObject().put("op", "position").put("key", key).put("p", positionMs).put("d", durationMs))
         return false
     }
 
@@ -146,12 +173,14 @@ class PositionStore(private val file: File) {
     fun markWatched(key: String) {
         positions.remove(key)
         if (watched.add(key)) dirty = true
+        onChange?.invoke(JSONObject().put("op", "watched").put("key", key))
     }
 
     @Synchronized
     fun setLastEpisode(seriesId: Int, episodeId: String) {
         lastEpisode[seriesId] = episodeId to System.currentTimeMillis()
         dirty = true
+        onChange?.invoke(JSONObject().put("op", "lastEpisode").put("seriesId", seriesId).put("id", episodeId))
     }
 
     @Synchronized
@@ -161,12 +190,41 @@ class PositionStore(private val file: File) {
     @Synchronized
     fun forgetPosition(key: String) {
         if (positions.remove(key) != null) dirty = true
+        onChange?.invoke(JSONObject().put("op", "forgetPosition").put("key", key))
     }
 
     /** Toglie una serie da "Continua a guardare". Gli episodi restano segnati come visti. */
     @Synchronized
     fun forgetSeries(seriesId: Int) {
         if (lastEpisode.remove(seriesId) != null) dirty = true
+        onChange?.invoke(JSONObject().put("op", "forgetSeries").put("seriesId", seriesId))
+    }
+
+    /** Tutto il contenuto, nel formato di positions.json (e di GET /api/state del server di casa). */
+    @Synchronized
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("positions", JSONObject().apply {
+            positions.forEach { (k, e) -> put(k, JSONObject().put("p", e.positionMs).put("d", e.durationMs).put("u", e.updatedAt)) }
+        })
+        put("watched", JSONArray(watched.toList()))
+        put("lastEpisode", JSONObject().apply {
+            lastEpisode.forEach { (k, v) -> put(k.toString(), JSONObject().put("id", v.first).put("u", v.second)) }
+        })
+    }
+
+    /** Sostituisce tutto con i dati del server di casa (stesso formato di positions.json). */
+    @Synchronized
+    fun replaceWith(o: JSONObject) {
+        positions.clear(); watched.clear(); lastEpisode.clear()
+        o.optJSONObject("positions")?.let { ps ->
+            ps.keys().forEach { k -> val e = ps.getJSONObject(k); positions[k] = Entry(e.getLong("p"), e.getLong("d"), e.getLong("u")) }
+        }
+        o.optJSONArray("watched")?.let { for (i in 0 until it.length()) watched += it.getString(i) }
+        o.optJSONObject("lastEpisode")?.let { le ->
+            le.keys().forEach { k -> val e = le.getJSONObject(k); k.toIntOrNull()?.let { id -> lastEpisode[id] = e.getString("id") to e.getLong("u") } }
+        }
+        dirty = true
+        save(force = true)
     }
 
     @Synchronized

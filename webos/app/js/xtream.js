@@ -100,7 +100,8 @@
     return this.json(this.api(null), 15000).then(function (root) {
       var ui = root && root.user_info;
       if (!ui || typeof ui !== 'object') throw new XtreamError('Il server non ha risposto come un pannello Xtream Codes. Controlla l\'indirizzo.');
-      if (int(ui.auth) !== 1) throw new XtreamError('Nome utente o password non corretti.', true);
+      // Il server di casa spiega perché ("sessione scaduta"); un pannello IPTV di solito no.
+      if (int(ui.auth) !== 1) throw new XtreamError(str(ui.message) || 'Nome utente o password non corretti.', true);
       var status = str(ui.status);
       if (status && status.toLowerCase() !== 'active') throw new XtreamError('Account non attivo (stato: ' + status + ').', true);
       return ui;

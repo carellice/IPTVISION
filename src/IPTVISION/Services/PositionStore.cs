@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace IPTVISION.Services;
 
@@ -21,6 +22,9 @@ public sealed class PositionStore
         public HashSet<string> Watched { get; set; } = [];
         public Dictionary<int, LastEpisodeEntry> LastEpisode { get; set; } = [];
     }
+
+    /// <summary>Ogni modifica, nel formato delle operazioni del server di casa (POST /api/ops).</summary>
+    public event Action<JsonObject>? Changed;
 
     private readonly string _file;
     private FileModel _data;
@@ -77,6 +81,7 @@ public sealed class PositionStore
         _data.Positions[key] = new Entry(positionMs, durationMs, DateTimeOffset.Now);
         _data.Watched.Remove(key);
         _dirty = true;
+        Changed?.Invoke(new JsonObject { ["op"] = "position", ["key"] = key, ["p"] = positionMs, ["d"] = durationMs });
         return false;
     }
 
@@ -84,21 +89,67 @@ public sealed class PositionStore
     {
         _data.Positions.Remove(key);
         _dirty |= _data.Watched.Add(key);
+        Changed?.Invoke(new JsonObject { ["op"] = "watched", ["key"] = key });
     }
 
     public void SetLastEpisode(int seriesId, string episodeId)
     {
         _data.LastEpisode[seriesId] = new LastEpisodeEntry(episodeId, DateTimeOffset.Now);
         _dirty = true;
+        Changed?.Invoke(new JsonObject { ["op"] = "lastEpisode", ["seriesId"] = seriesId, ["id"] = episodeId });
     }
 
     public LastEpisodeEntry? GetLastEpisode(int seriesId) => _data.LastEpisode.GetValueOrDefault(seriesId);
 
     /// <summary>Toglie un film da "Continua a guardare": dimentica il punto raggiunto.</summary>
-    public void ForgetPosition(string key) => _dirty |= _data.Positions.Remove(key);
+    public void ForgetPosition(string key)
+    {
+        _dirty |= _data.Positions.Remove(key);
+        Changed?.Invoke(new JsonObject { ["op"] = "forgetPosition", ["key"] = key });
+    }
 
     /// <summary>Toglie una serie da "Continua a guardare". Gli episodi restano segnati come visti.</summary>
-    public void ForgetSeries(int seriesId) => _dirty |= _data.LastEpisode.Remove(seriesId);
+    public void ForgetSeries(int seriesId)
+    {
+        _dirty |= _data.LastEpisode.Remove(seriesId);
+        Changed?.Invoke(new JsonObject { ["op"] = "forgetSeries", ["seriesId"] = seriesId });
+    }
+
+    /// <summary>Tutto il contenuto nel formato di positions.json delle app Android e TV (e del server di casa).</summary>
+    public JsonObject ToServerJson()
+    {
+        var positions = new JsonObject();
+        foreach (var (k, e) in _data.Positions)
+            positions[k] = new JsonObject { ["p"] = e.PositionMs, ["d"] = e.DurationMs, ["u"] = e.UpdatedAt.ToUnixTimeMilliseconds() };
+        var last = new JsonObject();
+        foreach (var (k, e) in _data.LastEpisode)
+            last[k.ToString()] = new JsonObject { ["id"] = e.EpisodeId, ["u"] = e.UpdatedAt.ToUnixTimeMilliseconds() };
+        return new JsonObject
+        {
+            ["positions"] = positions,
+            ["watched"] = new JsonArray(_data.Watched.Select(w => (JsonNode)w).ToArray()),
+            ["lastEpisode"] = last,
+        };
+    }
+
+    /// <summary>Sostituisce tutto con i dati del server di casa (stesso formato di <see cref="ToServerJson"/>).</summary>
+    public void ReplaceWith(JsonObject o)
+    {
+        var data = new FileModel();
+        if (o["positions"] is JsonObject ps)
+            foreach (var (k, v) in ps)
+                if (v is JsonObject e)
+                    data.Positions[k] = new Entry((long?)e["p"] ?? 0, (long?)e["d"] ?? 0, DateTimeOffset.FromUnixTimeMilliseconds((long?)e["u"] ?? 0));
+        if (o["watched"] is JsonArray w)
+            foreach (var k in w) if ((string?)k is { } key) data.Watched.Add(key);
+        if (o["lastEpisode"] is JsonObject le)
+            foreach (var (k, v) in le)
+                if (int.TryParse(k, out var id) && v is JsonObject e && (string?)e["id"] is { } ep)
+                    data.LastEpisode[id] = new LastEpisodeEntry(ep, DateTimeOffset.FromUnixTimeMilliseconds((long?)e["u"] ?? 0));
+        _data = data;
+        _dirty = true;
+        Save(force: true);
+    }
 
     public void Save(bool force = false)
     {

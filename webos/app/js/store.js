@@ -21,6 +21,8 @@
     favorites: [], lastStreamId: null, lastCategoryId: null,
     outputFormat: 'ts', autoPlayLast: true, autoCheckUpdates: true,
     sorts: {}, grids: { Movies: true, Series: true }, hideAdult: false,
+    // Server di casa (IPTVISION su CasaOS): indirizzo, ultima revisione avuta e l'account IPTV di prima.
+    homeServer: null, homeRevision: -1, own: null,
   };
   Object.keys(defaults).forEach(function (k) { if (settings[k] === undefined) settings[k] = defaults[k]; });
 
@@ -40,6 +42,26 @@
       var i = settings.favorites.indexOf(id);
       if (i >= 0) settings.favorites.splice(i, 1); else settings.favorites.push(id);
       save('settings', settings);
+      if (Settings.onFavorite) Settings.onFavorite(id, i < 0);
+    },
+    /** Chiamato a ogni preferito aggiunto o tolto (il server di casa lo registra). */
+    onFavorite: null,
+    /** L'account IPTV del TV prima di collegare il server di casa: torna quando lo si scollega. */
+    stashOwnAccount: function () {
+      settings.own = { server: settings.server, username: settings.username, password: settings.password };
+      save('settings', settings);
+    },
+    restoreOwnAccount: function () {
+      var own = settings.own || {};
+      settings.server = own.server || null;
+      settings.username = own.username || null;
+      settings.password = own.password || null;
+      settings.own = null;
+      settings.homeServer = null;
+      settings.homeRevision = -1;
+      settings.lastStreamId = null;
+      settings.lastCategoryId = null;
+      save('settings', settings);
     },
     sortOf: function (section) { return settings.sorts[section] || 'Default'; },
     setSort: function (section, v) { settings.sorts[section] = v; save('settings', settings); },
@@ -53,6 +75,8 @@
    */
   var pos = load('positions', { positions: {}, watched: {}, lastEpisode: {} });
   var dirty = false;
+
+  function changed(op) { if (Positions.onChange) Positions.onChange(op); }
 
   var Positions = {
     resumeMs: function (key) {
@@ -75,25 +99,44 @@
       pos.positions[key] = { p: Math.round(p), d: Math.round(d), u: Date.now() };
       delete pos.watched[key];
       dirty = true;
+      changed({ op: 'position', key: key, p: Math.round(p), d: Math.round(d) });
       return false;
     },
     markWatched: function (key) {
       delete pos.positions[key];
       pos.watched[key] = 1;
       dirty = true;
+      changed({ op: 'watched', key: key });
     },
     setLastEpisode: function (seriesId, episodeId) {
       pos.lastEpisode[seriesId] = { id: episodeId, u: Date.now() };
       dirty = true;
+      changed({ op: 'lastEpisode', seriesId: Number(seriesId), id: String(episodeId) });
     },
     lastEpisode: function (seriesId) { return pos.lastEpisode[seriesId] || null; },
     /** Toglie un film da "Continua a guardare": dimentica il punto raggiunto. */
     forgetPosition: function (key) {
       if (pos.positions[key]) { delete pos.positions[key]; dirty = true; }
+      changed({ op: 'forgetPosition', key: key });
     },
     /** Toglie una serie da "Continua a guardare". Gli episodi restano segnati come visti. */
     forgetSeries: function (seriesId) {
       if (pos.lastEpisode[seriesId]) { delete pos.lastEpisode[seriesId]; dirty = true; }
+      changed({ op: 'forgetSeries', seriesId: Number(seriesId) });
+    },
+    /** Chiamato a ogni modifica, nel formato delle operazioni del server di casa. */
+    onChange: null,
+    /** Tutto il contenuto nel formato del server di casa (watched come elenco). */
+    toJson: function () {
+      return { positions: pos.positions, watched: Object.keys(pos.watched), lastEpisode: pos.lastEpisode };
+    },
+    /** Sostituisce tutto con i dati del server di casa. */
+    replaceWith: function (o) {
+      var w = {};
+      (o.watched || []).forEach(function (k) { w[k] = 1; });
+      pos = { positions: o.positions || {}, watched: w, lastEpisode: o.lastEpisode || {} };
+      dirty = true;
+      Positions.save();
     },
     save: function () {
       if (!dirty) return;

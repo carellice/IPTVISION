@@ -232,7 +232,8 @@ class XtreamClient(val account: XtreamAccount) {
         }
         val ui = root.optJSONObject("user_info")
             ?: throw XtreamException("Il server non ha risposto come un pannello Xtream Codes. Controlla l'indirizzo.")
-        if (intOf(ui.str("auth")) != 1) throw XtreamException("Nome utente o password non corretti.", isAuthError = true)
+        // Il server di casa spiega perché ("sessione scaduta"); un pannello IPTV di solito no.
+        if (intOf(ui.str("auth")) != 1) throw XtreamException(ui.str("message")?.takeIf { it.isNotBlank() } ?: "Nome utente o password non corretti.", isAuthError = true)
         val status = ui.str("status")
         if (status != null && !status.equals("Active", true)) throw XtreamException("Account non attivo (stato: $status).", isAuthError = true)
         return AuthInfo(status, ui.str("exp_date")?.toLongOrNull()?.takeIf { it > 0 }, intOf(ui.str("max_connections")) ?: 0)

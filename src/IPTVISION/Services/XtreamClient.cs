@@ -103,8 +103,9 @@ public sealed class XtreamClient
         if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("user_info", out var ui) || ui.ValueKind != JsonValueKind.Object)
             throw new XtreamException("Il server non ha risposto come un pannello Xtream Codes. Controlla l'indirizzo.");
 
+        // Il server di casa spiega perché ("sessione scaduta"); un pannello IPTV di solito no.
         if (GetInt(ui, "auth") != 1)
-            throw new XtreamException("Nome utente o password non corretti.") { IsAuthError = true };
+            throw new XtreamException(GetString(ui, "message") is { Length: > 0 } msg ? msg : "Nome utente o password non corretti.") { IsAuthError = true };
 
         var status = GetString(ui, "status");
         if (status != null && !status.Equals("Active", StringComparison.OrdinalIgnoreCase))
