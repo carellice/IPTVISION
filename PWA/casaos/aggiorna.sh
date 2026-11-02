@@ -118,7 +118,7 @@ main() {
   # La nuova immagine ha un nome a parte: se la build non riesce, IPTVISION resta com'è.
   step "Preparo la nuova versione (su un Raspberry servono alcuni minuti)"
   local log="$WORK/build.log"
-  if ! docker build --pull -t "$NEW_IMAGE" "$src" >"$log" 2>&1; then
+  if ! docker build --pull --network host -t "$NEW_IMAGE" "$src" >"$log" 2>&1; then
     tail -n 25 "$log" | sed 's/^/    /'
     fail "Build non riuscita: IPTVISION resta alla versione ${installed:-di prima}."
   fi

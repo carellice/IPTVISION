@@ -4,7 +4,8 @@
 FROM node:24-alpine AS web
 WORKDIR /src
 COPY web/package.json web/package-lock.json ./web/
-RUN cd web && npm ci --no-audit --no-fund
+# Slow or flaky connections (a Raspberry Pi on Wi-Fi): npm waits and retries instead of giving up.
+RUN cd web && npm ci --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
 COPY shared ./shared
 COPY web ./web
 RUN cd web && npm run build

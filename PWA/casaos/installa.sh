@@ -227,13 +227,22 @@ fi
 
 step "Preparo IPTVISION (la prima volta servono alcuni minuti)"
 BUILD_LOG="$(mktemp)"
-docker build --pull -t "$IMAGE" "$SRC" >"$BUILD_LOG" 2>&1 &
+# --network host: la build usa la rete e il DNS del server. Sulla rete interna di Docker il DNS
+# può non rispondere (per esempio con Tailscale, che imposta 100.100.100.100) e npm non scarica nulla.
+docker build --pull --network host -t "$IMAGE" "$SRC" >"$BUILD_LOG" 2>&1 &
 build_pid=$!
 printf "    "
 while kill -0 "$build_pid" 2>/dev/null; do printf "."; sleep 5; done
 printf "\n"
 if ! wait "$build_pid"; then
   tail -n 25 "$BUILD_LOG" | sed 's/^/    /'
+  # La causa di un errore di npm sta più in alto delle ultime righe (codice, indirizzo non raggiunto).
+  if grep -q "npm error" "$BUILD_LOG"; then
+    echo
+    grep -E "npm error (code|errno|network request|request to)" "$BUILD_LOG" | head -n 5 | sed 's/^/    /'
+    warn "Il server non riesce a scaricare i pacchetti da registry.npmjs.org: controlla la connessione e il DNS"
+    info "  prova:  docker run --rm --network host node:24-alpine npm view react version"
+  fi
   fail "Build non riuscita (log completo: $BUILD_LOG)"
 fi
 rm -f "$BUILD_LOG"
