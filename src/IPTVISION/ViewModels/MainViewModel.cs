@@ -286,6 +286,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _pendingOps.Clear();
             RestoreOwnAccount();
             _restoredPassword = null;
+            ServerNetwork = null;
         }
         ResetSession();
     }

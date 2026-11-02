@@ -7,6 +7,7 @@ import * as xtream from './xtream.ts'
 import * as relay from './relay.ts'
 import * as play from './play.ts'
 import { guide } from './epg.ts'
+import { networkInfo } from './network.ts'
 import type { Op } from '../../shared/model.ts'
 
 const PORT = Number(process.env.PORT ?? 8080)
@@ -244,6 +245,9 @@ route('DELETE', '/api/devices/:id', (_req, res, p, _u, user) => {
   accounts.endDevice(user.id, p[0])
   json(res, 200, accounts.devices(user.id, user.token))
 })
+
+/** How the server reaches the Internet: through the VPN or not, with country and address. */
+route('GET', '/api/network', async (_req, res) => json(res, 200, await networkInfo()))
 
 // --- favorites and positions, shared by the browser and the native apps ---------------------------
 

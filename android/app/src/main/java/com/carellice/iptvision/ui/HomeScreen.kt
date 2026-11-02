@@ -88,6 +88,8 @@ val LocalWide = androidx.compose.runtime.compositionLocalOf { false }
 
 @Composable
 fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
+    // Rete del server di casa (VPN sì o no) appena si apre l'app; poi la aggiorna il giro ogni 30 secondi.
+    LaunchedEffect(Unit) { vm.loadServerNetwork() }
     LaunchedEffect(vm.section) {
         if (vm.section == Section.Movies) vm.ensureMovies()
         if (vm.section == Section.Series) vm.ensureSeries()
@@ -173,6 +175,7 @@ private fun SideNav(vm: AppViewModel) {
         }
         Box(Modifier.weight(1f))
         Clock()
+        ServerNetworkLine(vm, Modifier.padding(horizontal = 6.dp))
     }
 }
 

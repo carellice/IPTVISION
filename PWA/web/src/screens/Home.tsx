@@ -4,6 +4,7 @@ import { Clickable, Icon, type IconName, useWide } from '../components/ui.tsx'
 import { tween } from '../components/motion.ts'
 import { app, sections, setSection, useApp } from '../lib/app.ts'
 import { type Section, sectionTitle } from '../lib/library.ts'
+import { NetworkStatus } from '../components/network.tsx'
 import { LiveSection, MoviesSection, SeriesSection } from './Browse.tsx'
 import { SearchSection } from './Search.tsx'
 import { SettingsSection } from './Settings.tsx'
@@ -94,6 +95,7 @@ function SideNav() {
       })}
       <div style={{ flex: 1 }} />
       <Clock />
+      <div style={{ padding: '0 6px 6px' }}><NetworkStatus /></div>
     </div>
   )
 }

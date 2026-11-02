@@ -71,6 +71,10 @@ public static class ServerApi
     public static Task<JsonObject> OpsAsync(string url, string token, JsonArray ops) =>
         CallAsync(url, HttpMethod.Post, "/api/ops", token, new JsonObject { ["ops"] = ops });
 
+    /// <summary>Come esce su Internet il server di casa: "label" pronto da mostrare e "vpn" (true, false o null).</summary>
+    public static Task<JsonObject> NetworkAsync(string url, string token) =>
+        CallAsync(url, HttpMethod.Get, "/api/network", token, null);
+
     public static async Task LogoutAsync(string url, string token)
     {
         try { await CallAsync(url, HttpMethod.Post, "/api/logout", token, new JsonObject()); }

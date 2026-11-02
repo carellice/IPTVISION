@@ -25,6 +25,10 @@ public sealed partial class MainViewModel
     [ObservableProperty] private bool _serverBusy;
     [ObservableProperty] private string? _serverError;
     [ObservableProperty] private string? _serverStatus;
+    /// <summary>Rete del server di casa, per esempio "VPN attiva · Svizzera · 185.1.2.3"; null senza server.</summary>
+    [ObservableProperty] private string? _serverNetwork;
+    /// <summary>Colore del pallino: verde con la VPN attiva, rosso senza, grigio se non si sa.</summary>
+    [ObservableProperty] private string _serverNetworkColor = "#5C6473";
 
     public bool IsHomeServer => _settings.HomeServer != null;
     public string? HomeServerUrl => _settings.HomeServer;
@@ -35,9 +39,25 @@ public sealed partial class MainViewModel
         ServerAddress = _settings.HomeServer ?? "";
         // Le modifiche fatte qui partono, quelle degli altri dispositivi arrivano.
         _serverTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
-        _serverTimer.Tick += (_, _) => { _ = FlushServerOpsAsync(); _ = PullServerAsync(); };
+        _serverTimer.Tick += (_, _) => { _ = FlushServerOpsAsync(); _ = PullServerAsync(); _ = LoadServerNetworkAsync(); };
         _serverTimer.Start();
-        if (IsHomeServer) _ = PullServerAsync(force: true);
+        if (IsHomeServer) { _ = PullServerAsync(force: true); _ = LoadServerNetworkAsync(); }
+    }
+
+    /// <summary>Se il server di casa esce su Internet con la VPN o no, con paese e indirizzo.</summary>
+    private async Task LoadServerNetworkAsync()
+    {
+        if (_settings.HomeServer is not { } url) { ServerNetwork = null; return; }
+        try
+        {
+            var n = await ServerApi.NetworkAsync(url, SettingsService.Unprotect(_settings.ProtectedPassword) ?? "");
+            ServerNetwork = (string?)n["label"];
+            ServerNetworkColor = n["vpn"] is JsonValue v && v.TryGetValue<bool>(out var vpn) ? (vpn ? "#3DDC97" : "#FF5D6C") : "#5C6473";
+        }
+        catch (ServerException)
+        {
+            ServerNetwork = null;
+        }
     }
 
     private void NotifyServer()
@@ -157,6 +177,7 @@ public sealed partial class MainViewModel
             NotifyServer();
             IsServerLogin = false;
             ServerStatus = "Canali, film e serie passano dal server.";
+            _ = LoadServerNetworkAsync();
             await InitializeAsync();
         }
         catch (Exception ex) when (ex is ServerException or XtreamException)
@@ -183,6 +204,7 @@ public sealed partial class MainViewModel
         RestoreOwnPassword();
         _ = ServerApi.LogoutAsync(url, token);
         ServerStatus = null;
+        ServerNetwork = null;
         if (_settings.HasAccount) await InitializeAsync();
     }
 

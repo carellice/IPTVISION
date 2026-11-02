@@ -110,6 +110,11 @@ body.playing #root { display: none; }
 .clock { margin-top: auto; padding: 0 0.6rem; }
 .clock b { display: block; font-size: 1.8rem; }
 .clock span { color: var(--text2); font-size: 0.8rem; }
+/* Rete del server di casa sotto l'orologio: pallino verde con la VPN attiva, rosso senza. */
+.clock .net { display: block; margin-top: 0.4rem; color: var(--text2); font-size: 0.75rem; }
+.clock .net i { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 50%; margin-right: 0.4rem; background: #5c6473; }
+.clock .net.on i { background: #3ddc97; }
+.clock .net.off i { background: #ff5d6c; }
 
 .content { -webkit-flex: 1; flex: 1; min-width: 0; padding: 1.6rem 2rem 0 1.4rem; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; }
 .page-title { font-size: 1.9rem; font-weight: 700; margin: 0; }

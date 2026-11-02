@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { ActionButton, Clickable, Dialog, SectionTitle, Switch, TextButton, TextField, toast } from '../components/ui.tsx'
 import { api } from '../lib/api.ts'
+import { NetworkStatus } from '../components/network.tsx'
 import { app, clearCache, logoutXtream, refreshAll, setHideAdult, updateSettings, useApp } from '../lib/app.ts'
 
 // SettingsSection (ui/SearchSettings.kt) plus what the browser version adds: the account on the
@@ -74,6 +75,7 @@ export function SettingsSection() {
 
         <Group title="Server di casa" />
         <Info label="Accesso" value={app.username} />
+        <div style={{ padding: '6px 0' }}><NetworkStatus detail /></div>
         <Text>
           Per guardare dalle app IPTVISION di Android, Windows o dei TV LG e Samsung passando da questo server, apri nelle loro
           impostazioni "Server di casa" e scrivi <b style={{ color: 'var(--text)' }}>{address}</b> (oppure l'indirizzo IP del server

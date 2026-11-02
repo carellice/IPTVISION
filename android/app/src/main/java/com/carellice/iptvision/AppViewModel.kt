@@ -256,7 +256,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 epgVersion++
                 savePosition()
                 // Server di casa: le modifiche fatte qui partono, quelle degli altri dispositivi arrivano.
-                if (settings.homeServer != null) { flushServerOps(); pullServer() }
+                if (settings.homeServer != null) { flushServerOps(); pullServer(); loadServerNetwork() }
             }
         }
         viewModelScope.launch {
@@ -584,6 +584,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var serverError by mutableStateOf<String?>(null)
     var serverDialog by mutableStateOf(false)
     var serverSyncedAt by mutableStateOf<Long?>(null); private set
+    /** Rete del server di casa: "label" (es. "VPN attiva · Svizzera · 185.1.2.3") e "vpn" (true, false o null). */
+    var serverNetwork by mutableStateOf<JSONObject?>(null); private set
+
+    fun loadServerNetwork() {
+        val url = settings.homeServer ?: run { serverNetwork = null; return }
+        val token = settings.password ?: return
+        viewModelScope.launch {
+            serverNetwork = try { ServerApi.network(url, token) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+        }
+    }
 
     private val pendingOps = ArrayList<JSONObject>()
 
@@ -678,6 +688,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 applyServerState(state)
                 serverDialog = false
                 reopen()
+                loadServerNetwork()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -699,6 +710,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         synchronized(pendingOps) { pendingOps.clear() }
         settings.restoreOwnAccount()
         serverSyncedAt = null
+        serverNetwork = null
         reopen()
     }
 

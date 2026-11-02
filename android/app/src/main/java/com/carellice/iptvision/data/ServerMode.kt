@@ -71,6 +71,9 @@ object ServerApi {
 
     suspend fun ops(url: String, token: String, ops: JSONArray): JSONObject = call(url, "POST", "/api/ops", token, JSONObject().put("ops", ops))
 
+    /** Come esce su Internet il server di casa: VPN sì o no, paese, indirizzo ("label" è già pronto da mostrare). */
+    suspend fun network(url: String, token: String): JSONObject = call(url, "GET", "/api/network", token, null)
+
     suspend fun logout(url: String, token: String) {
         try { call(url, "POST", "/api/logout", token, JSONObject()) } catch (_: Exception) { /* già scollegato */ }
     }

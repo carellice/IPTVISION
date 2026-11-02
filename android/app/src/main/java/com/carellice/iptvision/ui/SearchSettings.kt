@@ -223,6 +223,8 @@ fun SettingsSection(vm: AppViewModel) {
         }
 
         Group("")
+        // Server di casa: in fondo, se il Raspberry esce su Internet con la VPN o no.
+        ServerNetworkLine(vm, Modifier.padding(vertical = 6.dp))
         ActionButton("Esci dall'account", Icons.Default.Logout, modifier = Modifier.padding(vertical = 6.dp)) { vm.logout() }
         VSpace(8.dp)
         Text(

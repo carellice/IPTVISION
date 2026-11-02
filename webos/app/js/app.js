@@ -314,6 +314,7 @@
         A.stack = []; A.openCat = {}; A.epg = {};
         u.toast('Server di casa collegato');
         openAccount(S.account(), false);
+        Server.loadNetwork();
       }).catch(function (e) {
         busy = false;
         if (token && S.get('password') !== token) Server.logout(url, token);
@@ -343,6 +344,7 @@
     Server.clearQueue();
     Player.stop();
     S.restoreOwnAccount();
+    Server.net = null;
     IPTV.Cache.clear();
     A.client = null; A.live = A.movies = A.series = null; A.stack = []; A.openCat = {}; A.epg = {};
     var account = S.account();
@@ -364,7 +366,9 @@
       if (A.section === s.id) activeItem = el;
       rail.appendChild(el);
     });
-    rail.appendChild(h('div', { class: 'clock' }, [h('b', { text: u.clock(Date.now() / 1000) }), h('span', { text: u.today() })]));
+    var net = h('span', { id: 'srv-net', class: 'net' });
+    Server.paintNetwork(net);
+    rail.appendChild(h('div', { class: 'clock' }, [h('b', { text: u.clock(Date.now() / 1000) }), h('span', { text: u.today() }), net]));
     var content = h('div', { class: 'content' });
     root.appendChild(h('div', { class: 'home' }, [rail, content]));
     if (!focusAfterRender) focusAfterRender = activeItem;
@@ -1309,7 +1313,7 @@
     if (A.screen === 'player' && overlay !== 'none' && playerTick) playerTick();
     if (++ticks % 15 === 0) savePosition();
     // Server di casa: le modifiche fatte qui partono, quelle degli altri dispositivi arrivano.
-    if (ticks % 30 === 0 && Server.active()) Server.flush().then(function () { return Server.pull(); });
+    if (ticks % 30 === 0 && Server.active()) Server.flush().then(function () { return Server.pull(); }).then(Server.loadNetwork);
   }, 1000);
 
   // Preferiti e posizioni arrivati dal server: si ridisegna, tranne durante la visione e la scrittura.
@@ -1392,6 +1396,6 @@
   var account = S.account();
   if (account) openAccount(account, S.get('autoPlayLast'));
   else render();
-  if (Server.active()) Server.pull(true);
+  if (Server.active()) Server.pull(true).then(Server.loadNetwork);
   if (S.get('autoCheckUpdates')) setTimeout(checkUpdates, 8000);
 })();

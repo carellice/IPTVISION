@@ -980,15 +980,24 @@
                     </StackPanel>
 
                     <!-- Piè di pagina -->
-                    <Border Grid.Row="4" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="0,1,0,0" Padding="16,0,8,0" Height="40">
+                    <Border Grid.Row="4" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="0,1,0,0" Padding="16,0,8,0" MinHeight="40">
                         <Grid>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5">
-                                    <Run Text="{Binding ItemCountText, Mode=OneWay}" />
-                                </TextBlock>
-                                <TextBlock Text=" · " Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5"
-                                           Visibility="{Binding FooterInfo, Converter={StaticResource NullToVis}}" />
-                                <TextBlock Text="{Binding FooterInfo}" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5" />
+                            <StackPanel VerticalAlignment="Center" Margin="0,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5">
+                                        <Run Text="{Binding ItemCountText, Mode=OneWay}" />
+                                    </TextBlock>
+                                    <TextBlock Text=" · " Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5"
+                                               Visibility="{Binding FooterInfo, Converter={StaticResource NullToVis}}" />
+                                    <TextBlock Text="{Binding FooterInfo}" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5" />
+                                </StackPanel>
+                                <!-- Server di casa: esce su Internet con la VPN o no. -->
+                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0" ToolTip="Rete del server di casa"
+                                            Visibility="{Binding ServerNetwork, Converter={StaticResource NullToVis}}">
+                                    <Ellipse Width="7" Height="7" Fill="{Binding ServerNetworkColor}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding ServerNetwork}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5"
+                                               Margin="6,0,0,0" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
                             </StackPanel>
                             <Button x:Name="RefreshButton" Style="{StaticResource IconButton}" Width="30" Height="30" FontSize="12.5"
                                     HorizontalAlignment="Right" Command="{Binding RefreshCommand}" ToolTip="Aggiorna elenco (Ctrl+R)"
@@ -1040,7 +1049,12 @@
                                             <StackPanel Visibility="{Binding IsHomeServer, Converter={StaticResource BoolToVis}}">
                                                 <TextBlock Text="{Binding HomeServerUrl}" FontWeight="SemiBold" FontSize="13.5" TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{Binding ServerStatus}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
-                                                           TextWrapping="Wrap" Margin="0,2,0,10" />
+                                                           TextWrapping="Wrap" Margin="0,2,0,6" />
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10"
+                                                            Visibility="{Binding ServerNetwork, Converter={StaticResource NullToVis}}">
+                                                    <Ellipse Width="7" Height="7" Fill="{Binding ServerNetworkColor}" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding ServerNetwork}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="7,0,0,0" />
+                                                </StackPanel>
                                                 <WrapPanel>
                                                     <Button Style="{StaticResource SecondaryButton}" Content="Aggiorna ora" Command="{Binding PullServerCommand}" Margin="0,0,8,0" />
                                                     <Button Style="{StaticResource SecondaryButton}" Content="Scollega il server" Command="{Binding DisconnectServerCommand}" />
@@ -1922,6 +1936,12 @@
                         <TextBlock Text="{Binding TvClock}" FontSize="30" FontWeight="SemiBold" HorizontalAlignment="Right"
                                    FontFamily="{StaticResource DisplayFont}" />
                         <TextBlock Text="{Binding TvDate}" FontSize="14" Foreground="#99A3B5" HorizontalAlignment="Right" />
+                        <!-- Modalità TV: sotto l'orologio, se il server di casa esce con la VPN. -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0"
+                                    Visibility="{Binding ServerNetwork, Converter={StaticResource NullToVis}}">
+                            <Ellipse Width="8" Height="8" Fill="{Binding ServerNetworkColor}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding ServerNetwork}" FontSize="13" Foreground="#99A3B5" Margin="7,0,0,0" />
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </Grid>

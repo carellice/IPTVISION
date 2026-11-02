@@ -105,6 +105,27 @@
     },
 
     clearQueue: function () { pending = []; },
+
+    /** Come esce su Internet il server di casa: { label, vpn } (es. "VPN attiva · Svizzera · 185.1.2.3"). */
+    net: null,
+    loadNetwork: function () {
+      if (!Server.active()) { Server.net = null; return Promise.resolve(); }
+      return call(Server.url(), 'GET', '/api/network', S.get('password'), null).then(function (n) {
+        Server.net = n;
+        // Si cambia solo la riga sotto l'orologio: niente ridisegno mentre si guarda o si scrive.
+        var el = document.getElementById('srv-net');
+        if (el) Server.paintNetwork(el);
+      }, function () { /* al prossimo giro */ });
+    },
+    paintNetwork: function (el) {
+      var n = Server.net;
+      el.style.display = n ? '' : 'none';
+      if (!n) return;
+      el.className = 'net' + (n.vpn === true ? ' on' : n.vpn === false ? ' off' : '');
+      el.innerHTML = '';
+      el.appendChild(document.createElement('i'));
+      el.appendChild(document.createTextNode(n.label || ''));
+    },
   };
 
   Pos.onChange = function (op) { Server.queue(op); };

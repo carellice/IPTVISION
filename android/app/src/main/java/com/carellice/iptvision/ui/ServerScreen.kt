@@ -1,6 +1,10 @@
 package com.carellice.iptvision.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +30,17 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.carellice.iptvision.AppViewModel
+
+/** Come esce su Internet il server di casa: pallino verde con la VPN attiva, rosso senza, e paese e indirizzo. */
+@Composable
+fun ServerNetworkLine(vm: AppViewModel, modifier: Modifier = Modifier) {
+    val n = vm.serverNetwork ?: return
+    val vpn = if (n.isNull("vpn")) null else n.optBoolean("vpn")
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(when (vpn) { true -> Color(0xFF3DDC97); false -> C.Danger; null -> C.Text3 }))
+        Text(n.optString("label"), color = C.Text2, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
+    }
+}
 
 /**
  * "Server di casa": collega l'app a IPTVISION installato su CasaOS. Da lì passano liste, guida e
