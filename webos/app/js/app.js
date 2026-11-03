@@ -707,6 +707,7 @@
       h('div', { class: 'grow' }, [
         h('h2', { text: m.name }),
         h('div', { class: 'muted', text: u.joinMeta(info.year || m.year, info.genre, info.duration, m.rating > 0 ? '★ ' + m.rating.toFixed(1) : null) }),
+        info.tech ? h('div', { class: 'dim', text: [u.techResolution(info.tech)].concat(u.techDetails(info.tech)).filter(Boolean).join('  ·  ') }) : null,
         h('div', { style: 'margin-top:1.4rem' }, buttons),
         info.plot ? h('div', { class: 'plot', text: info.plot }) : null,
         info.director ? h('div', { class: 'muted', text: 'Regia: ' + info.director }) : null,
@@ -834,18 +835,52 @@
   }
 
   /** Titolo pubblicato più volte (per esempio in FHD e in 4K): si sceglie quale versione aprire. */
+  // Dati tecnici delle versioni dei film, chiesti al server la prima volta che si apre la scelta.
+  var variantInfo = {};
+  var RESOLUTION_TAGS = { '4K': 1, 'UHD': 1, '2160P': 1, 'FHD': 1, '1080P': 1, 'HD': 1, '720P': 1, 'SD': 1, '480P': 1 };
+
+  /** Qualità di una versione: dal file se il server la dà, più le sigle del nome che non dicono la stessa cosa. */
+  function variantQuality(v, tech) {
+    var res = u.techResolution(tech);
+    var tags = (u.qualityOf(v.name) || '').split(' ').filter(function (t) { return t && !(res && RESOLUTION_TAGS[t]); });
+    if (res) tags.unshift(res);
+    return tags.join(' ');
+  }
+
+  function categoryName(lib, id) {
+    var name = null;
+    if (lib) lib.cats.forEach(function (c) { if (c.id === id) name = c.name; });
+    return name;
+  }
+
   function showVariants(e) {
     A.modalReturn = Nav.current();
     var box = h('div', { class: 'dialog' }, [h('h3', { text: 'Scegli la versione' }), h('div', { class: 'sub ellipsis', text: e.item.name })]);
     var list = h('div', { class: 'scroll', style: 'max-height:32rem' });
     e.variants.forEach(function (v, i) {
       var p = v.posKey ? Pos.progress(v.posKey) : 0;
+      var movie = v.kind === 'movie';
+      var cat = categoryName(movie ? A.movies : A.series, v.categoryId);
+      var badge = h('span', { class: 'badge q', text: variantQuality(v, null) || 'Versione ' + (i + 1) });
+      var details = h('div', { class: 'dim', text: movie && !(v.streamId in variantInfo) ? 'Leggo i dettagli della versione…' : (cat ? 'Categoria: ' + cat : '') });
+      // Si aggiornano solo badge e dettagli, senza ridisegnare la finestra: il focus resta dov'è.
+      var fill = function (info) {
+        var tech = info && info.tech;
+        badge.textContent = variantQuality(v, tech) || 'Versione ' + (i + 1);
+        details.textContent = u.techDetails(tech).concat(info && info.duration ? [info.duration] : [], cat ? ['Categoria: ' + cat] : []).join('  ·  ');
+      };
+      if (movie && v.streamId in variantInfo) fill(variantInfo[v.streamId]);
+      else if (movie && A.client) {
+        A.client.vodInfo(v.streamId).then(function (info) { variantInfo[v.streamId] = info; fill(info); })
+          .catch(function () { variantInfo[v.streamId] = null; fill(null); });
+      }
       list.appendChild(V.focusable(h('div', { class: 'opt' }, [
         h('div', { class: 'thumb poster' }, u.art(v.poster || v.cover, v.initials)),
         h('div', { class: 'grow' }, [
-          h('div', null, [h('span', { class: 'badge q', text: u.qualityOf(v.name) || 'Versione ' + (i + 1) }), p > 0 && p < 1 ? h('span', { class: 'badge', text: 'Iniziato' }) : null, p >= 1 ? h('span', { class: 'badge', text: 'Visto' }) : null]),
+          h('div', null, [badge, p > 0 && p < 1 ? h('span', { class: 'badge', text: 'Iniziato' }) : null, p >= 1 ? h('span', { class: 'badge', text: 'Visto' }) : null]),
           h('div', { class: 't ellipsis', style: 'margin-top:0.3rem;font-weight:600', text: v.name }),
           h('div', { class: 'dim', text: v.meta }),
+          details,
         ]),
       ]), function () { closeModal(); openItem(v); }));
     });

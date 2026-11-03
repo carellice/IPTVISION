@@ -87,7 +87,71 @@ data class VodInfo(
     val duration: String?,
     val director: String?,
     val cast: String?,
+    val tech: VodTech? = null,
 )
+
+/** Dati tecnici del file di un film (get_vod_info): servono a capire cosa cambia tra le versioni dello stesso titolo. */
+data class VodTech(
+    val width: Int,
+    val height: Int,
+    val videoCodec: String?,
+    val audioCodec: String?,
+    val audioChannels: Int,
+    val audioLanguage: String?,
+    val bitrateKbps: Int,
+    val container: String?,
+) {
+    val resolution: String?
+        get() = when {
+            height >= 2000 || width >= 3800 -> "4K"
+            height >= 1400 || width >= 2500 -> "1440p"
+            height >= 1000 || width >= 1900 -> "1080p"
+            height >= 700 || width >= 1260 -> "720p"
+            height > 0 -> "${height}p"
+            else -> null
+        }
+
+    /** "HEVC", "Dolby Digital 5.1 · ENG", "18,5 Mbit/s", "MKV": ciò che non è già nella risoluzione. */
+    val details: List<String>
+        get() = listOfNotNull(
+            videoCodec?.let { videoName(it) },
+            listOfNotNull(audioCodec?.let { audioName(it) }, channelsName(audioChannels), audioLanguage?.uppercase()?.takeIf { it != "UND" })
+                .joinToString(" ").ifEmpty { null },
+            if (bitrateKbps > 0) String.format(java.util.Locale.ITALY, "%.1f Mbit/s", bitrateKbps / 1000.0) else null,
+            container?.uppercase(),
+        )
+
+    private fun videoName(c: String) = when (c.lowercase()) {
+        "h264", "avc", "avc1" -> "H.264"
+        "hevc", "h265" -> "HEVC"
+        "av1" -> "AV1"
+        "vp9" -> "VP9"
+        "mpeg2video" -> "MPEG-2"
+        "mpeg4" -> "MPEG-4"
+        else -> c.uppercase()
+    }
+
+    private fun audioName(c: String) = when (c.lowercase()) {
+        "aac" -> "AAC"
+        "ac3" -> "Dolby Digital"
+        "eac3" -> "Dolby Digital Plus"
+        "truehd" -> "Dolby TrueHD"
+        "dts" -> "DTS"
+        "mp3" -> "MP3"
+        "opus" -> "Opus"
+        "flac" -> "FLAC"
+        else -> c.uppercase()
+    }
+
+    private fun channelsName(n: Int) = when (n) {
+        0 -> null
+        1 -> "mono"
+        2 -> "stereo"
+        6 -> "5.1"
+        8 -> "7.1"
+        else -> "$n canali"
+    }
+}
 
 data class SeriesInfo(
     val plot: String?,

@@ -487,18 +487,36 @@ fun MediaRow(
 // ---------- Scelta della versione ----------
 
 /** Titolo pubblicato più volte: si sceglie quale versione aprire (qualità letta dal nome). */
+private val RESOLUTION_TAGS = setOf("4K", "UHD", "2160P", "FHD", "1080P", "HD", "720P", "SD", "480P")
+
 @Composable
 fun VariantDialog(vm: AppViewModel) {
     val choice = vm.variantChoice ?: return
-    data class Opt(val name: String, val quality: String?, val meta: String, val url: String?, val initials: String, val progress: Float, val open: () -> Unit)
+    // Per ogni versione: qualità (dal file se il server la dà, altrimenti dal nome), dati tecnici e categoria,
+    // così si capisce cosa cambia da una all'altra.
+    data class Opt(
+        val name: String, val quality: String?, val meta: String, val url: String?, val initials: String, val progress: Float,
+        val details: String?, val loading: Boolean, val open: () -> Unit,
+    )
+    fun catName(cats: List<Category>?, id: String?) = cats?.firstOrNull { it.id == id }?.name
     val opts = when (choice) {
         is com.carellice.iptvision.VariantChoice.Films -> choice.items.map { m: Movie ->
-            Opt(m.name, com.carellice.iptvision.data.TextHelpers.qualityOf(m.name), m.meta, m.poster, m.initials, vm.positions.progress(m.key)) {
+            val loaded = m.streamId in vm.variantInfo
+            val info = vm.variantInfo[m.streamId]
+            val tech = info?.tech
+            // Se la risoluzione arriva dal file, le sigle del nome che dicono la stessa cosa (FHD, 4K…) si tolgono.
+            val fromName = com.carellice.iptvision.data.TextHelpers.qualityOf(m.name)?.split(' ').orEmpty()
+                .filter { tech?.resolution == null || it !in RESOLUTION_TAGS }
+            val quality = (listOfNotNull(tech?.resolution) + fromName).distinct().joinToString(" ").ifEmpty { null }
+            val details = (tech?.details.orEmpty() + listOfNotNull(info?.duration, catName(vm.movies?.categories, m.categoryId)?.let { "Categoria: $it" }))
+                .joinToString("  ·  ").ifEmpty { null }
+            Opt(m.name, quality, m.meta, m.poster, m.initials, vm.positions.progress(m.key), details, !loaded) {
                 vm.variantChoice = null; vm.openMovie(m)
             }
         }
         is com.carellice.iptvision.VariantChoice.Shows -> choice.items.map { s: Series ->
-            Opt(s.name, com.carellice.iptvision.data.TextHelpers.qualityOf(s.name), s.meta, s.cover, s.initials, 0f) {
+            Opt(s.name, com.carellice.iptvision.data.TextHelpers.qualityOf(s.name), s.meta, s.cover, s.initials, 0f,
+                catName(vm.series?.categories, s.categoryId)?.let { "Categoria: $it" }, false) {
                 vm.variantChoice = null; vm.openSeries(s)
             }
         }
@@ -527,6 +545,8 @@ fun VariantDialog(vm: AppViewModel) {
                             VSpace(4.dp)
                             Text(o.name, color = C.Text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             if (o.meta.isNotEmpty()) Text(o.meta, color = C.Text3, fontSize = 12.sp, maxLines = 1)
+                            if (o.details != null) Text(o.details, color = C.Text2, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            else if (o.loading) Text("Leggo i dettagli della versione…", color = C.Text3, fontSize = 12.sp)
                         }
                     }
                 }

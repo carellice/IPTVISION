@@ -81,6 +81,11 @@ fun MovieDetailScreen(vm: AppViewModel, m: Movie) {
                 Text(m.name, color = C.Text, fontSize = if (wide) 32.sp else 24.sp, fontWeight = FontWeight.Bold)
                 VSpace(6.dp)
                 Text(TextHelpers.joinMeta(info?.year ?: m.year, info?.genre, info?.duration, m.meta.substringAfter("·", "").trim().ifEmpty { null }), color = C.Text2)
+                // Risoluzione e dati del file, quando il server li fornisce.
+                info?.tech?.let { t ->
+                    VSpace(4.dp)
+                    Text(listOfNotNull(t.resolution).plus(t.details).joinToString("  ·  "), color = C.Text3, fontSize = 13.sp)
+                }
                 VSpace(18.dp)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     ActionButton(if (resume > 0) "Riprendi da ${TextHelpers.formatTime(resume)}" else "Guarda", Icons.Default.PlayArrow, primary = true,
@@ -185,8 +190,10 @@ private fun EpisodeRow(vm: AppViewModel, s: Series, ep: Episode, all: List<Episo
         Modifier.fillMaxWidth().tvClickable(focusScale = 1.02f) { vm.playEpisode(s, ep, all) }.padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box {
-            Artwork(ep.image ?: s.cover, ep.label, Modifier.width(150.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)), fontSize = 14)
+        // La larghezza sta sul riquadro: con la barra a tutta larghezza il riquadro si allargava a tutta la riga
+        // e il titolo dell'episodio, a fianco, restava senza spazio.
+        Box(Modifier.width(150.dp)) {
+            Artwork(ep.image ?: s.cover, ep.label, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)), fontSize = 14)
             if (progress > 0f && progress < 1f) ProgressLine(progress, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(5.dp))
         }
         HSpace(14.dp)

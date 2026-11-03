@@ -233,7 +233,29 @@ public sealed class XtreamClient
             Duration = secs > 0 ? FormatDuration(secs) : NullIfEmpty(GetString(info, "duration")),
             Director = NullIfEmpty(GetString(info, "director")),
             Cast = NullIfEmpty(GetString(info, "cast") ?? GetString(info, "actors")),
+            Tech = TechOf(info, doc.RootElement.TryGetProperty("movie_data", out var data) && data.ValueKind == JsonValueKind.Object ? data : null),
         };
+    }
+
+    /// <summary>Risoluzione, codec, audio e bitrate, se il pannello li fornisce (non tutti lo fanno).</summary>
+    private static VodTech? TechOf(JsonElement info, JsonElement? data)
+    {
+        JsonElement? Obj(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Object ? v : null;
+        var video = Obj(info, "video");
+        var audio = Obj(info, "audio");
+        var tags = audio is { } a ? Obj(a, "tags") : null;
+        var tech = new VodTech
+        {
+            Width = video is { } v1 ? GetInt(v1, "width") ?? 0 : 0,
+            Height = video is { } v2 ? GetInt(v2, "height") ?? 0 : 0,
+            VideoCodec = video is { } v3 ? NullIfEmpty(GetString(v3, "codec_name")) : null,
+            AudioCodec = audio is { } a1 ? NullIfEmpty(GetString(a1, "codec_name")) : null,
+            AudioChannels = audio is { } a2 ? GetInt(a2, "channels") ?? 0 : 0,
+            AudioLanguage = tags is { } t ? NullIfEmpty(GetString(t, "language")) : null,
+            BitrateKbps = GetInt(info, "bitrate") ?? 0,
+            Container = data is { } d ? NullIfEmpty(GetString(d, "container_extension")) : null,
+        };
+        return tech.IsEmpty ? null : tech;
     }
 
     public async Task<SeriesInfo> GetSeriesInfoAsync(int seriesId, CancellationToken ct)

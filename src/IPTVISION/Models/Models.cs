@@ -76,6 +76,76 @@ public sealed class VodInfo
     public string? Duration { get; init; }
     public string? Director { get; init; }
     public string? Cast { get; init; }
+    public VodTech? Tech { get; init; }
+}
+
+/// <summary>Dati tecnici del file di un film (get_vod_info): servono a capire cosa cambia tra le versioni dello stesso titolo.</summary>
+public sealed class VodTech
+{
+    public int Width { get; init; }
+    public int Height { get; init; }
+    public string? VideoCodec { get; init; }
+    public string? AudioCodec { get; init; }
+    public int AudioChannels { get; init; }
+    public string? AudioLanguage { get; init; }
+    public int BitrateKbps { get; init; }
+    public string? Container { get; init; }
+
+    public string? Resolution => Height >= 2000 || Width >= 3800 ? "4K"
+        : Height >= 1400 || Width >= 2500 ? "1440p"
+        : Height >= 1000 || Width >= 1900 ? "1080p"
+        : Height >= 700 || Width >= 1260 ? "720p"
+        : Height > 0 ? $"{Height}p" : null;
+
+    /// <summary>"HEVC", "Dolby Digital Plus 5.1 ENG", "18,5 Mbit/s", "MKV": ciò che non è già nella risoluzione.</summary>
+    public IEnumerable<string> Details
+    {
+        get
+        {
+            if (VideoCodec != null) yield return VideoCodec.ToLowerInvariant() switch
+            {
+                "h264" or "avc" or "avc1" => "H.264",
+                "hevc" or "h265" => "HEVC",
+                "av1" => "AV1",
+                "vp9" => "VP9",
+                "mpeg2video" => "MPEG-2",
+                "mpeg4" => "MPEG-4",
+                var c => c.ToUpperInvariant(),
+            };
+            var audio = new List<string>();
+            if (AudioCodec != null) audio.Add(AudioCodec.ToLowerInvariant() switch
+            {
+                "aac" => "AAC",
+                "ac3" => "Dolby Digital",
+                "eac3" => "Dolby Digital Plus",
+                "truehd" => "Dolby TrueHD",
+                "dts" => "DTS",
+                "mp3" => "MP3",
+                "opus" => "Opus",
+                "flac" => "FLAC",
+                var c => c.ToUpperInvariant(),
+            });
+            if (AudioChannels > 0) audio.Add(AudioChannels switch { 1 => "mono", 2 => "stereo", 6 => "5.1", 8 => "7.1", var n => $"{n} canali" });
+            if (AudioLanguage != null && !AudioLanguage.Equals("und", StringComparison.OrdinalIgnoreCase)) audio.Add(AudioLanguage.ToUpperInvariant());
+            if (audio.Count > 0) yield return string.Join(' ', audio);
+            if (BitrateKbps > 0) yield return (BitrateKbps / 1000.0).ToString("0.0", CultureInfo.GetCultureInfo("it-IT")) + " Mbit/s";
+            if (Container != null) yield return Container.ToUpperInvariant();
+        }
+    }
+
+    public bool IsEmpty => Resolution == null && !Details.Any();
+
+    private static readonly HashSet<string> ResolutionTags = ["4K", "UHD", "2160P", "FHD", "1080P", "HD", "720P", "SD", "480P"];
+
+    /// <summary>Qualità di una versione: risoluzione del file, più le sigle del nome che non dicono la stessa cosa (HDR…).</summary>
+    public static string? QualityLabel(string name, VodTech? tech)
+    {
+        var res = tech?.Resolution;
+        var tags = (TextHelpers.QualityOf(name) ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(t => res == null || !ResolutionTags.Contains(t));
+        var all = (res != null ? new[] { res } : []).Concat(tags).Distinct().ToArray();
+        return all.Length == 0 ? null : string.Join(' ', all);
+    }
 }
 
 /// <summary>Dettagli di una serie con tutti gli episodi (get_series_info).</summary>
@@ -326,8 +396,20 @@ public abstract partial class ArtworkItem : ObservableObject
     public bool HasVariants => Variants.Count > 1;
     public string VariantsText => $"{Variants.Count} versioni";
 
-    /// <summary>Qualità letta dal titolo, mostrata nella scelta della versione.</summary>
-    public string? Quality => TextHelpers.QualityOf(ItemName);
+    private string? _qualityFromFile;
+
+    /// <summary>Qualità mostrata nella scelta della versione: dal file se il server la dà, altrimenti dal titolo.</summary>
+    public string? Quality => _qualityFromFile ?? TextHelpers.QualityOf(ItemName);
+
+    /// <summary>Dati tecnici e categoria della versione, nella scelta della versione.</summary>
+    [ObservableProperty] private string? _variantDetails;
+
+    public void SetVariantInfo(string? quality, string? details)
+    {
+        _qualityFromFile = quality;
+        OnPropertyChanged(nameof(Quality));
+        VariantDetails = details;
+    }
 }
 
 public sealed class Movie : ArtworkItem

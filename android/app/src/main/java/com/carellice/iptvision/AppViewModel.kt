@@ -213,9 +213,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     var variantChoice by mutableStateOf<VariantChoice?>(null)
 
+    /** Dati tecnici delle versioni nella finestra di scelta, chiesti al server quando la si apre. */
+    val variantInfo = androidx.compose.runtime.mutableStateMapOf<Int, VodInfo?>()
+
+    private fun loadVariantInfo(items: List<Movie>) {
+        val c = client ?: return
+        items.filter { it.streamId !in variantInfo }.forEach { m ->
+            viewModelScope.launch {
+                variantInfo[m.streamId] = try { c.vodInfo(m.streamId) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+            }
+        }
+    }
+
     /** Film dalle liste: se ne esistono più versioni si sceglie prima quale. */
     fun openMovieEntry(e: Entry<Movie>) {
-        if (e.hasVariants) variantChoice = VariantChoice.Films(e.item.name, e.variants) else openMovie(e.item)
+        if (e.hasVariants) { variantChoice = VariantChoice.Films(e.item.name, e.variants); loadVariantInfo(e.variants) } else openMovie(e.item)
     }
 
     fun openSeriesEntry(e: Entry<Series>) {

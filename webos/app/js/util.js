@@ -70,6 +70,35 @@ window.IPTV = IPTV;
     return words.length ? words.join(' ') : normalize(name);
   }
 
+  /** "4K", "1080p"… dai dati tecnici di un film (vedi techOf in xtream.js). */
+  function techResolution(t) {
+    if (!t) return null;
+    if (t.height >= 2000 || t.width >= 3800) return '4K';
+    if (t.height >= 1400 || t.width >= 2500) return '1440p';
+    if (t.height >= 1000 || t.width >= 1900) return '1080p';
+    if (t.height >= 700 || t.width >= 1260) return '720p';
+    return t.height > 0 ? t.height + 'p' : null;
+  }
+
+  var VIDEO_CODECS = { h264: 'H.264', avc: 'H.264', avc1: 'H.264', hevc: 'HEVC', h265: 'HEVC', av1: 'AV1', vp9: 'VP9', mpeg2video: 'MPEG-2', mpeg4: 'MPEG-4' };
+  var AUDIO_CODECS = { aac: 'AAC', ac3: 'Dolby Digital', eac3: 'Dolby Digital Plus', truehd: 'Dolby TrueHD', dts: 'DTS', mp3: 'MP3', opus: 'Opus', flac: 'FLAC' };
+  var CHANNELS = { 1: 'mono', 2: 'stereo', 6: '5.1', 8: '7.1' };
+
+  /** ["HEVC", "Dolby Digital Plus 5.1 ENG", "18,5 Mbit/s", "MKV"]: ciò che non è già nella risoluzione. */
+  function techDetails(t) {
+    if (!t) return [];
+    var out = [];
+    if (t.videoCodec) out.push(VIDEO_CODECS[t.videoCodec.toLowerCase()] || t.videoCodec.toUpperCase());
+    var audio = [];
+    if (t.audioCodec) audio.push(AUDIO_CODECS[t.audioCodec.toLowerCase()] || t.audioCodec.toUpperCase());
+    if (t.audioChannels) audio.push(CHANNELS[t.audioChannels] || t.audioChannels + ' canali');
+    if (t.audioLanguage && t.audioLanguage.toLowerCase() !== 'und') audio.push(t.audioLanguage.toUpperCase());
+    if (audio.length) out.push(audio.join(' '));
+    if (t.bitrate) out.push((t.bitrate / 1000).toFixed(1).replace('.', ',') + ' Mbit/s');
+    if (t.container) out.push(t.container.toUpperCase());
+    return out;
+  }
+
   /** Le sigle di qualità nel titolo, per distinguere le versioni ("4K HDR", "FHD"). */
   function qualityOf(name) {
     var seen = {};
@@ -194,6 +223,7 @@ window.IPTV = IPTV;
 
   IPTV.u = {
     h: h, append: append, normalize: normalize, initials: initials, variantKey: variantKey, qualityOf: qualityOf,
+    techResolution: techResolution, techDetails: techDetails,
     groupVariants: groupVariants, joinMeta: joinMeta, formatTime: formatTime, clock: clock, today: today,
     fetchTimeout: fetchTimeout, delay: delay, toast: toast, art: art, progressBar: progressBar,
   };

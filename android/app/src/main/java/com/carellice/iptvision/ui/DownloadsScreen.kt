@@ -97,8 +97,9 @@ private fun DownloadRow(vm: AppViewModel, item: Downloads.Item, onDelete: () -> 
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box {
-            Artwork(item.image, item.title.take(2).uppercase(), Modifier.width(if (item.isEpisode) 110.dp else 62.dp).aspectRatio(if (item.isEpisode) 16f / 9f else 2f / 3f).clip(RoundedCornerShape(8.dp)), fontSize = 14)
+        // Larghezza sul riquadro, non sull'immagine: vedi EpisodeRow (la barra lo allargava a tutta la riga).
+        Box(Modifier.width(if (item.isEpisode) 110.dp else 62.dp)) {
+            Artwork(item.image, item.title.take(2).uppercase(), Modifier.fillMaxWidth().aspectRatio(if (item.isEpisode) 16f / 9f else 2f / 3f).clip(RoundedCornerShape(8.dp)), fontSize = 14)
             if (watched > 0f && watched < 1f) ProgressLine(watched, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(4.dp))
         }
         HSpace(14.dp)

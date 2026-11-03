@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IPTVISION.Models;
+using IPTVISION.Services;
 
 namespace IPTVISION.ViewModels;
 
@@ -278,6 +279,32 @@ public sealed partial class MainViewModel
             if (v is Movie m) m.Progress = _positions.GetProgress(m.Key);
         VariantChoices = item.Variants;
         VariantOwner = item;
+        foreach (var v in item.Variants) _ = LoadVariantInfoAsync(v);
+    }
+
+    /// <summary>Per ogni versione: risoluzione e dati del file (dal server, solo per i film) e categoria.</summary>
+    private async Task LoadVariantInfoAsync(ArtworkItem v)
+    {
+        string? CategoryName(List<Category> cats, string? id) => cats.FirstOrDefault(c => c.Id == id)?.Name;
+        var category = v switch
+        {
+            Movie m => CategoryName(_vodCats, m.Data.CategoryId),
+            Series s => CategoryName(_seriesCats, s.Data.CategoryId),
+            _ => null,
+        };
+        var categoryText = category != null ? $"Categoria: {category}" : null;
+        if (v is not Movie movie || _client == null)
+        {
+            v.SetVariantInfo(null, categoryText);
+            return;
+        }
+        if (v.VariantDetails != null) return;
+        v.SetVariantInfo(null, "Leggo i dettagli della versione…");
+        VodInfo? info = null;
+        try { info = await _client.GetVodInfoAsync(movie.StreamId, CancellationToken.None); }
+        catch (Exception ex) { Log.Write($"Dettagli versione {movie.StreamId} non disponibili", ex); }
+        var parts = (info?.Tech?.Details ?? []).Append(info?.Duration).Append(categoryText).OfType<string>();
+        v.SetVariantInfo(VodTech.QualityLabel(movie.Name, info?.Tech), string.Join("  ·  ", parts));
     }
 
     [RelayCommand]

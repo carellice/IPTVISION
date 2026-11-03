@@ -268,7 +268,25 @@ class XtreamClient(val account: XtreamAccount) {
             duration = if (secs > 0) formatDuration(secs) else nn(info.str("duration")),
             director = nn(info.str("director")),
             cast = nn(info.str("cast") ?: info.str("actors")),
+            tech = techOf(info, root.optJSONObject("movie_data")),
         )
+    }
+
+    /** Risoluzione, codec, audio e bitrate, se il pannello li fornisce (non tutti lo fanno). */
+    private fun techOf(info: JSONObject, data: JSONObject?): VodTech? {
+        val v = info.optJSONObject("video")
+        val a = info.optJSONObject("audio")
+        val tech = VodTech(
+            width = v?.optInt("width") ?: 0,
+            height = v?.optInt("height") ?: 0,
+            videoCodec = nn(v?.str("codec_name")),
+            audioCodec = nn(a?.str("codec_name")),
+            audioChannels = a?.optInt("channels") ?: 0,
+            audioLanguage = nn(a?.optJSONObject("tags")?.str("language")),
+            bitrateKbps = intOf(info.str("bitrate")) ?: 0,
+            container = nn(data?.str("container_extension")),
+        )
+        return if (tech.resolution == null && tech.details.isEmpty()) null else tech
     }
 
     suspend fun seriesInfo(seriesId: Int): SeriesInfo {

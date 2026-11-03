@@ -22,7 +22,7 @@
         <!-- Segnaposto: il menu vero si costruisce in Library_ContextMenuOpening secondo l'elemento sotto il mouse. -->
         <ContextMenu x:Key="EmptyMenu" />
         <DataTemplate x:Key="VariantItemTemplate" DataType="{x:Type m:ArtworkItem}">
-            <Grid Height="76" Margin="6,0" Background="Transparent">
+            <Grid MinHeight="76" Margin="6,4" Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="44" />
                     <ColumnDefinition Width="*" />
@@ -47,6 +47,9 @@
                         </Border>
                     </StackPanel>
                     <TextBlock Text="{Binding ItemName}" FontSize="13.5" FontWeight="SemiBold" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding VariantDetails}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"
+                               TextWrapping="Wrap" MaxHeight="34" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding VariantDetails, Converter={StaticResource NullToVis}}" />
                 </StackPanel>
             </Grid>
         </DataTemplate>

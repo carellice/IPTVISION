@@ -168,9 +168,22 @@
       return {
         plot: nn(i.plot) || nn(i.description), genre: nn(i.genre), year: yearOf(i.year, i.releasedate, ''),
         duration: secs > 0 ? Math.round(secs / 60) + ' min' : nn(i.duration), director: nn(i.director), cast: nn(i.cast) || nn(i.actors),
+        tech: techOf(i, root.movie_data),
       };
     });
   };
+
+  /** Risoluzione, codec, audio e bitrate del file, se il pannello li fornisce: distinguono le versioni dello stesso film. */
+  function techOf(i, data) {
+    var v = i.video && typeof i.video === 'object' ? i.video : {};
+    var a = i.audio && typeof i.audio === 'object' ? i.audio : {};
+    var t = {
+      width: int(v.width) || 0, height: int(v.height) || 0, videoCodec: nn(v.codec_name),
+      audioCodec: nn(a.codec_name), audioChannels: int(a.channels) || 0, audioLanguage: nn(a.tags && a.tags.language),
+      bitrate: int(i.bitrate) || 0, container: nn(data && data.container_extension),
+    };
+    return t.width || t.height || t.videoCodec || t.audioCodec || t.bitrate ? t : null;
+  }
 
   Client.prototype.seriesInfo = function (seriesId) {
     return this.json(this.api('get_series_info', 'series_id=' + seriesId), 30000).then(function (root) {
