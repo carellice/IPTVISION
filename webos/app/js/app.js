@@ -353,7 +353,8 @@
   }
 
   function renderHome() {
-    var rail = h('div', { class: 'rail' }, [h('div', { class: 'brand' }, [h('img', { src: 'img/largeIcon.png', alt: '' }), h('h1', { text: 'IPTVISION' })])]);
+    // data-enter: entrando nel menu dal contenuto si torna sulla sezione aperta (vedi nav.js).
+    var rail = h('div', { class: 'rail', 'data-enter': 'active' }, [h('div', { class: 'brand' }, [h('img', { src: 'img/largeIcon.png', alt: '' }), h('h1', { text: 'IPTVISION' })])]);
     var activeItem = null;
     SECTIONS.forEach(function (s) {
       var el = V.focusable(h('div', { class: 'nav-item' + (A.section === s.id ? ' active' : ''), data: { key: 'nav-' + s.id } }, s.icon + '  ' + s.title), function () {
@@ -371,7 +372,6 @@
     rail.appendChild(h('div', { class: 'clock' }, [h('b', { text: u.clock(Date.now() / 1000) }), h('span', { text: u.today() }), net]));
     var content = h('div', { class: 'content' });
     root.appendChild(h('div', { class: 'home' }, [rail, content]));
-    if (!focusAfterRender) focusAfterRender = activeItem;
 
     if (A.section === 'Search') {
       renderSearch(content);
@@ -379,12 +379,15 @@
       Array.prototype.forEach.call(rail.querySelectorAll('.nav-item'), function (el) {
         el.nav = { right: function () { return content.querySelector('[data-key="search-input"]'); } };
       });
-      return;
+    } else if (A.section === 'Settings') renderSettings(content);
+    else {
+      if (A.section === 'Movies') ensure('movies');
+      if (A.section === 'Series') ensure('series');
+      renderLibrary(content, A.section);
     }
-    if (A.section === 'Settings') return renderSettings(content);
-    if (A.section === 'Movies') ensure('movies');
-    if (A.section === 'Series') ensure('series');
-    renderLibrary(content, A.section);
+    // Il menu prende il focus solo se il contenuto non ne ha scelto uno: prima lo prendeva sempre, e
+    // chiudendo una categoria si finiva sul menu invece che sulla categoria appena chiusa.
+    if (!focusAfterRender) focusAfterRender = activeItem;
   }
 
   function renderLibrary(content, section) {
@@ -753,7 +756,7 @@
         function () { playEpisode(s, resume, eps, false); });
       head.lastChild.appendChild(play);
     }
-    var chips = h('div', { class: 'seasons' });
+    var chips = h('div', { class: 'seasons', 'data-enter': 'on' });
     seasons.forEach(function (n) {
       chips.appendChild(V.focusable(h('div', { class: 'chip' + (n === d.season ? ' on' : ''), data: { key: 'season-' + n }, text: 'Stagione ' + n }), function () {
         d.season = n;

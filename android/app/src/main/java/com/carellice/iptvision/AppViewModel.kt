@@ -171,6 +171,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** L'ultima categoria aperta per sezione: tornando all'elenco il focus riparte da lì. */
     val lastCategory = HashMap<Section, String>()
 
+    /** L'ultimo film o serie aperto per sezione: tornando dalla scheda il focus riparte da lì, non dal primo. */
+    val lastEntry = HashMap<Section, Any>()
+
     fun openCategory(s: Section, id: String) {
         lastCategory[s] = id
         when (s) {

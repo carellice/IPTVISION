@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -152,8 +153,17 @@ fun SeriesDetailScreen(vm: AppViewModel, s: Series) {
             } else {
                 item {
                     val state = rememberLazyListState(initialFirstVisibleItemIndex = seasons.indexOf(season).coerceAtLeast(0))
-                    LazyRow(state = state, horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 14.dp)) {
-                        items(seasons) { n -> Pill("Stagione $n", n == season, onFocus = { if (vm.isTv) season = n }) { season = n } }
+                    // Entrando nella fila col telecomando si va sulla stagione aperta: prima si finiva sulla
+                    // più vicina, che diventava subito quella mostrata.
+                    val seasonFocus = remember { FocusRequester() }
+                    LazyRow(
+                        state = state, horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 14.dp),
+                        modifier = Modifier.focusProperties { onEnter = { seasonFocus.requestFocus() } },
+                    ) {
+                        items(seasons) { n ->
+                            Pill("Stagione $n", n == season, modifier = if (n == season) Modifier.focusRequester(seasonFocus) else Modifier,
+                                onFocus = { if (vm.isTv) season = n }) { season = n }
+                        }
                     }
                 }
                 if (!vm.isTv) item {

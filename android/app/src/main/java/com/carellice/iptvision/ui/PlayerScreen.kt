@@ -178,6 +178,15 @@ fun PlayerScreen(vm: AppViewModel) {
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 val code = e.key.nativeKeyCode
+                // Con i comandi a schermo le frecce spostano il focus tra i pulsanti: prima arrivavano qui,
+                // ▶ mostrava le informazioni e ◀ l'elenco canali, e i comandi sparivano. Ogni tasto li tiene a schermo.
+                // Pannello canali o audio e sottotitoli aperti: i tasti sono tutti loro.
+                if (panel || tracks) return@onKeyEvent false
+                if (overlay == Overlay.Controls) {
+                    interaction++
+                    if (code == AKey.KEYCODE_DPAD_LEFT || code == AKey.KEYCODE_DPAD_RIGHT ||
+                        code == AKey.KEYCODE_DPAD_UP || code == AKey.KEYCODE_DPAD_DOWN) return@onKeyEvent false
+                }
                 when (code) {
                     AKey.KEYCODE_DPAD_UP, AKey.KEYCODE_CHANNEL_UP, AKey.KEYCODE_PAGE_UP, AKey.KEYCODE_MEDIA_NEXT ->
                         if (live) vm.zap(+1) else if (code == AKey.KEYCODE_DPAD_UP) { pc.seekBy(60_000); show(Overlay.Info) } else vm.playEpisodeOffset(+1)

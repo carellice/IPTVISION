@@ -358,12 +358,13 @@ fun MoviesSection(vm: AppViewModel) {
     LibrarySection(vm, Section.Movies, entries, { if (it == 1) "1 film" else "$it film" }, { vm.moviesFor(it).size }) { catId, grid ->
         val list = remember(lib, catId, vm.positionsVersion, vm.sortOf(Section.Movies)) { vm.moviesFor(catId) }
         var remove by remember { mutableStateOf<Entry<Movie>?>(null) }
-        EntryList(vm, list, grid, key = { it.streamId }) { e, mod, g ->
+        EntryList(vm, Section.Movies, list, grid, key = { it.streamId }) { e, mod, g ->
             val m = e.item
             // In "Continua a guardare" la pressione lunga (o il tasto Menu) toglie il titolo dall'elenco.
             val long: (() -> Unit)? = if (catId == CONTINUE_ID) ({ remove = e }) else null
-            if (g) Poster(m.name, m.meta, m.poster, m.initials, vm.progressOf(e), e.variantsText.takeIf { e.hasVariants }, mod, long) { vm.openMovieEntry(e) }
-            else MediaRow(m.name, m.meta, m.poster, m.initials, vm.progressOf(e), e.variantsText.takeIf { e.hasVariants }, mod, long) { vm.openMovieEntry(e) }
+            val open = { vm.lastEntry[Section.Movies] = m.streamId; vm.openMovieEntry(e) }
+            if (g) Poster(m.name, m.meta, m.poster, m.initials, vm.progressOf(e), e.variantsText.takeIf { e.hasVariants }, mod, long, open)
+            else MediaRow(m.name, m.meta, m.poster, m.initials, vm.progressOf(e), e.variantsText.takeIf { e.hasVariants }, mod, long, open)
         }
         remove?.let { e -> RemoveContinueDialog(e.item.name, { remove = null }) { vm.removeMovieFromContinue(e); remove = null } }
     }
@@ -383,11 +384,12 @@ fun SeriesSection(vm: AppViewModel) {
     LibrarySection(vm, Section.Series, entries, { if (it == 1) "1 serie" else "$it serie" }, { vm.seriesFor(it).size }) { catId, grid ->
         val list = remember(lib, catId, vm.positionsVersion, vm.sortOf(Section.Series)) { vm.seriesFor(catId) }
         var remove by remember { mutableStateOf<Entry<Series>?>(null) }
-        EntryList(vm, list, grid, key = { it.seriesId }) { e, mod, g ->
+        EntryList(vm, Section.Series, list, grid, key = { it.seriesId }) { e, mod, g ->
             val s = e.item
             val long: (() -> Unit)? = if (catId == CONTINUE_ID) ({ remove = e }) else null
-            if (g) Poster(s.name, s.meta, s.cover, s.initials, 0f, e.variantsText.takeIf { e.hasVariants }, mod, long) { vm.openSeriesEntry(e) }
-            else MediaRow(s.name, s.meta, s.cover, s.initials, 0f, e.variantsText.takeIf { e.hasVariants }, mod, long) { vm.openSeriesEntry(e) }
+            val open = { vm.lastEntry[Section.Series] = s.seriesId; vm.openSeriesEntry(e) }
+            if (g) Poster(s.name, s.meta, s.cover, s.initials, 0f, e.variantsText.takeIf { e.hasVariants }, mod, long, open)
+            else MediaRow(s.name, s.meta, s.cover, s.initials, 0f, e.variantsText.takeIf { e.hasVariants }, mod, long, open)
         }
         remove?.let { e -> RemoveContinueDialog(e.item.name, { remove = null }) { vm.removeSeriesFromContinue(e); remove = null } }
     }
@@ -408,6 +410,7 @@ private fun RemoveContinueDialog(title: String, onDismiss: () -> Unit, onConfirm
 @Composable
 private fun <T> EntryList(
     vm: AppViewModel,
+    section: Section,
     list: List<Entry<T>>,
     grid: Boolean,
     key: (T) -> Any,
@@ -415,8 +418,11 @@ private fun <T> EntryList(
 ) {
     if (list.isEmpty()) { Empty("Nessun contenuto."); return }
     val wide = LocalWide.current
+    // Tornando dalla scheda si riparte dal titolo aperto, già in vista.
+    val start = remember(list) { vm.lastEntry[section]?.let { k -> list.indexOfFirst { key(it.item) == k } }?.coerceAtLeast(0) ?: 0 }
     if (grid) {
         LazyVerticalGrid(
+            state = rememberLazyGridState(initialFirstVisibleItemIndex = start),
             columns = GridCells.Adaptive(if (wide) 150.dp else 110.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -424,11 +430,11 @@ private fun <T> EntryList(
             contentPadding = PaddingValues(12.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            itemsIndexed(list, key = { _, e -> key(e.item) }) { i, e -> item(e, Modifier.initialFocus(i == 0, vm.isTv), true) }
+            itemsIndexed(list, key = { _, e -> key(e.item) }) { i, e -> item(e, Modifier.initialFocus(i == start, vm.isTv), true) }
         }
     } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
-            itemsIndexed(list, key = { _, e -> key(e.item) }) { i, e -> item(e, Modifier.initialFocus(i == 0, vm.isTv), false) }
+        LazyColumn(state = rememberLazyListState(initialFirstVisibleItemIndex = start), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+            itemsIndexed(list, key = { _, e -> key(e.item) }) { i, e -> item(e, Modifier.initialFocus(i == start, vm.isTv), false) }
         }
     }
 }

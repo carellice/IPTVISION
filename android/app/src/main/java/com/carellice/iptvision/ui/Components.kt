@@ -1,5 +1,9 @@
 package com.carellice.iptvision.ui
 
+import android.content.pm.PackageManager
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -140,6 +144,34 @@ fun Modifier.dpadLeavable(): Modifier {
         }
     }
 }
+
+/**
+ * Campo di testo col telecomando: ricevere il focus non apre la tastiera, che coprirebbe la schermata;
+ * si apre premendo OK e si richiude passando a un altro elemento. Sul telefono si scrive come sempre.
+ * Uso: `readOnly = !t.editing` e `Modifier.tvTyping(t)` sul campo.
+ */
+class TvTyping(val tv: Boolean) {
+    var editing by mutableStateOf(!tv)
+}
+
+@Composable
+fun rememberTvTyping(): TvTyping {
+    val context = LocalContext.current
+    val t = remember { TvTyping(context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(t.editing) { if (t.tv && t.editing) keyboard?.show() }
+    return t
+}
+
+fun Modifier.tvTyping(t: TvTyping): Modifier = if (!t.tv) this else this
+    .onFocusChanged { if (!it.isFocused) t.editing = false }
+    .onPreviewKeyEvent { e ->
+        val ok = e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter
+        if (!t.editing && ok) {
+            if (e.type == KeyEventType.KeyUp) t.editing = true
+            true
+        } else false
+    }
 
 /** Immagine remota con le iniziali come segnaposto (loghi dei canali, locandine). */
 @Composable

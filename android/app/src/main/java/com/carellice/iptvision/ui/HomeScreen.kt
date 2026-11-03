@@ -52,8 +52,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.focusGroup
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
@@ -140,12 +150,24 @@ private fun Content(vm: AppViewModel, onVoiceSearch: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun SideNav(vm: AppViewModel) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { if (vm.isTv) runCatching { first.requestFocus() } }
+    // La sezione cambia solo quando ci si sposta con ▲ ▼ dentro il menu. Prima cambiava a ogni focus,
+    // anche quando il focus ci finiva da solo (categoria aperta o chiusa) e si saltava a "TV in diretta".
+    var moving by remember { mutableStateOf(false) }
     Column(
-        Modifier.width(220.dp).fillMaxHeight().background(C.Panel).padding(14.dp),
+        Modifier.width(220.dp).fillMaxHeight().background(C.Panel)
+            // Entrando con ◀ si torna sulla sezione aperta, non sulla voce più vicina.
+            .focusProperties { onEnter = { first.requestFocus() } }
+            .focusGroup()
+            .onPreviewKeyEvent { e ->
+                if (e.type == KeyEventType.KeyDown) moving = e.key == Key.DirectionUp || e.key == Key.DirectionDown
+                false
+            }
+            .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 6.dp, top = 8.dp, bottom = 18.dp)) {
@@ -163,7 +185,7 @@ private fun SideNav(vm: AppViewModel) {
                         background = if (selected) C.AccentSoft else Color.Transparent,
                         focusedBackground = C.SurfacePressed,
                         // Col telecomando basta spostarsi sulla voce per aprire la sezione.
-                        onFocus = { if (vm.isTv) vm.section = s },
+                        onFocus = { if (vm.isTv && moving) { moving = false; vm.section = s } },
                     ) { vm.section = s }
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,

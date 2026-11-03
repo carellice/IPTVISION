@@ -1,5 +1,7 @@
 package com.carellice.iptvision.ui
 
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -62,10 +64,13 @@ fun SearchSection(vm: AppViewModel, onVoiceSearch: () -> Unit) {
         SectionTitle("Cerca", if (q.isBlank()) "Canali, film e serie insieme" else "${results.total} risultati")
         VSpace(12.dp)
         Row(verticalAlignment = Alignment.CenterVertically) {
+            val typing = rememberTvTyping()
+            val keyboard = LocalSoftwareKeyboardController.current
             OutlinedTextField(
                 value = q,
                 onValueChange = vm::setQuery,
                 singleLine = true,
+                readOnly = !typing.editing,
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = C.Text2) },
                 trailingIcon = if (q.isNotEmpty()) { { IconButton(onClick = { vm.setQuery("") }) { Icon(Icons.Default.Close, "Cancella", tint = C.Text2) } } } else null,
                 placeholder = {
@@ -80,12 +85,14 @@ fun SearchSection(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                     )
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                // Premuto Cerca, la tastiera si chiude e col telecomando si scende subito ai risultati.
+                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide(); if (typing.tv) typing.editing = false }),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = C.Accent, unfocusedBorderColor = C.StrokeStrong,
                     focusedContainerColor = C.Panel, unfocusedContainerColor = C.Panel,
                 ),
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f).dpadLeavable(),
+                modifier = Modifier.weight(1f).tvTyping(typing).dpadLeavable(),
             )
             HSpace(10.dp)
             Row(

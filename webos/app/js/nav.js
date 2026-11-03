@@ -80,13 +80,41 @@
       var score = Math.max(primary, 0) + gap * 3 + (gap > 0 ? 1000 : 0) + edge * 0.05;
       if (score < bestScore) { bestScore = score; best = el; }
     });
+    // Entrando in un gruppo (il menu laterale, data-enter) si va sulla sua voce attiva, non sulla più vicina:
+    // dal contenuto si finiva su un'altra sezione, che si apriva da sola.
+    var group = best && closestGroup(best);
+    if (group && group !== closestGroup(current)) {
+      var active = group.querySelector('.' + group.getAttribute('data-enter'));
+      if (active && list.indexOf(active) >= 0) best = active;
+    }
     if (best) { focus(best); return true; }
     return false;
   }
 
+  function closestGroup(el) {
+    while (el && el !== document.body) {
+      if (el.getAttribute && el.getAttribute('data-enter')) return el;
+      el = el.parentNode;
+    }
+    return null;
+  }
+
+  /** Cursore in fondo al testo già scritto: sui TV il campo riapriva la scrittura dall'inizio. */
+  function caretToEnd(input) {
+    var n = input.value.length;
+    try { input.setSelectionRange(n, n); } catch (e) { /* tipi di campo senza cursore (es. email) */ }
+  }
+
   function activate() {
     if (!current) return;
-    if (current.tagName === 'INPUT') { current.focus(); return; }
+    if (current.tagName === 'INPUT') {
+      var input = current;
+      input.focus();
+      caretToEnd(input);
+      // Alcuni TV spostano il cursore dopo il focus, mentre si apre la tastiera: lo si rimette in fondo.
+      setTimeout(function () { if (document.activeElement === input) caretToEnd(input); }, 50);
+      return;
+    }
     if (typeof current.onActivate === 'function') current.onActivate();
     else current.click();
   }

@@ -89,12 +89,14 @@ internal fun Field(
     value: String, onChange: (String) -> Unit, label: String, hint: String?, type: KeyboardType,
     password: Boolean = false, done: (() -> Unit)? = null,
 ) {
+    val typing = rememberTvTyping()
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         label = { Text(label) },
         placeholder = hint?.let { { Text(it, color = C.Text3) } },
         singleLine = true,
+        readOnly = !typing.editing,
         visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
         keyboardOptions = KeyboardOptions(keyboardType = type, imeAction = if (done != null) ImeAction.Done else ImeAction.Next, autoCorrectEnabled = false),
         keyboardActions = KeyboardActions(onDone = { done?.invoke() }),
@@ -102,6 +104,8 @@ internal fun Field(
             focusedBorderColor = C.Accent, unfocusedBorderColor = C.StrokeStrong,
             focusedContainerColor = C.Panel, unfocusedContainerColor = C.Panel,
         ),
-        modifier = Modifier.fillMaxWidth().dpadLeavable(),
+        modifier = Modifier.fillMaxWidth()
+            .tvTyping(typing)
+            .dpadLeavable(),
     )
 }
