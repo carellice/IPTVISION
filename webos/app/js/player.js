@@ -20,6 +20,11 @@
   // Sui TV Samsung (Tizen) le richieste di mpegts.js al flusso restavano appese senza risposta,
   // mentre il lettore del TV, lo stesso dei film, apre la diretta senza problemi.
   var nativeLive = !!(IPTV.Platform && IPTV.Platform.tizen);
+  // Canali il cui audio il browser del TV non decodifica con mpegts.js (Dolby AC-3/E-AC-3, MPEG Layer II del
+  // digitale terrestre): si vedevano senza audio. Per questi si usa il lettore del TV, che li conosce.
+  var nativeAudio = {};
+  var nativeFailed = {}; // ...a meno che il lettore del TV abbia già fallito su quel canale.
+  var mediaInfo = null;
 
   var P = {
     state: 'idle', // idle | connecting | buffering | playing | paused | reconnecting
@@ -56,7 +61,8 @@
     startedAt = lastProgressAt = Date.now();
 
     var isTs = /\.ts(\?|$)/i.test(url);
-    if (live && isTs && !nativeLive && canUseMse()) {
+    mediaInfo = null;
+    if (live && isTs && !nativeLive && !nativeAudio[url] && canUseMse()) {
       // Sui TV di fascia media:
       // - la conversione del flusso gira in un worker, così menu e telecomando non la rallentano;
       // - si tengono solo 30 s già visti: con i 3 minuti predefiniti la memoria del TV si riempiva
@@ -67,7 +73,24 @@
         autoCleanupSourceBuffer: true, autoCleanupMaxBackwardDuration: 30, autoCleanupMinBackwardDuration: 15,
         liveBufferLatencyChasing: false,
       });
-      ts.on(mpegts.Events.ERROR, function () { scheduleRetry('errore del flusso'); });
+      ts.on(mpegts.Events.ERROR, function (type, detail, info) {
+        // Il browser rifiuta il codec audio (per esempio "audio/mp4;codecs=ac-3"): ci prova il lettore del TV.
+        var msg = info && info.msg ? String(info.msg) : '';
+        if (/addSourceBuffer/.test(msg) && /audio\//.test(msg) && !nativeAudio[url] && !nativeFailed[url]) {
+          // Fuori dall'evento di mpegts.js, che start() distrugge.
+          setTimeout(function () { useTvPlayer('codec audio non supportato dal browser'); }, 0);
+          return;
+        }
+        scheduleRetry('errore del flusso');
+      });
+      ts.on(mpegts.Events.MEDIA_INFO, function (info) {
+        mediaInfo = info;
+        // Codec audio che il browser dichiara di non saper riprodurre: inutile aspettare.
+        var c = info && info.hasAudio && info.audioCodec;
+        if (c && c !== 'mp3' && window.MediaSource && MediaSource.isTypeSupported && !MediaSource.isTypeSupported('audio/mp4; codecs="' + c + '"')) {
+          useTvPlayer('audio ' + c + ' non supportato');
+        }
+      });
       ts.attachMediaElement(video);
       ts.load();
       if (!userPaused) { var pr = ts.play(); if (pr && pr.catch) pr.catch(function () {}); }
@@ -88,10 +111,24 @@
     return null;
   }
 
+  /** Riapre il canale col lettore del TV, senza contare un tentativo. */
+  function useTvPlayer(reason) {
+    if (!url || nativeAudio[url] || nativeFailed[url]) return;
+    console.log('Lettore del TV per questo canale: ' + reason);
+    nativeAudio[url] = true;
+    everPlayed = false;
+    start();
+  }
+
   function scheduleRetry(reason) {
     if (!url) return;
     clearTimeout(retryTimer);
-    if (live && !everPlayed && otherFormat(url)) {
+    if (live && !everPlayed && nativeAudio[url]) {
+      // Nemmeno il lettore del TV lo apre: si torna a mpegts.js, almeno con l'immagine.
+      delete nativeAudio[url];
+      nativeFailed[url] = true;
+      console.log('Il lettore del TV non apre il canale: torno a mpegts.js');
+    } else if (live && !everPlayed && otherFormat(url)) {
       url = otherFormat(url);
       console.log('Il canale non parte: provo il formato ' + (/\.m3u8/i.test(url) ? 'HLS (m3u8)' : 'MPEG-TS'));
     }
@@ -139,6 +176,12 @@
       if (P.state !== 'playing' && video.readyState >= 3) setState('playing');
       // Dopo un minuto di visione regolare i tentativi ripartono da capo.
       if (attempt > 0 && Date.now() - startedAt > 60000) attempt = 0;
+      // Il video scorre da qualche secondo ma dell'audio non è stato decodificato nulla: si passa al lettore del TV.
+      if (ts && everPlayed && mediaInfo && mediaInfo.hasAudio && Date.now() - startedAt > 8000 &&
+        typeof video.webkitAudioDecodedByteCount === 'number' && video.webkitAudioDecodedByteCount === 0) {
+        useTvPlayer('audio non decodificato' + (mediaInfo.audioCodec ? ' (' + mediaInfo.audioCodec + ')' : ''));
+        return;
+      }
       // Senza inseguimento la diretta può restare indietro: oltre 25 s di ritardo si salta avanti, una volta sola.
       var b = video.buffered;
       if (live && b.length && b.end(b.length - 1) - t > 25) video.currentTime = b.end(b.length - 1) - 4;

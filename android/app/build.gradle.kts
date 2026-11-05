@@ -83,6 +83,10 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.8.0")
     implementation("androidx.media3:media3-exoplayer-hls:1.8.0")
     implementation("androidx.media3:media3-ui:1.8.0")
+    // Decoder FFmpeg per l'audio che molti dispositivi non sanno decodificare: AC-3 ed E-AC-3 (Dolby),
+    // usati da diversi canali del digitale terrestre. Senza, su quei canali non si sentiva nulla.
+    // Lo carica da solo DefaultRenderersFactory (EXTENSION_RENDERER_MODE_PREFER in PlayerController).
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.8.0+1")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
