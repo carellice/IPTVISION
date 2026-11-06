@@ -23,8 +23,14 @@
     sorts: {}, grids: { Movies: true, Series: true }, hideAdult: false,
     // Server di casa (IPTVISION su CasaOS): indirizzo, ultima revisione avuta e l'account IPTV di prima.
     homeServer: null, homeRevision: -1, own: null,
+    // Liste IPTV salvate: { alias, server, username, password, expiresAt } (secondi Unix, null = nessuna scadenza).
+    lists: [],
   };
   Object.keys(defaults).forEach(function (k) { if (settings[k] === undefined) settings[k] = defaults[k]; });
+
+  function sameList(a, b) {
+    return String(a.server || '').toLowerCase() === String(b.server || '').toLowerCase() && a.username === b.username;
+  }
 
   var Settings = {
     get: function (k) { return settings[k]; },
@@ -32,6 +38,34 @@
     account: function () {
       if (!settings.server || !settings.username) return null;
       return { server: settings.server, username: settings.username, password: settings.password || '' };
+    },
+    /** Liste salvate; un account di prima delle liste diventa la prima lista. */
+    lists: function () {
+      if (!settings.lists.length && settings.server && settings.username && !settings.homeServer) {
+        settings.lists.push({ alias: settings.username, server: settings.server, username: settings.username, password: settings.password || '', expiresAt: null });
+        save('settings', settings);
+      }
+      return settings.lists;
+    },
+    /** Aggiunge la lista o aggiorna quella con stesso server e utente (il nome resta se non se ne dà uno nuovo). */
+    saveList: function (l) {
+      var all = Settings.lists();
+      for (var i = 0; i < all.length; i++) {
+        if (sameList(all[i], l)) { l.alias = l.alias || all[i].alias; all[i] = l; save('settings', settings); return; }
+      }
+      l.alias = l.alias || l.username;
+      all.push(l);
+      save('settings', settings);
+    },
+    removeList: function (l) {
+      settings.lists = Settings.lists().filter(function (x) { return !sameList(x, l); });
+      save('settings', settings);
+    },
+    /** La lista in uso, se il TV parla direttamente col provider. */
+    activeList: function () {
+      if (settings.homeServer) return null;
+      var cur = { server: settings.server, username: settings.username };
+      return Settings.lists().filter(function (x) { return sameList(x, cur); })[0] || null;
     },
     clearAccount: function () {
       ['server', 'username', 'password', 'lastStreamId', 'lastCategoryId'].forEach(function (k) { settings[k] = null; });

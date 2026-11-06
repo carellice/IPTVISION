@@ -278,13 +278,13 @@ function applyState(s: UserState & { unchanged?: boolean }) {
   emit()
 }
 
-export async function loginXtream(server: string, username: string, password: string) {
+export async function loginXtream(server: string, username: string, password: string, alias = '') {
   if (server.trim() === '' && username.trim() === '') { app.loginError = 'Inserisci server e nome utente, oppure il link M3U completo.'; emit(); return }
   app.loginBusy = true
   app.loginError = null
   emit()
   try {
-    const r = await api<{ server: string; username: string }>('/api/xtream', { method: 'POST', json: { server, username, password } })
+    const r = await api<{ server: string; username: string }>('/api/xtream', { method: 'POST', json: { server, username, password, alias } })
     app.xtream = { server: r.server, username: r.username }
     app.stack = [{ kind: 'Home' }]
     app.section = 'Live'
@@ -296,6 +296,31 @@ export async function loginXtream(server: string, username: string, password: st
     app.loginBusy = false
     emit()
   }
+}
+
+/** A saved IPTV list (Impostazioni → Liste IPTV); the password stays on the server. */
+export type XtreamList = { index: number; alias: string; server: string; username: string; expiresAt: number | null; active: boolean }
+
+/** Opens the login screen over the app to add one more list (Indietro goes back). */
+export function addXtreamList() {
+  app.loginError = null
+  push({ kind: 'Login' })
+}
+
+/** Switches to another saved list: lists, guide and player start again from that account. */
+export async function switchXtreamList(index: number) {
+  player.stop()
+  app.playing = null
+  let s: UserState
+  try { s = await api<UserState>(`/api/xtream/lists/${index}/use`, { method: 'POST' }) } catch (e) { toast((e as Error).message, true); return }
+  applyState(s)
+  app.xtream = s.xtream
+  updateSettings({ lastStreamId: null, lastCategoryId: null })
+  app.stack = [{ kind: 'Home' }]
+  app.section = 'Live'
+  resetCatalog()
+  openAccount(false)
+  emit()
 }
 
 export async function logoutXtream() {

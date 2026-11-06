@@ -276,15 +276,43 @@ route('POST', '/api/import-native', async (req, res) => {
 // --- the IPTV account ----------------------------------------------------------------------------
 
 route('POST', '/api/xtream', async (req, res) => {
-  const b = await readJson<{ server?: string; username?: string; password?: string }>(req)
+  const b = await readJson<{ server?: string; username?: string; password?: string; alias?: string }>(req)
   const parsed = xtream.parseServerInput(String(b.server ?? ''))
   const username = String(b.username ?? '').trim() || parsed.username || ''
   const password = String(b.password ?? '') || parsed.password || ''
   if (!parsed.server || !username) throw new HttpError(400, 'Inserisci server e nome utente, oppure il link M3U completo.')
   const account = { server: parsed.server, username, password }
   const info = await provider(() => xtream.authenticate(account))
+  data.saveXtreamList({ ...account, alias: String(b.alias ?? '').trim().slice(0, 60) || username, expiresAt: info.expiresAt })
   data.setXtreamAccount(account)
   json(res, 200, { server: account.server, username, expiresAt: info.expiresAt, maxConnections: info.maxConnections })
+})
+
+/** The saved IPTV lists, without passwords. */
+const listsView = () => data.xtreamLists().map((l, index) => ({
+  index, alias: l.alias, server: l.server, username: l.username, expiresAt: l.expiresAt, active: data.isActiveList(l),
+}))
+
+const listAt = (p: string[]) => {
+  const l = data.xtreamLists()[Number(p[0])]
+  if (!l) throw new HttpError(404, 'Lista non trovata.')
+  return l
+}
+
+route('GET', '/api/xtream/lists', (_req, res) => json(res, 200, listsView()))
+
+route('POST', '/api/xtream/lists/:i/use', (_req, res, p, _u, user) => {
+  const l = listAt(p)
+  play.stopAll(user.token)
+  data.setXtreamAccount({ server: l.server, username: l.username, password: l.password })
+  json(res, 200, data.state())
+})
+
+route('DELETE', '/api/xtream/lists/:i', (_req, res, p, _u, user) => {
+  const active = data.isActiveList(listAt(p))
+  data.removeXtreamList(Number(p[0]))
+  if (active) { play.stopAll(user.token); data.setXtreamAccount(null) }
+  json(res, 200, listsView())
 })
 
 route('DELETE', '/api/xtream', (_req, res, _p, _u, user) => {
@@ -294,7 +322,10 @@ route('DELETE', '/api/xtream', (_req, res, _p, _u, user) => {
 })
 
 route('GET', '/api/xtream/info', async (_req, res) => {
-  const info = await provider(() => xtream.authenticate(requireXtream()))
+  const account = requireXtream()
+  const info = await provider(() => xtream.authenticate(account))
+  const saved = data.xtreamLists().find((l) => data.isActiveList(l))
+  if (saved && saved.expiresAt !== info.expiresAt) data.saveXtreamList({ ...saved, expiresAt: info.expiresAt })
   json(res, 200, { status: info.status, expiresAt: info.expiresAt, maxConnections: info.maxConnections })
 })
 

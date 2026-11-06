@@ -20,6 +20,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -45,9 +47,13 @@ import com.carellice.iptvision.R
 
 @Composable
 fun LoginScreen(vm: AppViewModel) {
-    var server by rememberSaveable { mutableStateOf(vm.settings.server ?: "") }
-    var user by rememberSaveable { mutableStateOf(vm.settings.username ?: "") }
+    // Aperta dalle Impostazioni per aggiungere una lista: campi vuoti e si può tornare indietro.
+    val adding = vm.stack.size > 1
+    var server by rememberSaveable { mutableStateOf(if (adding) "" else vm.settings.server ?: "") }
+    var user by rememberSaveable { mutableStateOf(if (adding) "" else vm.settings.username ?: "") }
     var pass by rememberSaveable { mutableStateOf("") }
+    var alias by rememberSaveable { mutableStateOf("") }
+    val saved = if (adding || vm.settings.homeServer != null) emptyList() else vm.settings.lists
 
     Box(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color(0xFF0F1830), C.Bg)))
@@ -67,14 +73,21 @@ fun LoginScreen(vm: AppViewModel) {
                 }
             }
             VSpace(6.dp)
+            if (saved.isNotEmpty()) {
+                Text("Liste salvate", color = C.Text2, fontSize = 14.sp)
+                saved.forEach { l -> ActionButton(l.alias, Icons.Default.List, modifier = Modifier.fillMaxWidth()) { vm.useList(l) } }
+                Text("Oppure aggiungi una lista", color = C.Text2, fontSize = 14.sp)
+            }
+            Field(alias, { alias = it }, "Nome della lista (facoltativo)", "Per esempio: Casa, Sport…", KeyboardType.Text)
             Field(server, { server = it }, "Server o link M3U", "http://server:porta oppure il link get.php completo", KeyboardType.Uri)
             Field(user, { user = it }, "Nome utente", null, KeyboardType.Text)
-            Field(pass, { pass = it }, "Password", null, KeyboardType.Password, password = true, done = { vm.login(server, user, pass) })
+            Field(pass, { pass = it }, "Password", null, KeyboardType.Password, password = true, done = { vm.login(server, user, pass, alias) })
             vm.loginError?.let { Text(it, color = C.Danger, fontSize = 14.sp) }
             if (vm.loginBusy) Loading("Accesso in corso…", Modifier.fillMaxWidth().padding(8.dp))
-            else ActionButton("Accedi", Icons.Default.Login, primary = true, modifier = Modifier.fillMaxWidth()) { vm.login(server, user, pass) }
+            else ActionButton("Accedi", Icons.Default.Login, primary = true, modifier = Modifier.fillMaxWidth()) { vm.login(server, user, pass, alias) }
+            if (adding && !vm.loginBusy) ActionButton("Annulla", Icons.Default.ArrowBack, modifier = Modifier.fillMaxWidth()) { vm.back() }
             // Senza account IPTV sul dispositivo: si può usare quello del server di casa.
-            ActionButton("Usa il server di casa", Icons.Default.Dns, modifier = Modifier.fillMaxWidth()) { vm.serverError = null; vm.serverDialog = true }
+            if (!adding) ActionButton("Usa il server di casa", Icons.Default.Dns, modifier = Modifier.fillMaxWidth()) { vm.serverError = null; vm.serverDialog = true }
             Text(
                 "Se incolli il link M3U completo, nome utente e password si compilano da soli. " +
                     "IPTVISION è solo un lettore e non contiene canali.",

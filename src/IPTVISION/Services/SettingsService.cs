@@ -49,7 +49,23 @@ public sealed class AppSettings
     public string? OwnUsername { get; set; }
     public string? OwnProtectedPassword { get; set; }
 
+    /// <summary>Liste IPTV salvate; quella in uso è anche in Server/Username/ProtectedPassword.</summary>
+    public List<SavedList> Lists { get; set; } = [];
+
     public bool HasAccount => !string.IsNullOrWhiteSpace(Server) && !string.IsNullOrWhiteSpace(Username) && ProtectedPassword != null;
+}
+
+/// <summary>Un account Xtream salvato, con il nome scelto dall'utente.</summary>
+public sealed class SavedList
+{
+    public string Alias { get; set; } = "";
+    public string Server { get; set; } = "";
+    public string Username { get; set; } = "";
+    public string? ProtectedPassword { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
+
+    public bool Is(string? server, string? username) =>
+        string.Equals(Server, server, StringComparison.OrdinalIgnoreCase) && Username == username;
 }
 
 public static class SettingsService

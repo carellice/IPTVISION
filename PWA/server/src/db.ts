@@ -117,6 +117,38 @@ export function setXtreamAccount(a: XtreamAccount | null) {
   })
 }
 
+/** A saved IPTV list: the active one is also in xtream_server/username/password. */
+export type XtreamList = XtreamAccount & { alias: string; expiresAt: number | null }
+
+const sameAccount = (a: XtreamAccount, b: XtreamAccount) => a.server.toLowerCase() === b.server.toLowerCase() && a.username === b.username
+
+export function xtreamLists(): XtreamList[] {
+  let lists: XtreamList[] = []
+  try { lists = JSON.parse(getMeta('xtream_lists') ?? '[]') } catch { /* unreadable: start again */ }
+  // Accounts from before the lists: the active one becomes the first list.
+  const a = xtreamAccount()
+  if (a && !lists.some((l) => sameAccount(l, a))) lists.unshift({ ...a, alias: a.username, expiresAt: null })
+  return lists
+}
+
+export function isActiveList(l: XtreamAccount): boolean {
+  const a = xtreamAccount()
+  return a != null && sameAccount(a, l)
+}
+
+/** Adds the list, or updates the one with the same server and username. */
+export function saveXtreamList(l: XtreamList) {
+  const lists = xtreamLists()
+  const i = lists.findIndex((x) => sameAccount(x, l))
+  if (i >= 0) lists[i] = l
+  else lists.push(l)
+  setMeta('xtream_lists', JSON.stringify(lists))
+}
+
+export function removeXtreamList(index: number) {
+  setMeta('xtream_lists', JSON.stringify(xtreamLists().filter((_, i) => i !== index)))
+}
+
 // --- favorites and positions -------------------------------------------------------------------
 
 /** Everything the clients sync: the same shape as the native positions.json, plus favorites. */

@@ -23,6 +23,7 @@ import com.carellice.iptvision.data.Episode
 import com.carellice.iptvision.data.Log
 import com.carellice.iptvision.data.Movie
 import com.carellice.iptvision.data.PositionStore
+import com.carellice.iptvision.data.SavedList
 import com.carellice.iptvision.data.Quiz
 import com.carellice.iptvision.data.Series
 import com.carellice.iptvision.data.SeriesInfo
@@ -285,7 +286,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- Account ----------
-    fun login(serverInput: String, user: String, pass: String) {
+    fun login(serverInput: String, user: String, pass: String, alias: String = "") {
         val (server, u, p) = XtreamClient.parseServerInput(serverInput)
         val username = user.trim().ifEmpty { u ?: "" }
         val password = pass.ifEmpty { p ?: "" }
@@ -295,7 +296,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         loginError = null
         viewModelScope.launch {
             try {
-                XtreamClient(account).authenticate()
+                val info = XtreamClient(account).authenticate()
+                settings.saveList(SavedList(alias.trim(), server, username, password, info.expiresAt))
                 settings.server = server
                 settings.username = username
                 settings.password = password
@@ -327,6 +329,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         stack.clear(); stack.add(Screen.Login)
     }
 
+    /** Passa a un'altra lista salvata: liste, guida e lettore ripartono da quell'account. */
+    fun useList(l: SavedList) {
+        if (settings.homeServer != null) return
+        player.stop()
+        playing = null
+        settings.server = l.server
+        settings.username = l.username
+        settings.password = l.password
+        settings.lastStreamId = null
+        settings.lastCategoryId = null
+        loginError = null
+        reopen()
+    }
+
+    fun removeList(l: SavedList) {
+        val active = settings.activeList?.isSame(l.server, l.username) == true
+        settings.removeList(l)
+        if (active) logout() else refreshUi()
+    }
+
+    /** Schermata di accesso sopra l'app, per una lista in più (Indietro torna a quella di prima). */
+    fun addList() {
+        loginError = null
+        push(Screen.Login)
+    }
+
     private fun openAccount(account: XtreamAccount, autoPlay: Boolean) {
         val c = XtreamClient(account)
         client = c
@@ -341,7 +369,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             status = if (cached == null) "Caricamento canali…" else null
             try {
-                c.authenticate()
+                val info = c.authenticate()
+                settings.activeList?.let { if (it.expiresAt != info.expiresAt) { settings.saveList(it.copy(expiresAt = info.expiresAt)); refreshUi() } }
                 downloadList(c, "get_live_categories", "live_cats")
                 downloadList(c, "get_live_streams", "live", 90)
                 val fresh = withContext(Dispatchers.IO) { loadLive(c.account.key) }

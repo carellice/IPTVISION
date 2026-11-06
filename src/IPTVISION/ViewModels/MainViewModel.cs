@@ -185,6 +185,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         LoginServer = _settings.Server ?? "";
         LoginUsername = _settings.Username ?? "";
         LoadBrowsePrefs();
+        RefreshSavedLists();
 
         var password = _settings.HasAccount ? SettingsService.Unprotect(_settings.ProtectedPassword) : null;
         if (password == null) { IsLoggedIn = false; return; }
@@ -240,7 +241,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _settings.Server = server;
             _settings.Username = user;
             _settings.ProtectedPassword = SettingsService.Protect(pass);
-            SettingsService.Save(_settings);
+            SaveList(server, user, _settings.ProtectedPassword, auth);
             await Task.Run(() => CacheService.Save(client.Account.Key, new ChannelCache { SavedAt = DateTimeOffset.Now, Categories = cats, Channels = chans }));
 
             _client = client;
@@ -376,6 +377,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void SetAccountInfo(AuthInfo auth)
     {
+        UpdateListExpiry(auth);
         AccountInfo = auth.ExpiresAt is { } exp
             ? $"Account attivo · scade il {exp.ToLocalTime():dd/MM/yyyy}"
             : "Account attivo · nessuna scadenza";

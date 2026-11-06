@@ -78,6 +78,11 @@ data class Programme(val start: Long, val stop: Long, val title: String, val des
     val timeRange: String get() = "${TextHelpers.clock(start)} – ${TextHelpers.clock(stop)}"
 }
 
+/** Un account Xtream salvato con il nome scelto dall'utente; expiresAt in secondi Unix, null = nessuna scadenza. */
+data class SavedList(val alias: String, val server: String, val username: String, val password: String, val expiresAt: Long?) {
+    fun isSame(server: String?, username: String?) = this.server.equals(server, ignoreCase = true) && this.username == username
+}
+
 data class AuthInfo(val status: String?, val expiresAt: Long?, val maxConnections: Int)
 
 data class VodInfo(

@@ -75,6 +75,9 @@ Prima scegli la categoria, poi vedi canali, film o serie. Ogni sezione si può m
 ### 🙈 Nascondi XXX
 Nelle impostazioni (su Windows, Android, TV LG e TV Samsung) c'è **Nascondi XXX**: spariscono tutte le categorie che hanno "XXX" nel nome, in TV in diretta, film e serie, insieme al loro contenuto, che non compare più nemmeno in **Tutti** e nella ricerca. Non distingue maiuscole e minuscole ed è spenta di base; spegnendola torna tutto com'era.
 
+### 📋 Più liste IPTV
+Si possono salvare più account Xtream Codes, ognuno con un nome a scelta (per esempio "Casa" o "Sport"). In **Impostazioni → Liste IPTV** (Windows, Android, TV LG e Samsung, browser) si vede per ogni lista la data di scadenza dell'abbonamento, se il provider la indica, e si passa dall'una all'altra senza riscrivere la password. **Aggiungi lista** apre la schermata di accesso; dopo **Esci dall'account** le liste salvate si scelgono con un clic.
+
 ### 🔎 Ricerca unica, anche a voce
 Cerca insieme tra canali, film e serie, oppure solo in uno dei tre (**Tutto**, **Canali**, **Film**, **Serie**): i risultati sono raggruppati per tipo e non serve scrivere gli accenti. Il pulsante 🎤 o **Ctrl+M** attiva la digitazione vocale di Windows, che capisce l'italiano.
 

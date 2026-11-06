@@ -78,6 +78,14 @@
 
   function openAccount(account, autoPlay) {
     A.client = new X.Client(account);
+    // La scadenza della lista in uso, aggiornata a ogni apertura (non serve per partire).
+    var active = S.activeList();
+    if (active) {
+      A.client.authenticate().then(function (ui) {
+        var exp = expiryOf(ui);
+        if (active.expiresAt !== exp) { active.expiresAt = exp; S.saveList(active); }
+      }).catch(function () { /* la vedrà il caricamento delle liste */ });
+    }
     A.live = A.movies = A.series = null;
     A.loading = {};
     A.screen = 'home';
@@ -234,32 +242,66 @@
     if (A.screen !== 'player') Nav.setScope(root, target);
   }
 
+  function expiryOf(ui) {
+    var n = parseInt(ui && ui.exp_date, 10);
+    return n > 0 ? n : null;
+  }
+
+  function expiryText(l) {
+    if (!l.expiresAt) return 'nessuna scadenza';
+    var d = new Date(l.expiresAt * 1000);
+    return 'scade il ' + ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+  }
+
+  /** Passa a un'altra lista salvata: liste, guida e lettore ripartono da quell'account. */
+  function useList(l) {
+    Player.stop();
+    S.set('server', l.server); S.set('username', l.username); S.set('password', l.password);
+    S.set('lastStreamId', null); S.set('lastCategoryId', null);
+    A.loginError = null;
+    A.stack = []; A.openCat = {}; A.epg = {};
+    openAccount(S.account(), false);
+  }
+
   function renderLogin() {
-    var server = h('input', { type: 'url', placeholder: 'http://server:porta oppure il link get.php completo', value: S.get('server') || '' });
-    var user = h('input', { type: 'text', value: S.get('username') || '' });
+    // Aperta dalle Impostazioni per aggiungere una lista: campi vuoti e si può tornare indietro.
+    var adding = !!(A.data && A.data.adding);
+    var server = h('input', { type: 'url', placeholder: 'http://server:porta oppure il link get.php completo', value: adding ? '' : S.get('server') || '' });
+    var user = h('input', { type: 'text', value: adding ? '' : S.get('username') || '' });
     var pass = h('input', { type: 'password' });
+    var alias = h('input', { type: 'text', placeholder: 'Per esempio: Casa, Sport…' });
     var err = h('div', { class: 'error' }, A.loginError || '');
-    [server, user, pass].forEach(function (i) { i.classList.add('f'); i.onSubmit = function () { Nav.move('down'); }; });
+    var saved = adding || S.get('homeServer') ? [] : S.lists().map(function (l) {
+      return V.focusable(h('div', { class: 'btn', style: 'margin-bottom:0.4rem', text: l.alias + '  ·  ' + expiryText(l) }), function () { useList(l); });
+    });
+    [alias, server, user, pass].forEach(function (i) { i.classList.add('f'); i.onSubmit = function () { Nav.move('down'); }; });
     var btn = V.focusable(h('div', { class: 'btn primary', text: 'Accedi' }), function () {
       var p = X.parseServerInput(server.value);
       var acc = { server: p.server, username: (user.value || '').trim() || p.username || '', password: pass.value || p.password || '' };
       if (!acc.server || !acc.username) { err.textContent = 'Inserisci server e nome utente, oppure il link M3U completo.'; return; }
       err.textContent = 'Accesso in corso…';
-      new X.Client(acc).authenticate().then(function () {
+      new X.Client(acc).authenticate().then(function (ui) {
+        S.saveList({ alias: (alias.value || '').trim(), server: acc.server, username: acc.username, password: acc.password, expiresAt: expiryOf(ui) });
         S.set('server', acc.server); S.set('username', acc.username); S.set('password', acc.password);
         A.loginError = null;
+        A.stack = [];
         openAccount(acc, false);
       }).catch(function (e) { err.textContent = e.message || 'Accesso non riuscito.'; });
     });
     pass.onSubmit = function () { btn.onActivate(); };
     root.appendChild(h('div', { class: 'login' }, h('div', { class: 'login-box' }, [
       h('div', { class: 'brand' }, [h('img', { src: 'img/largeIcon.png', alt: '' }), h('div', null, [h('h1', { text: 'IPTVISION' }), h('div', { class: 'muted', text: 'Accedi al tuo account Xtream Codes' })])]),
+      saved.length ? h('div', { class: 'muted', style: 'margin-bottom:0.4rem', text: 'Liste salvate' }) : null,
+      h('div', null, saved),
+      saved.length ? h('div', { class: 'muted', style: 'margin:0.4rem 0', text: 'Oppure aggiungi una lista' }) : null,
+      h('label', { class: 'field' }, [h('span', { text: 'Nome della lista (facoltativo)' }), alias]),
       h('label', { class: 'field' }, [h('span', { text: 'Server o link M3U' }), server]),
       h('label', { class: 'field' }, [h('span', { text: 'Nome utente' }), user]),
       h('label', { class: 'field' }, [h('span', { text: 'Password' }), pass]),
       err, btn,
-      // Senza account IPTV sul TV: si può usare quello del server di casa.
-      V.focusable(h('div', { class: 'btn', style: 'margin-top:0.6rem', text: 'Usa il server di casa' }), function () { push('server', {}); }),
+      adding ? V.focusable(h('div', { class: 'btn', style: 'margin-top:0.6rem', text: 'Annulla' }), back)
+        // Senza account IPTV sul TV: si può usare quello del server di casa.
+        : V.focusable(h('div', { class: 'btn', style: 'margin-top:0.6rem', text: 'Usa il server di casa' }), function () { push('server', {}); }),
       h('div', { class: 'dim', style: 'margin-top:1rem;font-size:0.85rem', text: 'Se incolli il link M3U completo, nome utente e password si compilano da soli. IPTVISION è solo un lettore e non contiene canali.' }),
     ])));
   }
@@ -636,6 +678,20 @@
     box.appendChild(h('div', { class: 'group-title', text: 'Account' }));
     box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Server' }), S.get('server') || '']));
     box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Utente' }), S.get('username') || '']));
+    if (!Server.active()) {
+      box.appendChild(h('div', { class: 'group-title', text: 'Liste IPTV' }));
+      var active = S.activeList();
+      S.lists().forEach(function (l) {
+        var inUse = active === l;
+        box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: l.alias + (inUse ? ' · in uso' : '') }), l.username + ' · ' + expiryText(l)]));
+        if (!inUse) box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Usa ' + l.alias }), function () { useList(l); }));
+        box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Rimuovi ' + l.alias }), function () {
+          S.removeList(l);
+          if (inUse) logout(); else render(true);
+        }));
+      });
+      box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Aggiungi lista' }), function () { A.loginError = null; push('login', { adding: true }); }));
+    }
     box.appendChild(h('div', { class: 'group-title', text: 'Server di casa' }));
     if (Server.active()) {
       box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Indirizzo' }), Server.url()]));
@@ -667,16 +723,19 @@
       box.appendChild(h('div', { class: 'info-line', style: 'color:var(--accent2)', text: 'Disponibile IPTVISION ' + A.update + '. Scarica il file ' + IPTV.Platform.ext + ' dalle release su GitHub e installalo dal PC (vedi README).' }));
     }
     box.appendChild(h('div', { class: 'group-title', text: '' }));
-    box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Esci dall\'account' }), function () {
-      Player.stop();
-      if (Server.active()) { Server.logout(Server.url(), S.get('password')); Server.clearQueue(); S.restoreOwnAccount(); }
-      S.clearAccount();
-      IPTV.Cache.clear();
-      A.client = null; A.live = A.movies = A.series = null; A.stack = []; A.openCat = {};
-      A.screen = 'login';
-      render();
-    }));
+    box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Esci dall\'account' }), logout));
     box.appendChild(h('div', { class: 'dim', style: 'margin-top:1rem;font-size:0.8rem', text: 'IPTVISION è solo un lettore e non contiene canali. Va usato con un servizio IPTV a cui si ha diritto di accedere.' }));
+  }
+
+  /** Torna alla schermata di accesso; le liste salvate restano lì da scegliere. */
+  function logout() {
+    Player.stop();
+    if (Server.active()) { Server.logout(Server.url(), S.get('password')); Server.clearQueue(); S.restoreOwnAccount(); }
+    S.clearAccount();
+    IPTV.Cache.clear();
+    A.client = null; A.live = A.movies = A.series = null; A.stack = []; A.openCat = {}; A.data = null;
+    A.screen = 'login';
+    render();
   }
 
   // ---------- Film, serie e versioni ----------

@@ -89,6 +89,51 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
             .remove("lastStreamId").remove("lastCategoryId").remove("homeServer").remove("homeRevision").apply()
     }
 
+    // ---------- Liste IPTV salvate ----------
+
+    /** Account Xtream salvati, ognuno col suo nome; quello in uso è anche in server/username/password. */
+    val lists: List<SavedList>
+        get() {
+            val out = ArrayList<SavedList>()
+            try {
+                val a = JSONArray(p.getString("lists", "[]"))
+                for (i in 0 until a.length()) {
+                    val o = a.getJSONObject(i)
+                    out += SavedList(o.getString("alias"), o.getString("server"), o.getString("username"), o.getString("password"),
+                        if (o.isNull("expiresAt")) null else o.getLong("expiresAt"))
+                }
+            } catch (e: Exception) {
+                Log.w("Liste salvate illeggibili", e)
+            }
+            // Account di prima delle liste: quello in uso diventa la prima lista.
+            val a = account
+            if (out.isEmpty() && a != null && homeServer == null) out += SavedList(a.username, a.server, a.username, a.password, null)
+            return out
+        }
+
+    private fun writeLists(lists: List<SavedList>) {
+        val a = JSONArray()
+        lists.forEach {
+            a.put(JSONObject().put("alias", it.alias).put("server", it.server).put("username", it.username)
+                .put("password", it.password).put("expiresAt", it.expiresAt ?: JSONObject.NULL))
+        }
+        p.edit().putString("lists", a.toString()).apply()
+    }
+
+    /** Aggiunge la lista o aggiorna quella con stesso server e utente (il nome resta se non se ne dà uno nuovo). */
+    fun saveList(l: SavedList) {
+        val all = lists.toMutableList()
+        val i = all.indexOfFirst { it.isSame(l.server, l.username) }
+        if (i >= 0) all[i] = l.copy(alias = l.alias.ifBlank { all[i].alias }) else all += l.copy(alias = l.alias.ifBlank { l.username })
+        writeLists(all)
+    }
+
+    fun removeList(l: SavedList) = writeLists(lists.filterNot { it.isSame(l.server, l.username) })
+
+    /** La lista in uso, se l'app parla direttamente col provider. */
+    val activeList: SavedList?
+        get() = if (homeServer != null) null else lists.firstOrNull { it.isSame(server, username) }
+
     fun clearAccount() {
         p.edit().remove("server").remove("username").remove("password").remove("lastStreamId").remove("lastCategoryId").apply()
     }

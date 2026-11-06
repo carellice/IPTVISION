@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { ActionButton, Clickable, Dialog, SectionTitle, Switch, TextButton, TextField, toast } from '../components/ui.tsx'
 import { api } from '../lib/api.ts'
 import { NetworkStatus } from '../components/network.tsx'
-import { app, clearCache, logoutXtream, refreshAll, setHideAdult, updateSettings, useApp } from '../lib/app.ts'
+import { type XtreamList, addXtreamList, app, clearCache, logoutXtream, refreshAll, setHideAdult, updateSettings, useApp, switchXtreamList } from '../lib/app.ts'
 
 // SettingsSection (ui/SearchSettings.kt) plus what the browser version adds: the account on the
 // home server, the devices connected to it and how to use it from the IPTVISION apps.
@@ -16,6 +16,7 @@ export function SettingsSection() {
   useApp()
   const [expires, setExpires] = useState<string | null>(null)
   const [devices, setDevices] = useState<Device[] | null>(null)
+  const [lists, setLists] = useState<XtreamList[]>([])
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [update, setUpdate] = useState<string | null>(null)
@@ -24,11 +25,19 @@ export function SettingsSection() {
     api<{ expiresAt: number | null }>('/api/xtream/info')
       .then((i) => setExpires(i.expiresAt ? dateFmt.format(i.expiresAt * 1000) : 'Nessuna'))
       .catch(() => setExpires(null))
+      // After /info: it has just written the expiry of the active list.
+      .finally(() => api<XtreamList[]>('/api/xtream/lists').then(setLists).catch(() => {}))
     api<Device[]>('/api/devices').then(setDevices).catch(() => setDevices([]))
   }, [])
 
   const disconnect = async (d: Device) => {
     try { setDevices(await api<Device[]>(`/api/devices/${d.id}`, { method: 'DELETE' })) } catch (e) { toast((e as Error).message) }
+  }
+
+  const removeList = async (l: XtreamList) => {
+    if (!confirm(`Rimuovere la lista "${l.alias}"?`)) return
+    try { setLists(await api<XtreamList[]>(`/api/xtream/lists/${l.index}`, { method: 'DELETE' })) } catch (e) { toast((e as Error).message); return }
+    if (l.active) await logoutXtream()
   }
 
   const logout = async () => {
@@ -60,6 +69,25 @@ export function SettingsSection() {
         <Info label="Server" value={app.xtream?.server ?? ''} />
         <Info label="Utente" value={app.xtream?.username ?? ''} />
         {expires && <Info label="Scadenza" value={expires} />}
+
+        <Group title="Liste IPTV" />
+        {lists.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '4px 0' }}>
+            {lists.map((l) => (
+              <div key={l.index} style={{ display: 'flex', alignItems: 'center', background: 'var(--surface)', borderRadius: 12, padding: '10px 14px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="ellipsis" style={{ color: 'var(--text)', fontSize: 15 }}>{l.alias}{l.active ? ' · in uso' : ''}</div>
+                  <div className="ellipsis" style={{ color: 'var(--text3)', fontSize: 12 }}>
+                    {l.username} · {l.server} · {l.expiresAt ? `scade il ${dateFmt.format(l.expiresAt * 1000)}` : 'nessuna scadenza'}
+                  </div>
+                </div>
+                {!l.active && <TextButton text="Usa" color="var(--accent2)" onClick={() => switchXtreamList(l.index)} />}
+                <TextButton text="Rimuovi" color="var(--danger)" onClick={() => removeList(l)} />
+              </div>
+            ))}
+          </div>
+        )}
+        <Row><ActionButton text="Aggiungi lista" icon="list" onClick={addXtreamList} /></Row>
 
         <Group title="Riproduzione" />
         <Toggle title="Riprendi l'ultimo canale all'avvio" subtitle="Apri l'app e il canale riparte da dov'eri rimasto."

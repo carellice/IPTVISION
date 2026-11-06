@@ -141,6 +141,30 @@
                             <TextBlock Text="Accedi con il tuo account Xtream Codes per vedere i canali in diretta."
                                        Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,26" />
 
+                            <!-- Liste già salvate: un clic e si riparte da lì, senza riscrivere la password. -->
+                            <StackPanel Visibility="{Binding HasSavedLists, Converter={StaticResource BoolToVis}}" Margin="0,0,0,18">
+                                <TextBlock Text="LISTE SALVATE" Style="{StaticResource FieldLabel}" />
+                                <ItemsControl ItemsSource="{Binding SavedLists}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource SecondaryButton}" Margin="0,0,0,6" HorizontalContentAlignment="Left"
+                                                    Command="{Binding DataContext.UseListCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Alias}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" />
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Oppure aggiungi una nuova lista:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="2,8,0,0" />
+                            </StackPanel>
+
+                            <TextBlock Text="NOME DELLA LISTA" Style="{StaticResource FieldLabel}" />
+                            <TextBox Style="{StaticResource InputBox}" Tag="Facoltativo, per esempio Casa o Sport"
+                                     Text="{Binding LoginAlias, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,18" />
+
                             <TextBlock Text="SERVER" Style="{StaticResource FieldLabel}" />
                             <TextBox x:Name="ServerBox" Style="{StaticResource InputBox}" Tag="http://server:porta"
                                      Text="{Binding LoginServer, UpdateSourceTrigger=PropertyChanged}" />
@@ -1045,6 +1069,43 @@
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>
+
+                                    <StackPanel Visibility="{Binding IsHomeServer, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                                        <TextBlock Text="LISTE IPTV" Style="{StaticResource SectionTitle}" />
+                                        <ItemsControl ItemsSource="{Binding SavedLists}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="14,10" Margin="0,0,0,6">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel VerticalAlignment="Center">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <TextBlock Text="{Binding Alias}" FontWeight="SemiBold" FontSize="13.5" />
+                                                                    <TextBlock Text="  · in uso" Foreground="#3DDC97" FontSize="12" VerticalAlignment="Center"
+                                                                               Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}}" />
+                                                                </StackPanel>
+                                                                <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                                                                           TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                                            </StackPanel>
+                                                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Usa" Margin="8,0,0,0"
+                                                                    Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"
+                                                                    Command="{Binding DataContext.UseListCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}" />
+                                                            <Button Grid.Column="2" Style="{StaticResource DangerButton}" Content="Rimuovi" Margin="8,0,0,0"
+                                                                    Command="{Binding DataContext.RemoveListCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Button Style="{StaticResource SecondaryButton}" Content="Aggiungi lista" Command="{Binding AddListCommand}"
+                                                HorizontalAlignment="Left" Margin="0,2,0,0" />
+                                    </StackPanel>
 
                                     <TextBlock Text="SERVER DI CASA" Style="{StaticResource SectionTitle}" />
                                     <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="14,12">

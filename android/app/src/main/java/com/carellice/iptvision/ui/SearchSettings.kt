@@ -2,6 +2,7 @@ package com.carellice.iptvision.ui
 
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -178,6 +180,10 @@ fun SettingsSection(vm: AppViewModel) {
         Group("Account")
         Info("Server", vm.settings.server ?: "")
         Info("Utente", vm.settings.username ?: "")
+        if (vm.settings.homeServer == null) {
+            vm.settings.activeList?.let { Info("Scadenza", expiryText(it.expiresAt)) }
+            ListsGroup(vm)
+        }
 
         ServerGroup(vm)
 
@@ -265,6 +271,33 @@ private fun ServerGroup(vm: AppViewModel) {
         ActionButton("Aggiorna ora", Icons.Default.Refresh) { vm.pullServer(force = true) }
         ActionButton("Scollega il server", Icons.Default.LinkOff) { vm.disconnectServer() }
     }
+}
+
+private val expiryFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.ITALY)
+
+private fun expiryText(expiresAt: Long?) = if (expiresAt == null) "Nessuna" else expiryFormat.format(java.util.Date(expiresAt * 1000))
+
+/** Le liste IPTV salvate: si passa dall'una all'altra senza riscrivere la password. */
+@Composable
+private fun ListsGroup(vm: AppViewModel) {
+    Group("Liste IPTV")
+    val active = vm.settings.activeList
+    vm.settings.lists.forEach { l ->
+        val inUse = active?.isSame(l.server, l.username) == true
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 3.dp).background(C.Surface, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(l.alias + if (inUse) " · in uso" else "", color = C.Text, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${l.username} · scadenza: ${expiryText(l.expiresAt).lowercase()}", color = C.Text3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (!inUse) { HSpace(8.dp); ActionButton("Usa", null) { vm.useList(l) } }
+            HSpace(8.dp)
+            ActionButton("Rimuovi", null) { vm.removeList(l) }
+        }
+    }
+    ActionButton("Aggiungi lista", Icons.Default.List, modifier = Modifier.padding(vertical = 6.dp)) { vm.addList() }
 }
 
 @Composable
