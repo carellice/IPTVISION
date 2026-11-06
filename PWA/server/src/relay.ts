@@ -2,7 +2,7 @@ import { createReadStream, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomBytes } from 'node:crypto'
 import { Readable } from 'node:stream'
-import { type XtreamAccount } from './db.ts'
+import { type XtreamAccount, setActiveExpiry, withUser } from './db.ts'
 import { xmltvFile } from './epg.ts'
 import { LIST_ACTIONS, type ListAction, USER_AGENT, apiUrl, getText, listFile, streamUrl, XtreamError } from './xtream.ts'
 
@@ -11,7 +11,7 @@ import { LIST_ACTIONS, type ListAction, USER_AGENT, apiUrl, getText, listFile, s
 // token as password: lists, guide and streams come from here, and the provider's address and
 // credentials never reach the phone or the TV.
 
-export type Caller = { username: string; token: string; account: XtreamAccount }
+export type Caller = { username: string; token: string; account: XtreamAccount; userId: number }
 
 /** Pipes a provider response to the client, passing Range so films can be seeked and resumed. */
 export async function pipeUpstream(req: IncomingMessage, res: ServerResponse, url: string, onBody?: (r: Response) => Promise<boolean>) {
@@ -102,6 +102,8 @@ export async function playerApi(req: IncomingMessage, res: ServerResponse, url: 
       // The login check: the provider's answer with this server's address and the caller's credentials.
       const root = JSON.parse(await getText(apiUrl(c.account, null), 15)) as Record<string, Record<string, unknown>>
       if (root.user_info && typeof root.user_info === 'object') {
+        const exp = parseInt(String(root.user_info.exp_date), 10)
+        withUser(c.userId, () => setActiveExpiry(exp > 0 ? exp : null))
         root.user_info.username = c.username
         root.user_info.password = c.token
       }

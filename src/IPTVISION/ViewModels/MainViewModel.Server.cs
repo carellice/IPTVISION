@@ -157,6 +157,13 @@ public sealed partial class MainViewModel
             }
             var mine = _positions.ToServerJson();
             mine["favorites"] = new JsonArray(_settings.Favorites.Select(f => (JsonNode)f).ToArray());
+            // Le liste salvate su questo PC si aggiungono a quelle del server.
+            if (!IsHomeServer)
+                mine["lists"] = new JsonArray(_settings.Lists.Select(l => (JsonNode)new JsonObject
+                {
+                    ["alias"] = l.Alias, ["server"] = l.Server, ["username"] = l.Username,
+                    ["password"] = SettingsService.Unprotect(l.ProtectedPassword) ?? "", ["expiresAt"] = l.ExpiresAt?.ToUnixTimeSeconds(),
+                }).ToArray());
             var state = await ServerApi.ImportNativeAsync(url, token, mine);
 
             if (_settings.HomeServer is { } old) await ServerApi.LogoutAsync(old, SettingsService.Unprotect(_settings.ProtectedPassword) ?? "");

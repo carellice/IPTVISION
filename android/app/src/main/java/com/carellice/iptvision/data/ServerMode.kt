@@ -57,9 +57,24 @@ object ServerApi {
     }
 
     /** Porta sul server l'account IPTV che c'era su questo dispositivo (se il server non ne ha uno). */
-    suspend fun sendXtream(url: String, token: String, account: XtreamAccount) {
-        call(url, "POST", "/api/xtream", token, JSONObject().put("server", account.server).put("username", account.username).put("password", account.password))
+    suspend fun sendXtream(url: String, token: String, account: XtreamAccount, alias: String = "") {
+        call(url, "POST", "/api/xtream", token, JSONObject().put("server", account.server).put("username", account.username).put("password", account.password).put("alias", alias))
     }
+
+    /** Le liste IPTV del server, senza password. */
+    suspend fun lists(url: String, token: String): List<SavedList> {
+        val a = call(url, "GET", "/api/xtream/lists", token, null).getJSONArray("list")
+        return (0 until a.length()).map { i ->
+            val o = a.getJSONObject(i)
+            SavedList(o.getString("alias"), o.getString("server"), o.getString("username"), "",
+                if (o.isNull("expiresAt")) null else o.getLong("expiresAt"), o.getInt("index"), o.optBoolean("active"))
+        }
+    }
+
+    /** Il server passa alla lista [index]; torna lo stato (preferiti e posizioni). */
+    suspend fun useList(url: String, token: String, index: Int): JSONObject = call(url, "POST", "/api/xtream/lists/$index/use", token, JSONObject())
+
+    suspend fun removeList(url: String, token: String, index: Int) { call(url, "DELETE", "/api/xtream/lists/$index", token, null) }
 
     suspend fun importNative(url: String, token: String, data: JSONObject): JSONObject = call(url, "POST", "/api/import-native", token, data)
 
@@ -81,14 +96,19 @@ object ServerApi {
     private suspend fun call(url: String, method: String, path: String, token: String?, body: JSONObject?): JSONObject = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(url + path).apply {
             if (token != null) header("Authorization", "Bearer $token")
-            if (method == "POST") post((body ?: JSONObject()).toString().toRequestBody(json)) else get()
+            when (method) {
+                "POST" -> post((body ?: JSONObject()).toString().toRequestBody(json))
+                "DELETE" -> delete()
+                else -> get()
+            }
         }.build()
         try {
             http.newCall(req).execute().use { resp ->
                 val text = resp.body?.string() ?: ""
                 if (resp.code in 300..399) throw ServerException("Il server risponde con un reindirizzamento: controlla se l'indirizzo è http o https.")
                 if (resp.code == 401 && token != null) throw ServerException("Sessione del server scaduta: ricollega il server dalle impostazioni.")
-                val o = try { JSONObject(text.ifEmpty { "{}" }) } catch (_: Exception) {
+                // Le risposte che sono un elenco arrivano dentro "list".
+                val o = try { if (text.trimStart().startsWith("[")) JSONObject().put("list", JSONArray(text)) else JSONObject(text.ifEmpty { "{}" }) } catch (_: Exception) {
                     throw ServerException("A questo indirizzo non risponde IPTVISION. Controlla indirizzo e porta.")
                 }
                 if (!resp.isSuccessful) throw ServerException(o.optString("error").ifEmpty { "Errore del server (${resp.code})." })

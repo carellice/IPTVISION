@@ -145,6 +145,24 @@ export function saveXtreamList(l: XtreamList) {
   setMeta('xtream_lists', JSON.stringify(lists))
 }
 
+/** Lists a native app had before connecting: the missing ones join the server's, which win on duplicates. */
+export function addXtreamLists(input: unknown) {
+  if (!Array.isArray(input)) return
+  const lists = xtreamLists()
+  for (const l of input as Partial<XtreamList>[]) {
+    if (!l || typeof l.server !== 'string' || typeof l.username !== 'string' || !l.server || !l.username) continue
+    const add = { server: l.server, username: l.username, password: String(l.password ?? ''), alias: String(l.alias || l.username).slice(0, 60), expiresAt: typeof l.expiresAt === 'number' ? l.expiresAt : null }
+    if (!lists.some((x) => sameAccount(x, add))) lists.push(add)
+  }
+  setMeta('xtream_lists', JSON.stringify(lists))
+}
+
+/** The provider's expiry, read at every login check, saved on the list in use. */
+export function setActiveExpiry(expiresAt: number | null) {
+  const saved = xtreamLists().find(isActiveList)
+  if (saved && saved.expiresAt !== expiresAt) saveXtreamList({ ...saved, expiresAt })
+}
+
 export function removeXtreamList(index: number) {
   setMeta('xtream_lists', JSON.stringify(xtreamLists().filter((_, i) => i !== index)))
 }

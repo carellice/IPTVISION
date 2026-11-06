@@ -52,11 +52,22 @@ public static class ServerApi
     }
 
     /// <summary>Porta sul server l'account IPTV che c'era su questo PC (se il server non ne ha uno).</summary>
-    public static Task SendXtreamAsync(string url, string token, XtreamAccount account) =>
+    public static Task SendXtreamAsync(string url, string token, XtreamAccount account, string alias = "") =>
         CallAsync(url, HttpMethod.Post, "/api/xtream", token, new JsonObject
         {
-            ["server"] = account.Server, ["username"] = account.Username, ["password"] = account.Password,
+            ["server"] = account.Server, ["username"] = account.Username, ["password"] = account.Password, ["alias"] = alias,
         });
+
+    /// <summary>Le liste IPTV salvate sul server, senza password: index, alias, username, expiresAt, active.</summary>
+    public static async Task<JsonArray> ListsAsync(string url, string token) =>
+        await SendAsync(url, HttpMethod.Get, "/api/xtream/lists", token, null) as JsonArray ?? [];
+
+    /// <summary>Il server passa alla lista <paramref name="index"/>; torna lo stato (preferiti e posizioni).</summary>
+    public static Task<JsonObject> UseListAsync(string url, string token, int index) =>
+        CallAsync(url, HttpMethod.Post, $"/api/xtream/lists/{index}/use", token, new JsonObject());
+
+    public static Task RemoveListAsync(string url, string token, int index) =>
+        SendAsync(url, HttpMethod.Delete, $"/api/xtream/lists/{index}", token, null);
 
     public static Task<JsonObject> ImportNativeAsync(string url, string token, JsonObject data) =>
         CallAsync(url, HttpMethod.Post, "/api/import-native", token, data);
@@ -81,7 +92,10 @@ public static class ServerApi
         catch (Exception ex) { Log.Write("Scollegamento dal server non riuscito", ex); }
     }
 
-    private static async Task<JsonObject> CallAsync(string url, HttpMethod method, string path, string? token, JsonObject? body)
+    private static async Task<JsonObject> CallAsync(string url, HttpMethod method, string path, string? token, JsonObject? body) =>
+        await SendAsync(url, method, path, token, body) as JsonObject ?? throw new ServerException("A questo indirizzo non risponde IPTVISION. Controlla indirizzo e porta.");
+
+    private static async Task<JsonNode?> SendAsync(string url, HttpMethod method, string path, string? token, JsonObject? body)
     {
         try
         {
@@ -94,10 +108,10 @@ public static class ServerApi
             if (code is >= 300 and < 400) throw new ServerException("Il server risponde con un reindirizzamento: controlla se l'indirizzo è http o https.");
             if (resp.StatusCode == HttpStatusCode.Unauthorized && token != null)
                 throw new ServerException("Sessione del server scaduta: ricollega il server dalle impostazioni.");
-            JsonObject o;
-            try { o = JsonNode.Parse(text.Length == 0 ? "{}" : text) as JsonObject ?? throw new FormatException(); }
+            JsonNode o;
+            try { o = JsonNode.Parse(text.Length == 0 ? "{}" : text) ?? throw new FormatException(); }
             catch (Exception) { throw new ServerException("A questo indirizzo non risponde IPTVISION. Controlla indirizzo e porta."); }
-            if (!resp.IsSuccessStatusCode) throw new ServerException((string?)o["error"] is { Length: > 0 } msg ? msg : $"Errore del server ({code}).");
+            if (!resp.IsSuccessStatusCode) throw new ServerException((o as JsonObject)?["error"] is JsonValue e && (string?)e is { Length: > 0 } msg ? msg : $"Errore del server ({code}).");
             return o;
         }
         catch (ServerException) { throw; }

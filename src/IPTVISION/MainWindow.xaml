@@ -1070,7 +1070,7 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <StackPanel Visibility="{Binding IsHomeServer, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                                    <StackPanel>
                                         <TextBlock Text="LISTE IPTV" Style="{StaticResource SectionTitle}" />
                                         <ItemsControl ItemsSource="{Binding SavedLists}">
                                             <ItemsControl.ItemTemplate>

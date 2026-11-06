@@ -269,7 +269,9 @@ route('POST', '/api/ops', async (req, res) => {
 
 /** The favorites and positions a native app had before connecting: added to the server's. */
 route('POST', '/api/import-native', async (req, res) => {
-  data.importNative(await readJson(req))
+  const b = await readJson<{ lists?: unknown }>(req)
+  data.importNative(b)
+  data.addXtreamLists(b.lists)
   json(res, 200, data.state())
 })
 
@@ -324,8 +326,7 @@ route('DELETE', '/api/xtream', (_req, res, _p, _u, user) => {
 route('GET', '/api/xtream/info', async (_req, res) => {
   const account = requireXtream()
   const info = await provider(() => xtream.authenticate(account))
-  const saved = data.xtreamLists().find((l) => data.isActiveList(l))
-  if (saved && saved.expiresAt !== info.expiresAt) data.saveXtreamList({ ...saved, expiresAt: info.expiresAt })
+  data.setActiveExpiry(info.expiresAt)
   json(res, 200, { status: info.status, expiresAt: info.expiresAt, maxConnections: info.maxConnections })
 })
 
@@ -400,7 +401,7 @@ function xtreamCaller(username: string | null, token: string | null): relay.Call
   const user = accounts.sessionUser(token ?? undefined)
   if (!user || !username || user.username.toLowerCase() !== username.toLowerCase()) return null
   const account = data.withUser(user.id, data.xtreamAccount)
-  return account ? { username: user.username, token: user.token, account } : null
+  return account ? { username: user.username, token: user.token, account, userId: user.id } : null
 }
 
 async function handleXtream(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {

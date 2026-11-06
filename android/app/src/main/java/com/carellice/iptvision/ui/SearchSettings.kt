@@ -39,6 +39,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -180,10 +181,8 @@ fun SettingsSection(vm: AppViewModel) {
         Group("Account")
         Info("Server", vm.settings.server ?: "")
         Info("Utente", vm.settings.username ?: "")
-        if (vm.settings.homeServer == null) {
-            vm.settings.activeList?.let { Info("Scadenza", expiryText(it.expiresAt)) }
-            ListsGroup(vm)
-        }
+        vm.settings.activeList?.let { Info("Scadenza", expiryText(it.expiresAt)) }
+        ListsGroup(vm)
 
         ServerGroup(vm)
 
@@ -281,9 +280,11 @@ private fun expiryText(expiresAt: Long?) = if (expiresAt == null) "Nessuna" else
 @Composable
 private fun ListsGroup(vm: AppViewModel) {
     Group("Liste IPTV")
+    val home = vm.settings.homeServer != null
+    LaunchedEffect(home) { vm.loadServerLists() }
     val active = vm.settings.activeList
-    vm.settings.lists.forEach { l ->
-        val inUse = active?.isSame(l.server, l.username) == true
+    (if (home) vm.serverLists else vm.settings.lists).forEach { l ->
+        val inUse = if (home) l.active else active?.isSame(l.server, l.username) == true
         Row(
             Modifier.fillMaxWidth().padding(vertical = 3.dp).background(C.Surface, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,

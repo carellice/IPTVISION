@@ -79,7 +79,8 @@ data class Programme(val start: Long, val stop: Long, val title: String, val des
 }
 
 /** Un account Xtream salvato con il nome scelto dall'utente; expiresAt in secondi Unix, null = nessuna scadenza. */
-data class SavedList(val alias: String, val server: String, val username: String, val password: String, val expiresAt: Long?) {
+/** Con il server di casa: [index] e [active] vengono dal server, la password resta lì. */
+data class SavedList(val alias: String, val server: String, val username: String, val password: String, val expiresAt: Long?, val index: Int = -1, val active: Boolean = false) {
     fun isSame(server: String?, username: String?) = this.server.equals(server, ignoreCase = true) && this.username == username
 }
 

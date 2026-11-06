@@ -230,6 +230,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         IsBusy = true;
         BusyText = "Accesso in corso…";
+        if (_settings.HomeServer is { } home)
+        {
+            // Col server di casa la lista nuova va sul server, che la usa per tutti i dispositivi.
+            try
+            {
+                await ServerApi.SendXtreamAsync(home, SettingsService.Unprotect(_settings.ProtectedPassword) ?? "", new XtreamAccount(server, user, pass), LoginAlias.Trim());
+                LoginAlias = "";
+                await ReloadFromServerAsync(null);
+            }
+            catch (ServerException ex) { LoginError = ex.Message; }
+            finally { IsBusy = false; }
+            return;
+        }
         try
         {
             var client = new XtreamClient(new XtreamAccount(server, user, pass));

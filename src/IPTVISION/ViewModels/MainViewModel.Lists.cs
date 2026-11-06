@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IPTVISION.Models;
@@ -7,9 +8,12 @@ using IPTVISION.Services;
 namespace IPTVISION.ViewModels;
 
 /// <summary>Una lista salvata come la mostrano Impostazioni e schermata di accesso.</summary>
-public sealed record SavedListItem(SavedList List, string Alias, string Detail, bool IsActive);
+public sealed record SavedListItem(SavedList List, string Alias, string Detail, bool IsActive, int ServerIndex = -1);
 
-/// <summary>Più account Xtream salvati, ognuno col suo nome: si passa dall'uno all'altro senza riscrivere la password.</summary>
+/// <summary>
+/// Più account Xtream salvati, ognuno col suo nome: si passa dall'uno all'altro senza riscrivere la password.
+/// Col server di casa le liste sono quelle del server, uguali su ogni dispositivo.
+/// </summary>
 public sealed partial class MainViewModel
 {
     [ObservableProperty] private string _loginAlias = "";
@@ -20,6 +24,7 @@ public sealed partial class MainViewModel
 
     private void RefreshSavedLists()
     {
+        if (IsHomeServer) { _ = LoadServerListsAsync(); return; }
         // Account salvati prima delle liste: quello in uso diventa la prima lista.
         if (_settings.Lists.Count == 0 && _settings.HasAccount && !IsHomeServer)
         {
@@ -34,10 +39,42 @@ public sealed partial class MainViewModel
         foreach (var l in _settings.Lists)
         {
             var active = IsLoggedIn && !IsHomeServer && l.Is(_settings.Server, _settings.Username);
-            var exp = l.ExpiresAt is { } e ? $"scade il {e.ToLocalTime():dd/MM/yyyy}" : "nessuna scadenza nota";
-            SavedLists.Add(new SavedListItem(l, l.Alias, $"{l.Username} · {exp}", active));
+            SavedLists.Add(new SavedListItem(l, l.Alias, $"{l.Username} · {ExpiryText(l.ExpiresAt)}", active));
         }
         OnPropertyChanged(nameof(HasSavedLists));
+    }
+
+    private static string ExpiryText(DateTimeOffset? e) => e is { } d ? $"scade il {d.ToLocalTime():dd/MM/yyyy}" : "nessuna scadenza nota";
+
+    private async Task LoadServerListsAsync()
+    {
+        if (_settings.HomeServer is not { } url) return;
+        JsonArray lists;
+        try { lists = await ServerApi.ListsAsync(url, SettingsService.Unprotect(_settings.ProtectedPassword) ?? ""); }
+        catch (ServerException ex) { ServerStatus = ex.Message; return; }
+        SavedLists.Clear();
+        foreach (var n in lists.OfType<JsonObject>())
+        {
+            var l = new SavedList
+            {
+                Alias = (string?)n["alias"] ?? "", Server = (string?)n["server"] ?? "", Username = (string?)n["username"] ?? "",
+                ExpiresAt = (long?)n["expiresAt"] is { } sec ? DateTimeOffset.FromUnixTimeSeconds(sec) : null,
+            };
+            SavedLists.Add(new SavedListItem(l, l.Alias, $"{l.Username} · {ExpiryText(l.ExpiresAt)}", IsLoggedIn && (bool?)n["active"] == true, (int?)n["index"] ?? -1));
+        }
+        OnPropertyChanged(nameof(HasSavedLists));
+    }
+
+    /// <summary>Col server di casa: liste e guida ripartono da zero, il gettone del server resta.</summary>
+    private async Task ReloadFromServerAsync(JsonObject? state)
+    {
+        var token = _settings.ProtectedPassword;
+        ResetSession();
+        _settings.ProtectedPassword = token;
+        SettingsService.Save(_settings);
+        CacheService.Clear();
+        if (state != null) ApplyServerState(state);
+        await InitializeAsync();
     }
 
     partial void OnIsLoggedInChanged(bool value) => RefreshSavedLists();
@@ -68,7 +105,13 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private async Task UseList(SavedListItem item)
     {
-        if (IsHomeServer || item.IsActive) return;
+        if (item.IsActive) return;
+        if (_settings.HomeServer is { } url)
+        {
+            try { await ReloadFromServerAsync(await ServerApi.UseListAsync(url, SettingsService.Unprotect(_settings.ProtectedPassword) ?? "", item.ServerIndex)); }
+            catch (ServerException ex) { ShowToast(ex.Message); }
+            return;
+        }
         if (IsLoggedIn) ResetSession();
         _settings.Server = item.List.Server;
         _settings.Username = item.List.Username;
@@ -79,8 +122,17 @@ public sealed partial class MainViewModel
     }
 
     [RelayCommand]
-    private void RemoveList(SavedListItem item)
+    private async Task RemoveList(SavedListItem item)
     {
+        if (_settings.HomeServer is { } url)
+        {
+            // Senza lista in uso il server non avrebbe niente da mostrare a nessun dispositivo.
+            if (item.IsActive) { ShowToast("Prima passa a un'altra lista."); return; }
+            try { await ServerApi.RemoveListAsync(url, SettingsService.Unprotect(_settings.ProtectedPassword) ?? "", item.ServerIndex); }
+            catch (ServerException ex) { ShowToast(ex.Message); }
+            RefreshSavedLists();
+            return;
+        }
         _settings.Lists.Remove(item.List);
         SettingsService.Save(_settings);
         if (item.IsActive) ResetSession();
@@ -91,7 +143,9 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void AddList()
     {
+        var token = _settings.ProtectedPassword;
         ResetSession();
+        if (IsHomeServer) { _settings.ProtectedPassword = token; SettingsService.Save(_settings); }
         LoginServer = LoginUsername = LoginAlias = "";
         LoginError = null;
     }

@@ -64,6 +64,10 @@
       });
     },
     sendXtream: function (url, token, account) { return call(url, 'POST', '/api/xtream', token, account); },
+    /** Le liste IPTV del server (senza password), uguali su ogni dispositivo. */
+    lists: function () { return call(Server.url(), 'GET', '/api/xtream/lists', S.get('password'), null); },
+    useList: function (index) { return call(Server.url(), 'POST', '/api/xtream/lists/' + index + '/use', S.get('password'), {}); },
+    removeList: function (index) { return call(Server.url(), 'DELETE', '/api/xtream/lists/' + index, S.get('password'), null); },
     importNative: function (url, token, data) { return call(url, 'POST', '/api/import-native', token, data); },
     logout: function (url, token) { return call(url, 'POST', '/api/logout', token, {}).catch(function () { /* già scollegato */ }); },
 

@@ -45,7 +45,7 @@ public sealed partial class MainViewModel
 
     partial void OnIsSettingsOpenChanged(bool value)
     {
-        if (value) IsDownloadsOpen = false;
+        if (value) { IsDownloadsOpen = false; RefreshSavedLists(); }
     }
 
     [RelayCommand]

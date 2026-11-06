@@ -294,7 +294,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val account = XtreamAccount(server, username, password)
         loginBusy = true
         loginError = null
+        val home = settings.homeServer
         viewModelScope.launch {
+            if (home != null) {
+                // Col server di casa la lista nuova va sul server, che la usa per tutti i dispositivi.
+                try {
+                    ServerApi.sendXtream(home, settings.password ?: "", account, alias.trim())
+                    reloadFromServer(null)
+                } catch (e: ServerException) {
+                    loginError = e.message
+                } finally {
+                    loginBusy = false
+                }
+                return@launch
+            }
             try {
                 val info = XtreamClient(account).authenticate()
                 settings.saveList(SavedList(alias.trim(), server, username, password, info.expiresAt))
@@ -331,7 +344,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Passa a un'altra lista salvata: liste, guida e lettore ripartono da quell'account. */
     fun useList(l: SavedList) {
-        if (settings.homeServer != null) return
+        settings.homeServer?.let { url ->
+            viewModelScope.launch {
+                try { reloadFromServer(ServerApi.useList(url, settings.password ?: "", l.index)) } catch (e: ServerException) { serverError = e.message }
+            }
+            return
+        }
         player.stop()
         playing = null
         settings.server = l.server
@@ -343,7 +361,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         reopen()
     }
 
+    /** Le liste del server di casa, uguali su ogni dispositivo. */
+    var serverLists by mutableStateOf<List<SavedList>>(emptyList()); private set
+
+    fun loadServerLists() {
+        val url = settings.homeServer ?: return
+        viewModelScope.launch {
+            try { serverLists = ServerApi.lists(url, settings.password ?: "") } catch (e: ServerException) { serverError = e.message }
+        }
+    }
+
+    /** Col server di casa: liste e guida ripartono da zero, il gettone del server resta. */
+    private fun reloadFromServer(state: JSONObject?) {
+        player.stop()
+        playing = null
+        settings.lastStreamId = null
+        settings.lastCategoryId = null
+        cacheDir.listFiles()?.forEach { it.delete() }
+        state?.let(::applyServerState)
+        serverLists = emptyList()
+        reopen()
+    }
+
     fun removeList(l: SavedList) {
+        settings.homeServer?.let { url ->
+            // Senza lista in uso il server non avrebbe niente da mostrare a nessun dispositivo.
+            if (l.active) { serverError = "Prima passa a un'altra lista."; return }
+            viewModelScope.launch {
+                try { ServerApi.removeList(url, settings.password ?: "", l.index) } catch (e: ServerException) { serverError = e.message }
+                loadServerLists()
+            }
+            return
+        }
         val active = settings.activeList?.isSame(l.server, l.username) == true
         settings.removeList(l)
         if (active) logout() else refreshUi()
@@ -717,6 +766,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     ServerApi.sendXtream(url, login.token, own)
                 }
                 val mine = positions.toJson().put("favorites", JSONArray(favorites.toList()))
+                // Le liste salvate qui si aggiungono a quelle del server.
+                if (own != null) mine.put("lists", JSONArray(settings.lists.map {
+                    JSONObject().put("alias", it.alias).put("server", it.server).put("username", it.username)
+                        .put("password", it.password).put("expiresAt", it.expiresAt ?: JSONObject.NULL)
+                }))
                 val state = ServerApi.importNative(url, login.token, mine)
                 val old = settings.homeServer
                 if (old != null) ServerApi.logout(old, settings.password ?: "") else settings.stashOwnAccount()

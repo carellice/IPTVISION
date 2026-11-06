@@ -255,11 +255,25 @@
 
   /** Passa a un'altra lista salvata: liste, guida e lettore ripartono da quell'account. */
   function useList(l) {
+    if (Server.active()) {
+      Server.useList(l.index).then(function (state) { Server.apply(state); reloadFromServer(); }, function (e) { u.toast(e.message); });
+      return;
+    }
     Player.stop();
     S.set('server', l.server); S.set('username', l.username); S.set('password', l.password);
     S.set('lastStreamId', null); S.set('lastCategoryId', null);
     A.loginError = null;
     A.stack = []; A.openCat = {}; A.epg = {};
+    openAccount(S.account(), false);
+  }
+
+  /** Col server di casa: liste e guida ripartono da zero, il gettone del server resta. */
+  function reloadFromServer() {
+    Player.stop();
+    S.set('lastStreamId', null); S.set('lastCategoryId', null);
+    IPTV.Cache.clear();
+    A.loginError = null;
+    A.stack = []; A.openCat = {}; A.epg = {}; A.serverLists = null;
     openAccount(S.account(), false);
   }
 
@@ -280,6 +294,12 @@
       var acc = { server: p.server, username: (user.value || '').trim() || p.username || '', password: pass.value || p.password || '' };
       if (!acc.server || !acc.username) { err.textContent = 'Inserisci server e nome utente, oppure il link M3U completo.'; return; }
       err.textContent = 'Accesso in corso…';
+      if (Server.active()) {
+        // Col server di casa la lista nuova va sul server, che la usa per tutti i dispositivi.
+        acc.alias = (alias.value || '').trim();
+        Server.sendXtream(Server.url(), S.get('password'), acc).then(reloadFromServer, function (e) { err.textContent = e.message; });
+        return;
+      }
       new X.Client(acc).authenticate().then(function (ui) {
         S.saveList({ alias: (alias.value || '').trim(), server: acc.server, username: acc.username, password: acc.password, expiresAt: expiryOf(ui) });
         S.set('server', acc.server); S.set('username', acc.username); S.set('password', acc.password);
@@ -342,6 +362,8 @@
       }).then(function (login) {
         var mine = Pos.toJson();
         mine.favorites = S.get('favorites');
+        // Le liste salvate sul TV si aggiungono a quelle del server.
+        if (own) mine.lists = S.lists();
         return Server.importNative(url, token, mine).then(function (state) { return [login, state]; });
       }).then(function (r) {
         var login = r[0], state = r[1];
@@ -678,7 +700,23 @@
     box.appendChild(h('div', { class: 'group-title', text: 'Account' }));
     box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Server' }), S.get('server') || '']));
     box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Utente' }), S.get('username') || '']));
-    if (!Server.active()) {
+    if (Server.active()) {
+      box.appendChild(h('div', { class: 'group-title', text: 'Liste IPTV' }));
+      if (!A.serverLists) {
+        box.appendChild(h('div', { class: 'dim', text: 'Carico le liste del server…' }));
+        A.serverLists = [];
+        Server.lists().then(function (l) { A.serverLists = l; if (A.screen === 'home' && A.section === 'Settings') render(true); }, function (e) { u.toast(e.message); });
+      }
+      (A.serverLists || []).forEach(function (l) {
+        box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: l.alias + (l.active ? ' · in uso' : '') }), l.username + ' · ' + expiryText(l)]));
+        if (l.active) return; // senza lista in uso il server non avrebbe niente da mostrare
+        box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Usa ' + l.alias }), function () { useList(l); }));
+        box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Rimuovi ' + l.alias }), function () {
+          Server.removeList(l.index).then(function (lists) { A.serverLists = lists; render(true); }, function (e) { u.toast(e.message); });
+        }));
+      });
+      box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Aggiungi lista' }), function () { A.loginError = null; push('login', { adding: true }); }));
+    } else {
       box.appendChild(h('div', { class: 'group-title', text: 'Liste IPTV' }));
       var active = S.activeList();
       S.lists().forEach(function (l) {
@@ -697,6 +735,7 @@
       box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Indirizzo' }), Server.url()]));
       box.appendChild(h('div', { class: 'dim', style: 'margin:0.3rem 0', text: Server.error || ('Canali, film e serie passano dal server.' + (Server.syncedAt ? ' Aggiornato alle ' + u.clock(Server.syncedAt / 1000) + '.' : '')) }));
       box.appendChild(V.focusable(h('div', { class: 'btn', text: '↻  Aggiorna ora' }), function () {
+        A.serverLists = null;
         Server.pull(true).then(function () { render(true); });
       }));
       box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Scollega il server' }), disconnectServer));
