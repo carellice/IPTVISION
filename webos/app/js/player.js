@@ -17,6 +17,8 @@
   // l'unico segno che avanza sono gli eventi timeupdate, che smettono di arrivare quando il flusso si blocca.
   var ticks = 0, lastTicks = 0;
   var retryTimer = null;
+  var startTimer = null, lastStartAt = 0;
+  var NATIVE_GAP_MS = 700;
   // Sui TV Samsung (Tizen) le richieste di mpegts.js al flusso restavano appese senza risposta,
   // mentre il lettore del TV, lo stesso dei film, apre la diretta senza problemi.
   var nativeLive = !!(IPTV.Platform && IPTV.Platform.tizen);
@@ -52,7 +54,18 @@
 
   function start() {
     if (!url) return;
+    clearTimeout(startTimer);
+    startTimer = null;
+    // Il lettore dei TV Samsung si blocca se lo si riapre più volte al secondo (cambio canale tenendo premuta
+    // la freccia): tra un'apertura e l'altra si lascia passare almeno un attimo, e conta solo l'ultimo canale.
+    var since = Date.now() - lastStartAt;
+    if (nativeLive && since < NATIVE_GAP_MS) {
+      startTimer = setTimeout(start, NATIVE_GAP_MS - since);
+      return;
+    }
+    lastStartAt = Date.now();
     destroyTs();
+    video.pause();
     video.removeAttribute('src');
     try { video.load(); } catch (e) { /* niente da scaricare */ }
     setState(attempt > 0 ? 'reconnecting' : 'connecting');
@@ -183,8 +196,10 @@
         return;
       }
       // Senza inseguimento la diretta può restare indietro: oltre 25 s di ritardo si salta avanti, una volta sola.
+      // Solo con mpegts.js: col lettore dei TV Samsung currentTime resta a 0, il salto scattava ogni secondo
+      // e i seek continui sulla diretta bloccavano il lettore, e a volte tutto il TV.
       var b = video.buffered;
-      if (live && b.length && b.end(b.length - 1) - t > 25) video.currentTime = b.end(b.length - 1) - 4;
+      if (ts && live && b.length && b.end(b.length - 1) - t > 25) video.currentTime = b.end(b.length - 1) - 4;
       return;
     }
     var limit = live ? (everPlayed ? 12000 : 25000) : (everPlayed ? 20000 : 35000);
@@ -202,6 +217,8 @@
   P.stop = function () {
     clearTimeout(retryTimer);
     retryTimer = null;
+    clearTimeout(startTimer);
+    startTimer = null;
     url = null;
     destroyTs();
     video.pause();
