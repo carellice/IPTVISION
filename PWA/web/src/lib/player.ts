@@ -14,9 +14,30 @@ export type Source = { kind: 'live'; id: number } | { kind: 'movie' | 'series'; 
 
 type Probe = {
   duration: number
-  video: { codec: string; height: number } | null
+  video: { codec: string; height: number; tenBit?: boolean } | null
   audio: { index: number; codec: string; label: string }[]
   direct: boolean
+}
+
+// What each codec ffprobe names is called for the browser, to ask whether it decodes it.
+const CODEC_TYPES: Record<string, (tenBit: boolean) => string> = {
+  h264: () => 'video/mp4; codecs="avc1.640028"',
+  hevc: (tenBit) => `video/mp4; codecs="${tenBit ? 'hvc1.2.4.L150.90' : 'hvc1.1.6.L150.90'}"`,
+  vp9: (tenBit) => `video/mp4; codecs="vp09.${tenBit ? '02.40.10' : '00.40.08'}"`,
+  av1: (tenBit) => `video/mp4; codecs="av01.0.08M.${tenBit ? '10' : '08'}"`,
+}
+
+/**
+ * Whether this browser shows the video of a file as it is. Xvid/DivX, MPEG-2, VC-1 and 10-bit H.264
+ * never; HEVC, VP9 and AV1 depend on the phone. What it doesn't show the server re-encodes in H.264.
+ */
+function browserDecodes(video: HTMLVideoElement, v: Probe['video']): boolean {
+  if (!v) return true
+  const type = CODEC_TYPES[v.codec]
+  if (!type || (v.codec === 'h264' && v.tenBit)) return false
+  const t = type(!!v.tenBit)
+  try { if (window.MediaSource?.isTypeSupported(t)) return true } catch { /* old browser */ }
+  return video.canPlayType(t) === 'probably'
 }
 
 export type Track = { index: number; label: string; selected: boolean }
@@ -74,7 +95,16 @@ export class PlayerController {
     video.addEventListener('pause', () => { if (this.source && this.userPaused) this.setState('Paused') })
     video.addEventListener('waiting', () => { if (this.state !== 'Reconnecting') this.setState(this.everPlayed ? 'Buffering' : 'Connecting') })
     video.addEventListener('ended', () => this.ended())
-    video.addEventListener('error', () => { if (this.source && !this.ts) this.scheduleRetry('errore di riproduzione') })
+    video.addEventListener('error', () => {
+      if (!this.source || this.ts) return
+      // The browser can't decode the video: the next attempt has it re-encoded by the server.
+      const code = video.error?.code
+      if ((code === MediaError.MEDIA_ERR_DECODE || code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) && this.useH264()) {
+        this.scheduleRetry('video non decodificabile dal browser')
+        return
+      }
+      this.scheduleRetry('errore di riproduzione')
+    })
     video.addEventListener('resize', () => { this.videoSize = video.videoHeight > 0 ? `${video.videoHeight}p` : ''; this.emit() })
     if (this.source) this.start()
   }
@@ -119,6 +149,8 @@ export class PlayerController {
         return
       }
       if (session !== this.session) return
+      if (!this.reencode && !browserDecodes(video, this.probe.video)) this.reencode = true
+      if (this.reencode) this.probe = { ...this.probe, direct: false }
       this.durationMs = Math.round(this.probe.duration * 1000)
       this.audioTracks = this.probe.audio.map((a) => ({ index: a.index, label: a.label, selected: a.index === this.audio }))
       this.emit()
@@ -129,8 +161,8 @@ export class PlayerController {
       video.src = `/api/raw/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}${startSec > 0 ? `#t=${startSec}` : ''}`
     } else {
       this.offsetSec = startSec
-      const hevc = this.probe.video?.codec === 'hevc' ? '&hevc=1' : ''
-      video.src = `/api/play/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}&start=${startSec}&audio=${this.audio}${hevc}`
+      const codec = this.reencode ? '&video=h264' : this.probe.video?.codec === 'hevc' ? '&hevc=1' : ''
+      video.src = `/api/play/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}&start=${startSec}&audio=${this.audio}${codec}`
     }
     this.go(video)
   }
@@ -217,7 +249,12 @@ export class PlayerController {
     if (!video.paused && pos !== this.lastPos && !starved) {
       this.lastPos = pos
       this.lastProgressAt = Date.now()
-      if (this.videoFrozen(video)) { this.scheduleRetry('video fermo, audio regolare'); return }
+      if (this.videoFrozen(video)) {
+        // Sound without pictures, more than once: the browser doesn't really decode this video.
+        if (this.attempt > 0) this.useH264()
+        this.scheduleRetry('video fermo, audio regolare')
+        return
+      }
       // After a minute of regular watching the attempts start over.
       if (this.attempt > 0 && Date.now() - this.startedAt > 60_000) this.attempt = 0
       if (this.state !== 'Playing') this.setState('Playing')
@@ -227,8 +264,18 @@ export class PlayerController {
     if (Date.now() - this.lastProgressAt > limit) this.scheduleRetry('flusso bloccato')
   }
 
+  /** Re-encodes the video in H.264 from the next attempt on; false when it already is. */
+  private useH264(): boolean {
+    if (this.reencode) return false
+    this.reencode = true
+    if (this.probe) this.probe = { ...this.probe, direct: false }
+    return true
+  }
+
   /** Time follows the audio: if no frame is shown for 4 s while it advances, the stream is reopened. */
   private videoFrozen(video: HTMLVideoElement): boolean {
+    // A file with a video whose pictures never came: the browser plays only its sound.
+    if (!video.videoWidth && this.probe?.video && this.everPlayed && Date.now() - this.startedAt > 8_000) return true
     if (!video.videoWidth || !video.getVideoPlaybackQuality) return false
     const q = video.getVideoPlaybackQuality()
     const frames = q.totalVideoFrames - q.droppedVideoFrames

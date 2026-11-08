@@ -60,7 +60,8 @@ export function live(req: IncomingMessage, res: ServerResponse, owner: string, a
 
 export type Probe = {
   duration: number
-  video: { codec: string; height: number } | null
+  /** [tenBit]: 10-bit pictures, which browsers don't decode in H.264. */
+  video: { codec: string; height: number; tenBit: boolean } | null
   audio: { index: number; codec: string; label: string }[]
   /** The browser can read the file as it is (MP4, H.264, AAC/MP3). */
   direct: boolean
@@ -86,7 +87,7 @@ export function probe(a: XtreamAccount, kind: Kind, id: string, ext: string): Pr
     child.on('exit', () => {
       clearTimeout(timer)
       try {
-        const j = JSON.parse(out) as { format?: { duration?: string; format_name?: string }; streams?: { codec_type: string; codec_name: string; height?: number; tags?: Record<string, string> }[] }
+        const j = JSON.parse(out) as { format?: { duration?: string; format_name?: string }; streams?: { codec_type: string; codec_name: string; height?: number; pix_fmt?: string; tags?: Record<string, string> }[] }
         const streams = j.streams ?? []
         const v = streams.find((s) => s.codec_type === 'video' && s.codec_name !== 'mjpeg' && s.codec_name !== 'png')
         const audio = streams.filter((s) => s.codec_type === 'audio').map((s, index) => {
@@ -94,8 +95,9 @@ export function probe(a: XtreamAccount, kind: Kind, id: string, ext: string): Pr
           return { index, codec: s.codec_name, label: label || `Traccia ${index + 1}` }
         })
         const mp4 = /mp4|mov/.test(j.format?.format_name ?? '')
-        const direct = mp4 && (!v || v.codec_name === 'h264') && audio.every((s) => s.codec === 'aac' || s.codec === 'mp3') && audio.length <= 1
-        resolve({ duration: Number(j.format?.duration) || 0, video: v ? { codec: v.codec_name, height: v.height ?? 0 } : null, audio, direct })
+        const tenBit = /10|12/.test(v?.pix_fmt ?? '')
+        const direct = mp4 && (!v || (v.codec_name === 'h264' && !tenBit)) && audio.every((s) => s.codec === 'aac' || s.codec === 'mp3') && audio.length <= 1
+        resolve({ duration: Number(j.format?.duration) || 0, video: v ? { codec: v.codec_name, height: v.height ?? 0, tenBit } : null, audio, direct })
       } catch {
         reject(new Error('Impossibile leggere il file dal server IPTV'))
       }
@@ -103,12 +105,18 @@ export function probe(a: XtreamAccount, kind: Kind, id: string, ext: string): Pr
   })
 }
 
-/** A film or an episode from [start] seconds, as fragmented MP4 with AAC audio. */
+/**
+ * A film or an episode from [start] seconds, as fragmented MP4 with AAC audio. [h264] re-encodes the
+ * video the browser can't decode (Xvid/DivX, MPEG-2, VC-1, 10-bit H.264, HEVC on phones without it).
+ */
 export function vod(req: IncomingMessage, res: ServerResponse, owner: string, a: XtreamAccount, kind: Kind, id: string, ext: string,
-  start: number, audio: number, hevc: boolean) {
+  start: number, audio: number, hevc: boolean, h264 = false) {
+  const v = h264
+    ? ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-pix_fmt', 'yuv420p', '-g', '50', '-vf', "scale='min(1920,iw)':-2"]
+    : ['-c:v', 'copy', ...(hevc ? ['-tag:v', 'hvc1'] : [])]
   run(req, res, owner, [
     ...input, ...(start > 0 ? ['-ss', String(start)] : []), '-i', streamUrl(a, kind, id, ext),
-    '-map', '0:v:0?', '-map', `0:a:${audio}?`, '-c:v', 'copy', ...(hevc ? ['-tag:v', 'hvc1'] : []),
+    '-map', '0:v:0?', '-map', `0:a:${audio}?`, ...v,
     '-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-sn', '-dn',
     '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-frag_duration', '2000000', 'pipe:1',
   ], 'video/mp4')

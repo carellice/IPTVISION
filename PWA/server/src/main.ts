@@ -382,7 +382,7 @@ route('GET', '/api/probe/:kind/:id', async (_req, res, p, url) => {
 
 route('GET', '/api/play/:kind/:id', (req, res, p, url, user) => {
   play.vod(req, res, user.token, requireXtream(), kindOf(p[0]), safeId(p[1]), safeExt(url.searchParams.get('ext')),
-    intParam(url, 'start'), intParam(url, 'audio'), url.searchParams.get('hevc') === '1')
+    intParam(url, 'start'), intParam(url, 'audio'), url.searchParams.get('hevc') === '1', url.searchParams.get('video') === 'h264')
 })
 
 route('GET', '/api/raw/:kind/:id', async (req, res, p, url, user) => {
