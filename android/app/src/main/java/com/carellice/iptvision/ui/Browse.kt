@@ -347,7 +347,7 @@ private fun ChannelTile(vm: AppViewModel, ch: Channel, playlist: List<Channel>, 
 @Composable
 fun MoviesSection(vm: AppViewModel) {
     val lib = vm.movies
-    if (lib == null) { Loading(if (vm.moviesLoading) "Caricamento film…" else null); return }
+    if (lib == null) { if (vm.moviesLoading) DownloadProgress("Caricamento film…", vm.moviesProgress) else Loading(); return }
     val cont = remember(lib, vm.positionsVersion) { vm.moviesFor(CONTINUE_ID) }
     val entries = remember(lib, cont.size) {
         cats(lib.categories, { lib.byCategory[it]?.size ?: 0 }, buildList {
@@ -373,7 +373,7 @@ fun MoviesSection(vm: AppViewModel) {
 @Composable
 fun SeriesSection(vm: AppViewModel) {
     val lib = vm.series
-    if (lib == null) { Loading(if (vm.seriesLoading) "Caricamento serie…" else null); return }
+    if (lib == null) { if (vm.seriesLoading) DownloadProgress("Caricamento serie…", vm.seriesProgress) else Loading(); return }
     val cont = remember(lib, vm.positionsVersion) { vm.seriesFor(CONTINUE_ID) }
     val entries = remember(lib, cont.size) {
         cats(lib.categories, { lib.byCategory[it]?.size ?: 0 }, buildList {

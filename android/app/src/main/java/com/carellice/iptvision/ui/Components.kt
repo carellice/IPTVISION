@@ -18,12 +18,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
@@ -257,6 +259,38 @@ fun Loading(text: String? = null, modifier: Modifier = Modifier.fillMaxSize()) {
             Spacer(Modifier.height(14.dp))
             Text(text, color = C.Text2)
         }
+    }
+}
+
+/**
+ * Il primo download di una lista grande: una barra che si riempie se il server dice quanto pesa,
+ * altrimenti scorre, con i megabyte già arrivati. Arrivato tutto, la lista si prepara.
+ */
+@Composable
+fun DownloadProgress(title: String, progress: Pair<Long, Long>?, modifier: Modifier = Modifier.fillMaxSize()) {
+    if (progress == null) { Loading(title, modifier); return }
+    val (read, total) = progress
+    Column(modifier.padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(title, color = C.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(16.dp))
+        val bar = Modifier.widthIn(max = 360.dp).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+        if (total > 0) {
+            LinearProgressIndicator(progress = { (read.toFloat() / total).coerceIn(0f, 1f) }, modifier = bar, color = C.Accent, trackColor = C.Accent.copy(alpha = 0.2f))
+        } else {
+            LinearProgressIndicator(modifier = bar, color = C.Accent, trackColor = C.Accent.copy(alpha = 0.2f))
+        }
+        Spacer(Modifier.height(12.dp))
+        val mb = { b: Long -> String.format(java.util.Locale.ITALY, "%.1f MB", b / 1_048_576.0) }
+        Text(
+            when {
+                total > 0 && read >= total -> "Preparazione dell'elenco…"
+                total > 0 -> "${(read * 100 / total).toInt()}% · ${mb(read)} di ${mb(total)}"
+                else -> "${mb(read)} scaricati"
+            },
+            color = C.Text2, fontSize = 13.sp,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text("Solo la prima volta: poi la lista si apre subito.", color = C.Text3, fontSize = 12.sp, textAlign = TextAlign.Center)
     }
 }
 

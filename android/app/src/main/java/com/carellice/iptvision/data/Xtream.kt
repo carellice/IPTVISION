@@ -240,15 +240,35 @@ class XtreamClient(val account: XtreamAccount) {
     }
 
     /** Scarica una lista (canali, film, serie, categorie) direttamente su file: si legge poi in streaming. */
-    suspend fun download(action: String, target: File, timeoutSec: Long) {
+    /**
+     * Scarica [action] in [target]. [timeoutSec] è il tempo massimo senza ricevere dati, non la durata
+     * totale: una lista grande su una rete lenta veniva interrotta a metà e riscaricata da capo.
+     * [onProgress] riceve i byte arrivati e il totale, -1 se il server non lo dice.
+     */
+    suspend fun download(action: String, target: File, timeoutSec: Long, onProgress: ((Long, Long) -> Unit)? = null) {
         val tmp = File(target.path + ".part")
         withRetry {
-            val call = http.newBuilder().callTimeout(timeoutSec, TimeUnit.SECONDS).build()
+            val call = http.newBuilder().callTimeout(0, TimeUnit.SECONDS).readTimeout(timeoutSec, TimeUnit.SECONDS).build()
                 .newCall(Request.Builder().url(apiUrl(action)).build())
             call.execute().use { resp ->
                 checkResponse(resp.code)
                 val body = resp.body ?: throw IOException("Risposta vuota")
-                tmp.outputStream().use { out -> body.byteStream().copyTo(out) }
+                val total = body.contentLength()
+                tmp.outputStream().use { out ->
+                    val input = body.byteStream()
+                    val buffer = ByteArray(64 * 1024)
+                    var read = 0L
+                    var told = 0L
+                    while (true) {
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        out.write(buffer, 0, n)
+                        read += n
+                        // Un aggiornamento ogni mezzo megabyte basta alla barra e non pesa sull'interfaccia.
+                        if (onProgress != null && read - told >= 512 * 1024) { told = read; onProgress(read, total) }
+                    }
+                    onProgress?.invoke(read, total)
+                }
             }
         }
         if (!tmp.renameTo(target)) {

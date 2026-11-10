@@ -155,6 +155,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var series by mutableStateOf<Library<Series>?>(null); private set
     var moviesLoading by mutableStateOf(false); private set
     var seriesLoading by mutableStateOf(false); private set
+    /** Il primo download di film e serie: byte arrivati e totale (-1 se ignoto); null quando non si scarica. */
+    var moviesProgress by mutableStateOf<Pair<Long, Long>?>(null); private set
+    var seriesProgress by mutableStateOf<Pair<Long, Long>?>(null); private set
 
     var favorites by mutableStateOf(settings.favorites); private set
     // Prima si sceglie la categoria, poi si vede l'elenco: null = elenco delle categorie.
@@ -460,8 +463,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun file(kind: String, key: String) = File(cacheDir, "${kind}_$key.json")
 
-    private suspend fun downloadList(c: XtreamClient, action: String, kind: String, timeoutSec: Long = 30) =
-        c.download(action, file(kind, c.account.key), timeoutSec)
+    private suspend fun downloadList(c: XtreamClient, action: String, kind: String, timeoutSec: Long = 30, onProgress: ((Long, Long) -> Unit)? = null) =
+        c.download(action, file(kind, c.account.key), timeoutSec, onProgress)
 
     private fun <T> library(cats: List<Category>, items: List<T>, catOf: (T) -> String?): Library<T> {
         // "Nascondi XXX": via le categorie con XXX nel nome e tutto il loro contenuto, anche da Tutti e dalla ricerca.
@@ -509,10 +512,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         moviesLoading = true
         viewModelScope.launch {
             try {
-                movies = loadOrDownload(c, "vod", "get_vod_categories", "get_vod_streams", XtreamClient::parseMovies, Movie::categoryId)
+                movies = loadOrDownload(
+                    c, "vod", "get_vod_categories", "get_vod_streams", XtreamClient::parseMovies, Movie::categoryId,
+                    onProgress = { moviesProgress = it }, onUpdated = { if (client === c) movies = it },
+                )
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 error = (e as? XtreamException)?.message ?: "Impossibile caricare i film."
-            } finally { moviesLoading = false }
+            } finally { moviesLoading = false; moviesProgress = null }
         }
     }
 
@@ -522,35 +528,55 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         seriesLoading = true
         viewModelScope.launch {
             try {
-                series = loadOrDownload(c, "series", "get_series_categories", "get_series", XtreamClient::parseSeries, Series::categoryId)
+                series = loadOrDownload(
+                    c, "series", "get_series_categories", "get_series", XtreamClient::parseSeries, Series::categoryId,
+                    onProgress = { seriesProgress = it }, onUpdated = { if (client === c) series = it },
+                )
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 error = (e as? XtreamException)?.message ?: "Impossibile caricare le serie."
-            } finally { seriesLoading = false }
+            } finally { seriesLoading = false; seriesProgress = null }
         }
     }
 
-    /** Film e serie: dalla cache se ha meno di 12 ore, altrimenti dal server. */
+    /**
+     * Film e serie: dalla cache se ha meno di 12 ore, altrimenti dal server. Una cache più vecchia si
+     * mostra subito e si aggiorna in sottofondo, passando la lista nuova a [onUpdated]: si aspetta il
+     * download, con [onProgress], solo la prima volta.
+     */
     private suspend fun <T> loadOrDownload(
         c: XtreamClient, kind: String, catAction: String, action: String,
         parse: (File) -> List<T>, catOf: (T) -> String?,
+        onProgress: (Pair<Long, Long>) -> Unit, onUpdated: (Library<T>) -> Unit,
     ): Library<T> {
         val key = c.account.key
         val f = file(kind, key)
         val fresh = f.exists() && System.currentTimeMillis() - f.lastModified() < 12 * 3600_000L
-        if (!fresh) {
-            try {
-                downloadList(c, catAction, "${kind}_cats")
-                downloadList(c, action, kind, 180)
-            } catch (e: Exception) {
-                if (!f.exists()) throw e
-                Log.w("Aggiornamento $kind fallito, uso la cache", e)
-            }
+        suspend fun read() = withContext(Dispatchers.Default) {
+            val cats = file("${kind}_cats", key).takeIf { it.exists() }?.let(XtreamClient::parseCategories) ?: emptyList()
+            library(cats, parse(f), catOf)
         }
-        return try {
-            withContext(Dispatchers.Default) {
-                val cats = file("${kind}_cats", key).takeIf { it.exists() }?.let(XtreamClient::parseCategories) ?: emptyList()
-                library(cats, parse(f), catOf)
+        suspend fun download(progress: Boolean) {
+            downloadList(c, catAction, "${kind}_cats")
+            downloadList(c, action, kind, 60, if (progress) { read, total -> onProgress(read to total) } else null)
+        }
+        if (!fresh && f.exists()) {
+            val stale = try { read() } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+            if (stale != null) {
+                viewModelScope.launch {
+                    try {
+                        download(progress = false)
+                        onUpdated(read())
+                    } catch (e: CancellationException) { throw e } catch (e: Exception) {
+                        Log.w("Aggiornamento $kind fallito, resta la cache", e)
+                    }
+                }
+                return stale
             }
+            f.delete()
+        }
+        if (!f.exists()) download(progress = true)
+        return try {
+            read()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -559,7 +585,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (!fresh) throw e
             Log.w("Cache $kind illeggibile, la riscarico", e)
             f.delete()
-            loadOrDownload(c, kind, catAction, action, parse, catOf)
+            loadOrDownload(c, kind, catAction, action, parse, catOf, onProgress, onUpdated)
         }
     }
 
