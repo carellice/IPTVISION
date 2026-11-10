@@ -1536,7 +1536,7 @@
                         </Border>
 
                         <!-- Prossimo episodio -->
-                        <Border x:Name="NextEpisodeCard" VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,24,140" Width="320"
+                        <Border x:Name="NextEpisodeCard" Panel.ZIndex="1" VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,24,140" Width="320"
                                 Background="#F0181B22" BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="14" Padding="16,14"
                                 Visibility="{Binding NextEpisodeOffer, Converter={StaticResource NullToVis}}">
                             <StackPanel>
@@ -1560,8 +1560,9 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Ultimo minuto di un episodio: si passa subito al successivo -->
-                        <Button x:Name="NextEpisodeButton" Style="{StaticResource PrimaryButton}" VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                        <!-- Ultimo minuto di un episodio: si passa subito al successivo. Sopra la barra dei comandi,
+                             che anche trasparente prenderebbe i clic sulla sua parte bassa. -->
+                        <Button x:Name="NextEpisodeButton" Panel.ZIndex="1" Style="{StaticResource PrimaryButton}" VerticalAlignment="Bottom" HorizontalAlignment="Right"
                                 Margin="0,0,24,140" Height="40" Padding="18,0" FontSize="13.5" Command="{Binding NextEpisodeCommand}"
                                 Visibility="{Binding ShowNextEpisodeButton, Converter={StaticResource BoolToVis}}">
                             <StackPanel Orientation="Horizontal">
