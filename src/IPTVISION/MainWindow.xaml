@@ -1560,6 +1560,16 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Ultimo minuto di un episodio: si passa subito al successivo -->
+                        <Button x:Name="NextEpisodeButton" Style="{StaticResource PrimaryButton}" VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                                Margin="0,0,24,140" Height="40" Padding="18,0" FontSize="13.5" Command="{Binding NextEpisodeCommand}"
+                                Visibility="{Binding ShowNextEpisodeButton, Converter={StaticResource BoolToVis}}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE893;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Prossimo episodio" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
                         <!-- Barra comandi -->
                         <Grid x:Name="ControlBar" VerticalAlignment="Bottom" Background="{StaticResource ControlBarShade}" Opacity="0">
                             <StackPanel VerticalAlignment="Bottom" Margin="18,60,18,16">
@@ -1578,6 +1588,8 @@
                                     <TextBlock Grid.Column="2" Text="{Binding DurationText}" Foreground="#B3FFFFFF" FontSize="12" MinWidth="52"
                                                TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
+                                <TextBlock Text="{Binding EndsAtText}" Foreground="#B3FFFFFF" FontSize="12" Margin="6,0,6,4" HorizontalAlignment="Right"
+                                           Visibility="{Binding EndsAtText, Converter={StaticResource NullToVis}}" />
 
                                 <Grid Height="46">
                                     <Grid.ColumnDefinitions>

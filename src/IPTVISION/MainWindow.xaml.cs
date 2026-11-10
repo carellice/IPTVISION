@@ -377,7 +377,8 @@ public partial class MainWindow : Window
     private void Overlay_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         // Clic sulla barra dei comandi o sulla proposta del prossimo episodio: non è un clic sul video.
-        var onVideo = !IsWithin(e.OriginalSource as DependencyObject, ControlBar) && !IsWithin(e.OriginalSource as DependencyObject, NextEpisodeCard);
+        var onVideo = !IsWithin(e.OriginalSource as DependencyObject, ControlBar) && !IsWithin(e.OriginalSource as DependencyObject, NextEpisodeCard)
+            && !IsWithin(e.OriginalSource as DependencyObject, NextEpisodeButton);
         // Le frecce devono arrivare al lettore, non all'elenco rimasto con il focus.
         if (onVideo && !_vm.IsTvMode) Keyboard.Focus(this);
         if (e.ClickCount == 2)

@@ -56,6 +56,10 @@ public sealed partial class MainViewModel
     [ObservableProperty] private string _durationText = "0:00";
     [ObservableProperty] private bool _hasPreviousEpisode;
     [ObservableProperty] private bool _hasNextEpisode;
+    /// <summary>A che ora finisce film o episodio, guardandolo fino in fondo da adesso.</summary>
+    [ObservableProperty] private string? _endsAtText;
+    /// <summary>Nell'ultimo minuto di un episodio, come su Netflix, il pulsante per passare al successivo.</summary>
+    [ObservableProperty] private bool _showNextEpisodeButton;
 
     [ObservableProperty] private Episode? _nextEpisodeOffer;
     [ObservableProperty] private int _nextEpisodeCountdown;
@@ -486,6 +490,9 @@ public sealed partial class MainViewModel
             PositionMs = pos;
             PositionText = TextHelpers.FormatTime(pos);
         }
+        var left = len - pos;
+        EndsAtText = len > 0 && pos > 0 ? $"Finisce alle {DateTime.Now.AddMilliseconds(Math.Max(0, left)):HH:mm}" : null;
+        ShowNextEpisodeButton = CurrentEpisode != null && HasNextEpisode && NextEpisodeOffer == null && len > 0 && pos > 0 && left <= 60_000;
         if (++_positionTicks % 20 == 0) // ogni 10 s
         {
             var hadProgress = CurrentMovie?.HasProgress ?? true;
