@@ -104,10 +104,11 @@
   };
 
   /*
-   * Posizioni di ripresa: chiavi "m:{id}" film, "e:{id}" episodi.
+   * Posizioni di ripresa: chiavi "m:{id}" film, "e:{id}" episodi; nella "Mia lista" anche "s:{id}" serie.
    * Non riprende i primi 30 s né gli ultimi 90 s, come su Windows e Android.
    */
   var pos = load('positions', { positions: {}, watched: {}, lastEpisode: {} });
+  if (!pos.myList) pos.myList = {};
   var dirty = false;
 
   function changed(op) { if (Positions.onChange) Positions.onChange(op); }
@@ -158,17 +159,26 @@
       if (pos.lastEpisode[seriesId]) { delete pos.lastEpisode[seriesId]; dirty = true; }
       changed({ op: 'forgetSeries', seriesId: Number(seriesId) });
     },
+    /** La "Mia lista": film e serie, con il momento in cui sono stati aggiunti. */
+    inMyList: function (key) { return !!pos.myList[key]; },
+    myListAddedAt: function (key) { return pos.myList[key] || 0; },
+    setMyList: function (key, on) {
+      if (!!pos.myList[key] === on) return;
+      if (on) pos.myList[key] = Date.now(); else delete pos.myList[key];
+      dirty = true;
+      changed({ op: 'myList', key: key, on: on });
+    },
     /** Chiamato a ogni modifica, nel formato delle operazioni del server di casa. */
     onChange: null,
     /** Tutto il contenuto nel formato del server di casa (watched come elenco). */
     toJson: function () {
-      return { positions: pos.positions, watched: Object.keys(pos.watched), lastEpisode: pos.lastEpisode };
+      return { positions: pos.positions, watched: Object.keys(pos.watched), lastEpisode: pos.lastEpisode, myList: pos.myList };
     },
     /** Sostituisce tutto con i dati del server di casa. */
     replaceWith: function (o) {
       var w = {};
       (o.watched || []).forEach(function (k) { w[k] = 1; });
-      pos = { positions: o.positions || {}, watched: w, lastEpisode: o.lastEpisode || {} };
+      pos = { positions: o.positions || {}, watched: w, lastEpisode: o.lastEpisode || {}, myList: o.myList || {} };
       dirty = true;
       Positions.save();
     },

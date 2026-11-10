@@ -31,6 +31,7 @@ export type Library<T> = { categories: Category[]; items: T[]; byCategory: Map<s
 export const ALL_ID = '__all'
 export const FAVORITES_ID = '__fav'
 export const CONTINUE_ID = '__continue'
+export const MYLIST_ID = '__mylist'
 
 // --- from the compact lists of the server ---------------------------------------------------------
 

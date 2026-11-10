@@ -917,6 +917,13 @@ public partial class MainWindow : Window
             _vm.Download(sel is SearchHit h ? h.Item : sel);
             e.Handled = true;
         }
+        else if (e.Key == Key.L && Keyboard.Modifiers == ModifierKeys.None && sender is ListBox { SelectedItem: { } listed }
+                 && (listed is SearchHit lh ? lh.Item : listed) is ArtworkItem art0 and (Movie or Series))
+        {
+            // L: aggiunge o toglie il film o la serie dalla "Mia lista".
+            _vm.ToggleMyList(art0);
+            e.Handled = true;
+        }
         else if (e.Key == Key.Delete && sender == DownloadList && DownloadList.SelectedItem is DownloadItem d)
         {
             _vm.DeleteDownloadCommand.Execute(d);
@@ -960,6 +967,14 @@ public partial class MainWindow : Window
             else _vm.IsDownloadsOpen = true;
         };
         menu.Items.Add(mi);
+        if (item is Movie or Series)
+        {
+            var art = (ArtworkItem)item;
+            var inList = _vm.InMyList(art);
+            var mine = new MenuItem { Header = inList ? "Togli dalla mia lista" : "Aggiungi alla mia lista", InputGestureText = "L" };
+            mine.Click += (_, _) => _vm.ToggleMyList(art);
+            menu.Items.Add(mine);
+        }
         if (item is Movie or Series && ((ArtworkItem)item).HasProgress)
         {
             var remove = new MenuItem { Header = "Rimuovi da Continua a guardare", InputGestureText = "Canc" };

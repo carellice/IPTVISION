@@ -163,6 +163,7 @@ public sealed partial class CategoryItem : ObservableObject
     public const string AllId = "__all";
     public const string FavoritesId = "__fav";
     public const string ContinueId = "__continue";
+    public const string MyListId = "__mylist";
 
     public CategoryItem(string id, string name) { Id = id; Name = name; }
 
@@ -170,6 +171,7 @@ public sealed partial class CategoryItem : ObservableObject
     public string Name { get; }
     public bool IsFavorites => Id == FavoritesId;
     public bool IsContinue => Id == ContinueId;
+    public bool IsMyList => Id == MyListId;
 
     [ObservableProperty] private int _count;
     [ObservableProperty] private bool _isTvFocused;

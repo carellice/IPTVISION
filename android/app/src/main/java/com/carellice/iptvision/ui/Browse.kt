@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
@@ -62,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import com.carellice.iptvision.ALL_ID
 import com.carellice.iptvision.AppViewModel
 import com.carellice.iptvision.CONTINUE_ID
+import com.carellice.iptvision.MYLIST_ID
 import com.carellice.iptvision.FAVORITES_ID
 import com.carellice.iptvision.ListSort
 import com.carellice.iptvision.Playing
@@ -173,7 +175,7 @@ private fun CategoryBrowser(vm: AppViewModel, section: Section, entries: List<Ca
 
 private fun catTint(id: String) = when (id) {
     FAVORITES_ID -> C.Star
-    CONTINUE_ID -> C.Accent
+    CONTINUE_ID, MYLIST_ID -> C.Accent
     else -> C.Text2
 }
 
@@ -349,9 +351,11 @@ fun MoviesSection(vm: AppViewModel) {
     val lib = vm.movies
     if (lib == null) { if (vm.moviesLoading) DownloadProgress("Caricamento film…", vm.moviesProgress) else Loading(); return }
     val cont = remember(lib, vm.positionsVersion) { vm.moviesFor(CONTINUE_ID) }
-    val entries = remember(lib, cont.size) {
+    val mine = remember(lib, vm.positionsVersion) { vm.moviesFor(MYLIST_ID) }
+    val entries = remember(lib, cont.size, mine.size) {
         cats(lib.categories, { lib.byCategory[it]?.size ?: 0 }, buildList {
             if (cont.isNotEmpty()) add(CatEntry(CONTINUE_ID, "Continua a guardare", cont.size, Icons.Default.History))
+            if (mine.isNotEmpty()) add(CatEntry(MYLIST_ID, "La mia lista", mine.size, Icons.Default.Bookmark))
             add(CatEntry(ALL_ID, "Tutti", lib.items.size, Icons.Default.Apps))
         })
     }
@@ -360,13 +364,18 @@ fun MoviesSection(vm: AppViewModel) {
         var remove by remember { mutableStateOf<Entry<Movie>?>(null) }
         EntryList(vm, Section.Movies, list, grid, key = { it.streamId }) { e, mod, g ->
             val m = e.item
-            // In "Continua a guardare" la pressione lunga (o il tasto Menu) toglie il titolo dall'elenco.
-            val long: (() -> Unit)? = if (catId == CONTINUE_ID) ({ remove = e }) else null
+            // In "Continua a guardare" e nella "Mia lista" la pressione lunga (o il tasto Menu) toglie il titolo dall'elenco.
+            val long: (() -> Unit)? = if (catId == CONTINUE_ID || catId == MYLIST_ID) ({ remove = e }) else null
             val open = { vm.lastEntry[Section.Movies] = m.streamId; vm.openMovieEntry(e) }
             if (g) Poster(m.name, m.meta, m.poster, m.initials, vm.progressOf(e), e.variantsText.takeIf { e.hasVariants }, mod, long, open)
             else MediaRow(m.name, m.meta, m.poster, m.initials, vm.progressOf(e), e.variantsText.takeIf { e.hasVariants }, mod, long, open)
         }
-        remove?.let { e -> RemoveContinueDialog(e.item.name, { remove = null }) { vm.removeMovieFromContinue(e); remove = null } }
+        remove?.let { e ->
+            RemoveContinueDialog(e.item.name, catId == MYLIST_ID, { remove = null }) {
+                if (catId == MYLIST_ID) vm.toggleMyList(e.item) else vm.removeMovieFromContinue(e)
+                remove = null
+            }
+        }
     }
 }
 
@@ -375,9 +384,11 @@ fun SeriesSection(vm: AppViewModel) {
     val lib = vm.series
     if (lib == null) { if (vm.seriesLoading) DownloadProgress("Caricamento serie…", vm.seriesProgress) else Loading(); return }
     val cont = remember(lib, vm.positionsVersion) { vm.seriesFor(CONTINUE_ID) }
-    val entries = remember(lib, cont.size) {
+    val mine = remember(lib, vm.positionsVersion) { vm.seriesFor(MYLIST_ID) }
+    val entries = remember(lib, cont.size, mine.size) {
         cats(lib.categories, { lib.byCategory[it]?.size ?: 0 }, buildList {
             if (cont.isNotEmpty()) add(CatEntry(CONTINUE_ID, "Continua a guardare", cont.size, Icons.Default.History))
+            if (mine.isNotEmpty()) add(CatEntry(MYLIST_ID, "La mia lista", mine.size, Icons.Default.Bookmark))
             add(CatEntry(ALL_ID, "Tutte", lib.items.size, Icons.Default.Apps))
         })
     }
@@ -386,21 +397,26 @@ fun SeriesSection(vm: AppViewModel) {
         var remove by remember { mutableStateOf<Entry<Series>?>(null) }
         EntryList(vm, Section.Series, list, grid, key = { it.seriesId }) { e, mod, g ->
             val s = e.item
-            val long: (() -> Unit)? = if (catId == CONTINUE_ID) ({ remove = e }) else null
+            val long: (() -> Unit)? = if (catId == CONTINUE_ID || catId == MYLIST_ID) ({ remove = e }) else null
             val open = { vm.lastEntry[Section.Series] = s.seriesId; vm.openSeriesEntry(e) }
             if (g) Poster(s.name, s.meta, s.cover, s.initials, 0f, e.variantsText.takeIf { e.hasVariants }, mod, long, open)
             else MediaRow(s.name, s.meta, s.cover, s.initials, 0f, e.variantsText.takeIf { e.hasVariants }, mod, long, open)
         }
-        remove?.let { e -> RemoveContinueDialog(e.item.name, { remove = null }) { vm.removeSeriesFromContinue(e); remove = null } }
+        remove?.let { e ->
+            RemoveContinueDialog(e.item.name, catId == MYLIST_ID, { remove = null }) {
+                if (catId == MYLIST_ID) vm.toggleMyList(e.item) else vm.removeSeriesFromContinue(e)
+                remove = null
+            }
+        }
     }
 }
 
 @Composable
-private fun RemoveContinueDialog(title: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+private fun RemoveContinueDialog(title: String, myList: Boolean, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = C.Panel,
-        title = { Text("Rimuovere da Continua a guardare?", color = C.Text) },
+        title = { Text(if (myList) "Rimuovere dalla mia lista?" else "Rimuovere da Continua a guardare?", color = C.Text) },
         text = { Text(title, color = C.Text2) },
         confirmButton = { TextButton(onClick = onConfirm) { Text("Rimuovi", color = C.Danger) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Indietro", color = C.Text2) } },

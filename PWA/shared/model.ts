@@ -89,6 +89,8 @@ export type UserState = {
   positions: Record<string, PositionEntry>
   watched: string[]
   lastEpisode: Record<string, { id: string; u: number }>
+  /** "La mia lista": films ("m:{id}") and series ("s:{id}") with when they were added. */
+  myList: Record<string, number>
   hideAdult: boolean
   /** The IPTV account is set (its password never leaves the server). */
   xtream: { server: string; username: string } | null
@@ -102,4 +104,5 @@ export type Op =
   | { op: 'lastEpisode'; seriesId: number; id: string }
   | { op: 'forgetSeries'; seriesId: number }
   | { op: 'favorite'; streamId: number; on: boolean }
+  | { op: 'myList'; key: string; on: boolean }
   | { op: 'hideAdult'; on: boolean }

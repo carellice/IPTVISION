@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import type { Episode, Movie, Series } from '../../../shared/model.ts'
 import { episodeDuration, episodeLabel, episodeTitle, formatTime, joinMeta } from '../../../shared/text.ts'
 import { ActionButton, Artwork, Empty, Icon, IconButton, Loading, Pill, ProgressLine, Clickable, useWide } from '../components/ui.tsx'
-import { app, back, playEpisode, playMovie, progress, resumeEpisode, resumeMs, useApp } from '../lib/app.ts'
+import { app, back, inMyList, playEpisode, playMovie, progress, resumeEpisode, resumeMs, toggleMyList, useApp } from '../lib/app.ts'
 
 // ui/DetailScreens.kt: the card of a film and of a series with its seasons and episodes.
 
@@ -33,6 +33,7 @@ export function MovieDetail({ movie: m }: { movie: Movie }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
         <ActionButton text={resume > 0 ? `Riprendi da ${formatTime(resume)}` : 'Guarda'} icon="play_arrow" primary onClick={() => playMovie(m)} />
         {resume > 0 && <ActionButton text="Dall'inizio" icon="replay" onClick={() => playMovie(m, true)} />}
+        <MyListButton item={m} />
       </div>
       <div style={{ height: 18 }} />
       {info?.plot && <div style={{ color: 'var(--text)', fontSize: 15, lineHeight: '22px', userSelect: 'text' }}>{info.plot}</div>}
@@ -87,11 +88,14 @@ export function SeriesDetail({ series: s }: { series: Series }) {
               <div style={{ height: 10 }} />
               {(info?.plot ?? s.plot) && <div className={wide ? 'clamp6' : 'clamp4'} style={{ color: 'var(--text)', fontSize: 14 }}>{info?.plot ?? s.plot}</div>}
               <div style={{ height: 14 }} />
-              {resumeEp && (() => {
-                const r = resumeMs(`e:${resumeEp.id}`)
-                const label = r > 0 ? `Riprendi ${episodeLabel(resumeEp)} da ${formatTime(r)}` : `Guarda ${episodeLabel(resumeEp)}`
-                return <ActionButton text={label} icon="play_arrow" primary onClick={() => playEpisode(s, resumeEp, episodes)} />
-              })()}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {resumeEp && (() => {
+                  const r = resumeMs(`e:${resumeEp.id}`)
+                  const label = r > 0 ? `Riprendi ${episodeLabel(resumeEp)} da ${formatTime(r)}` : `Guarda ${episodeLabel(resumeEp)}`
+                  return <ActionButton text={label} icon="play_arrow" primary onClick={() => playEpisode(s, resumeEp, episodes)} />
+                })()}
+                <MyListButton item={s} />
+              </div>
             </div>
           </div>
           {!info ? (
@@ -116,6 +120,12 @@ export function SeriesDetail({ series: s }: { series: Series }) {
       )}
     </DetailFrame>
   )
+}
+
+/** Adds or removes the title from "La mia lista"; once watched it leaves by itself. */
+function MyListButton({ item }: { item: Movie | Series }) {
+  const on = inMyList(item)
+  return <ActionButton text={on ? 'Nella mia lista' : 'La mia lista'} icon={on ? 'check' : 'add'} onClick={() => toggleMyList(item)} />
 }
 
 function EpisodeRow({ s, ep, all, current }: { s: Series; ep: Episode; all: Episode[]; current: boolean }) {

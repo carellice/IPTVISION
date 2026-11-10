@@ -6,7 +6,7 @@ namespace IPTVISION.Services;
 
 /// <summary>
 /// Ricorda dove si è arrivati in film ed episodi, quali sono stati visti
-/// e l'ultimo episodio aperto di ogni serie. Chiavi: "m:{id}" film, "e:{id}" episodi, serie per id.
+/// l'ultimo episodio aperto di ogni serie e la "Mia lista". Chiavi: "m:{id}" film, "e:{id}" episodi, "s:{id}" serie.
 /// </summary>
 public sealed class PositionStore
 {
@@ -21,6 +21,8 @@ public sealed class PositionStore
         public Dictionary<string, Entry> Positions { get; set; } = [];
         public HashSet<string> Watched { get; set; } = [];
         public Dictionary<int, LastEpisodeEntry> LastEpisode { get; set; } = [];
+        /// <summary>La "Mia lista": film ("m:") e serie ("s:") con il momento in cui sono stati aggiunti.</summary>
+        public Dictionary<string, DateTimeOffset> MyList { get; set; } = [];
     }
 
     /// <summary>Ogni modifica, nel formato delle operazioni del server di casa (POST /api/ops).</summary>
@@ -115,6 +117,19 @@ public sealed class PositionStore
         Changed?.Invoke(new JsonObject { ["op"] = "forgetSeries", ["seriesId"] = seriesId });
     }
 
+    public bool InMyList(string key) => _data.MyList.ContainsKey(key);
+
+    /// <summary>Quando il titolo è entrato nella "Mia lista" (null se non c'è).</summary>
+    public DateTimeOffset? MyListAddedAt(string key) => _data.MyList.TryGetValue(key, out var u) ? u : null;
+
+    public void SetMyList(string key, bool on)
+    {
+        var changed = on ? _data.MyList.TryAdd(key, DateTimeOffset.Now) : _data.MyList.Remove(key);
+        if (!changed) return;
+        _dirty = true;
+        Changed?.Invoke(new JsonObject { ["op"] = "myList", ["key"] = key, ["on"] = on });
+    }
+
     /// <summary>Tutto il contenuto nel formato di positions.json delle app Android e TV (e del server di casa).</summary>
     public JsonObject ToServerJson()
     {
@@ -124,11 +139,14 @@ public sealed class PositionStore
         var last = new JsonObject();
         foreach (var (k, e) in _data.LastEpisode)
             last[k.ToString()] = new JsonObject { ["id"] = e.EpisodeId, ["u"] = e.UpdatedAt.ToUnixTimeMilliseconds() };
+        var myList = new JsonObject();
+        foreach (var (k, u) in _data.MyList) myList[k] = u.ToUnixTimeMilliseconds();
         return new JsonObject
         {
             ["positions"] = positions,
             ["watched"] = new JsonArray(_data.Watched.Select(w => (JsonNode)w).ToArray()),
             ["lastEpisode"] = last,
+            ["myList"] = myList,
         };
     }
 
@@ -146,6 +164,9 @@ public sealed class PositionStore
             foreach (var (k, v) in le)
                 if (int.TryParse(k, out var id) && v is JsonObject e && (string?)e["id"] is { } ep)
                     data.LastEpisode[id] = new LastEpisodeEntry(ep, DateTimeOffset.FromUnixTimeMilliseconds((long?)e["u"] ?? 0));
+        if (o["myList"] is JsonObject ml)
+            foreach (var (k, v) in ml)
+                data.MyList[k] = DateTimeOffset.FromUnixTimeMilliseconds((long?)v ?? 0);
         _data = data;
         _dirty = true;
         Save(force: true);

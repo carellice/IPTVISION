@@ -6,7 +6,7 @@ import * as quiz from '../../../shared/quiz.ts'
 import { type Entry, groupVariants } from '../../../shared/text.ts'
 import { ApiError, api } from './api.ts'
 import {
-  ALL_ID, CONTINUE_ID, FAVORITES_ID, type CategoryHit, type Library, type ListSort, type SearchScope, type Section,
+  ALL_ID, CONTINUE_ID, FAVORITES_ID, MYLIST_ID, type CategoryHit, type Library, type ListSort, type SearchScope, type Section,
   library, search as searchLib, sortChannels, sortMovies, sortSeries, toChannels, toMovies, toSeries,
 } from './library.ts'
 import { PlayerController } from './player.ts'
@@ -96,6 +96,8 @@ export const app = {
   xtream: null as UserState['xtream'],
   hideAdult: false,
   favorites: new Set<number>(),
+  /** "La mia lista": films ("m:{id}") and series ("s:{id}") with when they were added. */
+  myList: {} as Record<string, number>,
   pos: { positions: {}, watched: new Set(), lastEpisode: {} } as Positions,
   revision: -1,
   positionsVersion: 0,
@@ -272,6 +274,7 @@ function applyState(s: UserState & { unchanged?: boolean }) {
   app.xtream = s.xtream
   app.hideAdult = s.hideAdult
   app.favorites = new Set(s.favorites)
+  app.myList = s.myList ?? {}
   app.pos = { positions: s.positions, watched: new Set(s.watched), lastEpisode: s.lastEpisode }
   app.positionsVersion++
   if (hideChanged) rebuildLibraries()
@@ -553,6 +556,51 @@ export function toggleFavorite(ch: Channel) {
   emit()
 }
 
+// --- "La mia lista" (AppViewModel.kt) ----------------------------------------------------------------
+
+const seriesKey = (s: Series) => `s:${s.seriesId}`
+
+/** The keys of every version of the same title: one of them in the list is enough. */
+const movieKeys = (m: Movie) => [...new Set([...(app.movies?.items.filter((x) => x.name === m.name).map((x) => x.key) ?? []), m.key])]
+const seriesKeys = (s: Series) => [...new Set([...(app.series?.items.filter((x) => x.name === s.name).map(seriesKey) ?? []), seriesKey(s)])]
+
+export const inMyList = (item: Movie | Series) => ('streamId' in item ? movieKeys(item) : seriesKeys(item)).some((k) => k in app.myList)
+
+function setMyList(keys: string[], key: string, on: boolean) {
+  const next = { ...app.myList }
+  for (const k of on ? [key] : keys) {
+    if (on === k in next) continue
+    if (on) next[k] = Date.now()
+    else delete next[k]
+    queue({ op: 'myList', key: k, on }, true)
+  }
+  app.myList = next
+  app.positionsVersion++
+  emit()
+}
+
+export function toggleMyList(item: Movie | Series) {
+  const on = !inMyList(item)
+  if ('streamId' in item) setMyList(movieKeys(item), item.key, on)
+  else setMyList(seriesKeys(item), seriesKey(item), on)
+}
+
+/** The titles of the list, the last added first. */
+const inListOrder = <T>(items: T[], key: (t: T) => string) =>
+  items.filter((it) => key(it) in app.myList).sort((a, b) => app.myList[key(b)] - app.myList[key(a)])
+
+/** A film watched to the end, or the last episode of a series, leaves "La mia lista". */
+function leaveMyListIfFinished() {
+  const p = app.playing
+  if (p?.kind === 'Film') setMyList(movieKeys(p.movie), p.movie.key, false)
+  if (p?.kind === 'Ep' && !nextEpisode()) {
+    // Only with every episode of the series at hand.
+    const all = app.seriesInfo?.episodes ?? []
+    const last = all.reduce<Episode | null>((a, e) => (!a || e.season > a.season || (e.season === a.season && e.number > a.number) ? e : a), null)
+    if (last?.id === p.episode.id) setMyList(seriesKeys(p.series), seriesKey(p.series), false)
+  }
+}
+
 /** Removes a film from "Continua a guardare" (every version of the same title). */
 export function removeMovieFromContinue(e: Entry<Movie>) {
   const positions = { ...app.pos.positions }
@@ -592,7 +640,8 @@ export function moviesFor(categoryId: string): Entry<Movie>[] {
   if (!l) return []
   const list = categoryId === ALL_ID ? l.items
     : categoryId === CONTINUE_ID ? l.items.filter((m) => resumeMs(m.key) > 0).sort((a, b) => (app.pos.positions[b.key]?.u ?? 0) - (app.pos.positions[a.key]?.u ?? 0))
-      : l.byCategory.get(categoryId) ?? []
+      : categoryId === MYLIST_ID ? inListOrder(l.items, (m) => m.key)
+        : l.byCategory.get(categoryId) ?? []
   return groupVariants(sortMovies(list, sortOf('Movies')), (m) => m.name)
 }
 
@@ -602,7 +651,8 @@ export function seriesFor(categoryId: string): Entry<Series>[] {
   const list = categoryId === ALL_ID ? l.items
     : categoryId === CONTINUE_ID ? l.items.flatMap((s) => { const le = lastEpisode(s.seriesId); return le ? [[s, le.u] as const] : [] })
       .sort((a, b) => b[1] - a[1]).map((x) => x[0])
-      : l.byCategory.get(categoryId) ?? []
+      : categoryId === MYLIST_ID ? inListOrder(l.items, seriesKey)
+        : l.byCategory.get(categoryId) ?? []
   return groupVariants(sortSeries(list, sortOf('Series')), (s) => s.name)
 }
 
@@ -796,9 +846,10 @@ let countdownTimer: number | undefined
 
 player.onEnded = () => {
   const p = app.playing
-  if (p?.kind === 'Film') { markWatched(p.movie.key); app.positionsVersion++; back(); return }
+  if (p?.kind === 'Film') { markWatched(p.movie.key); leaveMyListIfFinished(); app.positionsVersion++; back(); return }
   if (p?.kind === 'Ep') {
     markWatched(`e:${p.episode.id}`)
+    leaveMyListIfFinished()
     app.positionsVersion++
     if (!nextEpisode()) { back(); return }
     // At the end of an episode the next one starts after 10 seconds, unless cancelled.
@@ -832,7 +883,7 @@ export function savePosition(force = false) {
   const p = app.playing
   const key = p?.kind === 'Film' ? p.movie.key : p?.kind === 'Ep' ? `e:${p.episode.id}` : null
   if (key && player.isActive && player.state !== 'Connecting' && player.state !== 'Reconnecting') {
-    if (recordPosition(key, player.currentPosition(), player.currentDuration())) app.positionsVersion++
+    if (recordPosition(key, player.currentPosition(), player.currentDuration())) { leaveMyListIfFinished(); app.positionsVersion++ }
   }
   if (force) flush()
 }

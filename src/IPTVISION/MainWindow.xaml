@@ -789,7 +789,8 @@
                                 <TextBlock Text="{Binding OpenSeriesMeta}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding OpenSeriesPlot}" FontSize="12" Foreground="#C2C8D2" TextWrapping="Wrap" Margin="0,6,0,0"
                                            MaxHeight="86" TextTrimming="WordEllipsis" ToolTip="{Binding OpenSeriesPlot}" />
-                                <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,8,0,0" Height="30" FontSize="12" Padding="10,0"
+                                <WrapPanel Margin="0,8,0,0">
+                                <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,0,8,0" Height="30" FontSize="12" Padding="10,0"
                                         Command="{Binding DownloadSeasonCommand}" ToolTip="Scarica tutti gli episodi della stagione per guardarli offline"
                                         Visibility="{Binding SelectedSeason, Converter={StaticResource NullToVis}}">
                                     <StackPanel Orientation="Horizontal">
@@ -797,6 +798,20 @@
                                         <TextBlock Text="Scarica la stagione" Margin="7,0,0,0" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
+                                <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Height="30" FontSize="12" Padding="10,0"
+                                        Command="{Binding ToggleOpenSeriesMyListCommand}" ToolTip="La mia lista: finita la serie esce da sola (tasto L sulle liste)">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE73E;" Style="{StaticResource Icon}" FontSize="12" VerticalAlignment="Center"
+                                                   Visibility="{Binding OpenSeriesInMyList, Converter={StaticResource BoolToVis}}" />
+                                        <TextBlock Text="&#xE710;" Style="{StaticResource Icon}" FontSize="12" VerticalAlignment="Center"
+                                                   Visibility="{Binding OpenSeriesInMyList, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                                        <TextBlock Text="Nella mia lista" Margin="7,0,0,0" VerticalAlignment="Center"
+                                                   Visibility="{Binding OpenSeriesInMyList, Converter={StaticResource BoolToVis}}" />
+                                        <TextBlock Text="La mia lista" Margin="7,0,0,0" VerticalAlignment="Center"
+                                                   Visibility="{Binding OpenSeriesInMyList, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                                    </StackPanel>
+                                </Button>
+                                </WrapPanel>
                             </StackPanel>
                         </Grid>
 

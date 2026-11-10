@@ -92,6 +92,7 @@ data class Library<T>(val categories: List<Category>, val items: List<T>, val by
 const val ALL_ID = "__all"
 const val FAVORITES_ID = "__fav"
 const val CONTINUE_ID = "__continue"
+const val MYLIST_ID = "__mylist"
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val ctx: Context get() = getApplication()
@@ -618,7 +619,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> memo(lib: Any, categoryId: String, sort: Any, build: () -> List<Entry<T>>): List<Entry<T>> {
-        val key = listOf(System.identityHashCode(lib), (lib as Library<*>).items.size, categoryId, sort, if (categoryId == CONTINUE_ID) positionsVersion else 0)
+        val key = listOf(System.identityHashCode(lib), (lib as Library<*>).items.size, categoryId, sort, if (categoryId == CONTINUE_ID || categoryId == MYLIST_ID) positionsVersion else 0)
         return listMemo.getOrPut(key, build) as List<Entry<T>>
     }
 
@@ -631,6 +632,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val list = when (categoryId) {
             ALL_ID -> l.items
             CONTINUE_ID -> l.items.filter { positions.resumeMs(it.key) > 0 }.sortedByDescending { positions.updatedAt(it.key) ?: 0 }
+            MYLIST_ID -> inListOrder(l.items) { it.key }
             else -> l.byCategory[categoryId] ?: emptyList()
         }
         val sorted = when (sortOf(Section.Movies)) {
@@ -654,6 +656,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             ALL_ID -> l.items
             CONTINUE_ID -> l.items.mapNotNull { s -> positions.lastEpisode(s.seriesId)?.let { s to it.second } }
                 .sortedByDescending { it.second }.map { it.first }
+            MYLIST_ID -> inListOrder(l.items) { it.key }
             else -> l.byCategory[categoryId] ?: emptyList()
         }
         val sorted = when (sortOf(Section.Series)) {
@@ -664,6 +667,43 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else -> list
         }
         return groupVariants(sorted) { it.variantKey }
+    }
+
+    // ---------- La mia lista ----------
+
+    /** I titoli della "Mia lista", dall'ultimo aggiunto. */
+    private fun <T> inListOrder(items: List<T>, key: (T) -> String): List<T> {
+        val order = positions.myList().withIndex().associate { it.value to it.index }
+        return items.filter { key(it) in order }.sortedBy { order[key(it)] }
+    }
+
+    /** Le chiavi di tutte le versioni dello stesso titolo: in lista ne basta una. */
+    private fun movieKeys(m: Movie) = ((movies?.items?.filter { it.variantKey == m.variantKey } ?: emptyList()).map { it.key } + m.key).distinct()
+    private fun seriesKeys(s: Series) = ((series?.items?.filter { it.variantKey == s.variantKey } ?: emptyList()).map { it.key } + s.key).distinct()
+
+    fun inMyList(m: Movie) = movieKeys(m).any(positions::inMyList)
+    fun inMyList(s: Series) = seriesKeys(s).any(positions::inMyList)
+
+    fun toggleMyList(m: Movie) = setMyList(movieKeys(m), m.key, !inMyList(m))
+    fun toggleMyList(s: Series) = setMyList(seriesKeys(s), s.key, !inMyList(s))
+
+    private fun setMyList(keys: List<String>, key: String, on: Boolean) {
+        if (on) positions.setMyList(key, true) else keys.forEach { positions.setMyList(it, false) }
+        positions.save(force = true)
+        positionsVersion++
+    }
+
+    /** Finito un film, o l'ultimo episodio di una serie, il titolo esce dalla "Mia lista". */
+    private fun leaveMyListIfFinished(p: Playing?) {
+        when (p) {
+            is Playing.Film -> movieKeys(p.movie).forEach { positions.setMyList(it, false) }
+            is Playing.Ep -> {
+                // Solo con tutti gli episodi della serie: dai download arrivano solo quelli scaricati.
+                val last = seriesInfo?.episodes?.maxWithOrNull(compareBy({ it.season }, { it.number }))
+                if (last?.id == p.episode.id && nextEpisode() == null) seriesKeys(p.series).forEach { positions.setMyList(it, false) }
+            }
+            else -> {}
+        }
     }
 
     /** Toglie un film da "Continua a guardare" (tutte le versioni dello stesso titolo). */
@@ -1043,9 +1083,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun onPlaybackEnded() {
         when (val p = playing) {
-            is Playing.Film -> { positions.markWatched(p.movie.key); positionsVersion++; back() }
+            is Playing.Film -> { positions.markWatched(p.movie.key); leaveMyListIfFinished(p); positionsVersion++; back() }
             is Playing.Ep -> {
                 positions.markWatched(p.episode.key)
+                leaveMyListIfFinished(p)
                 positionsVersion++
                 if (nextEpisode() == null) { back(); return }
                 // Alla fine di un episodio parte il successivo dopo 10 secondi, annullabile.
@@ -1072,7 +1113,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else -> null
         }
         if (key != null && player.isActive) {
-            if (positions.update(key, player.currentPosition(), player.currentDuration())) positionsVersion++
+            if (positions.update(key, player.currentPosition(), player.currentDuration())) { leaveMyListIfFinished(playing); positionsVersion++ }
         }
         positions.save(force)
         if (force) flushServerOps()

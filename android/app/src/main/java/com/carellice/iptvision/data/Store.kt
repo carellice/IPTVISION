@@ -140,8 +140,8 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
 }
 
 /**
- * Ricorda dove si è arrivati in film ed episodi, quali sono stati visti
- * e l'ultimo episodio aperto di ogni serie. Chiavi: "m:{id}" film, "e:{id}" episodi.
+ * Ricorda dove si è arrivati in film ed episodi, quali sono stati visti, l'ultimo episodio
+ * aperto di ogni serie e la "Mia lista". Chiavi: "m:{id}" film, "e:{id}" episodi, "s:{id}" serie.
  */
 class PositionStore(private val file: File) {
     data class Entry(val positionMs: Long, val durationMs: Long, val updatedAt: Long)
@@ -152,6 +152,8 @@ class PositionStore(private val file: File) {
     private val positions = HashMap<String, Entry>()
     private val watched = HashSet<String>()
     private val lastEpisode = HashMap<Int, Pair<String, Long>>()
+    /** La "Mia lista": film ("m:") e serie ("s:") con il momento in cui sono stati aggiunti. */
+    private val myList = HashMap<String, Long>()
     private var dirty = false
     private var lastSave = 0L
 
@@ -172,6 +174,7 @@ class PositionStore(private val file: File) {
                         k.toIntOrNull()?.let { id -> lastEpisode[id] = e.getString("id") to e.getLong("u") }
                     }
                 }
+                readMyList(o)
             }
         } catch (e: Exception) {
             Log.w("Posizioni di ripresa illeggibili", e)
@@ -245,6 +248,27 @@ class PositionStore(private val file: File) {
         onChange?.invoke(JSONObject().put("op", "forgetSeries").put("seriesId", seriesId))
     }
 
+    @Synchronized
+    fun inMyList(key: String) = key in myList
+
+    /** Le chiavi della "Mia lista", dall'ultima aggiunta. */
+    @Synchronized
+    fun myList(): List<String> = myList.entries.sortedByDescending { it.value }.map { it.key }
+
+    @Synchronized
+    fun setMyList(key: String, on: Boolean) {
+        val changed = if (on) myList.put(key, System.currentTimeMillis()) == null else myList.remove(key) != null
+        if (!changed) return
+        dirty = true
+        onChange?.invoke(JSONObject().put("op", "myList").put("key", key).put("on", on))
+    }
+
+    private fun readMyList(o: JSONObject) {
+        o.optJSONObject("myList")?.let { ml -> ml.keys().forEach { k -> myList[k] = ml.getLong(k) } }
+    }
+
+    private fun myListJson() = JSONObject().apply { myList.forEach { (k, u) -> put(k, u) } }
+
     /** Tutto il contenuto, nel formato di positions.json (e di GET /api/state del server di casa). */
     @Synchronized
     fun toJson(): JSONObject = JSONObject().apply {
@@ -255,12 +279,13 @@ class PositionStore(private val file: File) {
         put("lastEpisode", JSONObject().apply {
             lastEpisode.forEach { (k, v) -> put(k.toString(), JSONObject().put("id", v.first).put("u", v.second)) }
         })
+        put("myList", myListJson())
     }
 
     /** Sostituisce tutto con i dati del server di casa (stesso formato di positions.json). */
     @Synchronized
     fun replaceWith(o: JSONObject) {
-        positions.clear(); watched.clear(); lastEpisode.clear()
+        positions.clear(); watched.clear(); lastEpisode.clear(); myList.clear()
         o.optJSONObject("positions")?.let { ps ->
             ps.keys().forEach { k -> val e = ps.getJSONObject(k); positions[k] = Entry(e.getLong("p"), e.getLong("d"), e.getLong("u")) }
         }
@@ -268,6 +293,7 @@ class PositionStore(private val file: File) {
         o.optJSONObject("lastEpisode")?.let { le ->
             le.keys().forEach { k -> val e = le.getJSONObject(k); k.toIntOrNull()?.let { id -> lastEpisode[id] = e.getString("id") to e.getLong("u") } }
         }
+        readMyList(o)
         dirty = true
         save(force = true)
     }
@@ -288,6 +314,7 @@ class PositionStore(private val file: File) {
             o.put("lastEpisode", JSONObject().apply {
                 lastEpisode.forEach { (k, v) -> put(k.toString(), JSONObject().put("id", v.first).put("u", v.second)) }
             })
+            o.put("myList", myListJson())
             writeAtomic(file, o.toString())
             dirty = false
             lastSave = System.currentTimeMillis()

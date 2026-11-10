@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
@@ -91,6 +93,7 @@ fun MovieDetailScreen(vm: AppViewModel, m: Movie) {
                     ActionButton(if (resume > 0) "Riprendi da ${TextHelpers.formatTime(resume)}" else "Guarda", Icons.Default.PlayArrow, primary = true,
                         modifier = Modifier.focusRequester(play)) { vm.playMovie(m) }
                     if (resume > 0) ActionButton("Dall'inizio", Icons.Default.Replay) { vm.playMovie(m, fromStart = true) }
+                    MyListButton(vm.inMyList(m)) { vm.toggleMyList(m) }
                     if (!vm.isTv) DownloadButton(vm, m.key) { vm.downloadMovie(m) }
                 }
                 VSpace(18.dp)
@@ -115,6 +118,7 @@ fun MovieDetailScreen(vm: AppViewModel, m: Movie) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SeriesDetailScreen(vm: AppViewModel, s: Series) {
     @Suppress("UNUSED_VARIABLE") val pv = vm.positionsVersion
@@ -141,12 +145,15 @@ fun SeriesDetailScreen(vm: AppViewModel, s: Series) {
                         VSpace(10.dp)
                         (info?.plot ?: s.plot)?.let { Text(it, color = C.Text, fontSize = 14.sp, maxLines = if (wide) 6 else 4, overflow = TextOverflow.Ellipsis) }
                         VSpace(14.dp)
-                        if (resumeEp != null) {
-                            val r = vm.positions.resumeMs(resumeEp.key)
-                            val label = if (r > 0) "Riprendi ${resumeEp.label} da ${TextHelpers.formatTime(r)}" else "Guarda ${resumeEp.label}"
-                            ActionButton(label, Icons.Default.PlayArrow, primary = true, modifier = Modifier.focusRequester(play)) {
-                                vm.playEpisode(s, resumeEp, episodes)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (resumeEp != null) {
+                                val r = vm.positions.resumeMs(resumeEp.key)
+                                val label = if (r > 0) "Riprendi ${resumeEp.label} da ${TextHelpers.formatTime(r)}" else "Guarda ${resumeEp.label}"
+                                ActionButton(label, Icons.Default.PlayArrow, primary = true, modifier = Modifier.focusRequester(play)) {
+                                    vm.playEpisode(s, resumeEp, episodes)
+                                }
                             }
+                            MyListButton(vm.inMyList(s)) { vm.toggleMyList(s) }
                         }
                     }
                 }
@@ -181,6 +188,12 @@ fun SeriesDetailScreen(vm: AppViewModel, s: Series) {
             }
         }
     }
+}
+
+/** Aggiunge o toglie il titolo dalla "Mia lista"; finito di guardarlo esce da solo. */
+@Composable
+private fun MyListButton(inList: Boolean, onClick: () -> Unit) {
+    ActionButton(if (inList) "Nella mia lista" else "La mia lista", if (inList) Icons.Default.Check else Icons.Default.Add, onClick = onClick)
 }
 
 @Composable

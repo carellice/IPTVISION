@@ -445,10 +445,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 }
                 break;
             case LibraryMode.Movies:
-                AddLibraryCategories(_vodCats, _movies.Select(m => m.CategoryId), _movies.Count, _movies.Count(m => m.HasProgress));
+                AddLibraryCategories(_vodCats, _movies.Select(m => m.CategoryId), _movies.Count, _movies.Count(m => m.HasProgress), _movies.Count(m => _positions.InMyList(m.Key)));
                 break;
             case LibraryMode.Series:
-                AddLibraryCategories(_seriesCats, _series.Select(s => s.CategoryId), _series.Count, _series.Count(s => s.HasProgress));
+                AddLibraryCategories(_seriesCats, _series.Select(s => s.CategoryId), _series.Count, _series.Count(s => s.HasProgress), _series.Count(s => _positions.InMyList(s.Key)));
                 break;
         }
         // Prima si sceglie la categoria: resta aperta solo quella scelta in questa sessione.
@@ -459,10 +459,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnCategoriesRebuilt();
     }
 
-    private void AddLibraryCategories(List<Category> cats, IEnumerable<string?> ids, int total, int inProgress)
+    private void AddLibraryCategories(List<Category> cats, IEnumerable<string?> ids, int total, int inProgress, int inMyList)
     {
         if (total == 0) return;
         if (inProgress > 0) Categories.Add(new CategoryItem(CategoryItem.ContinueId, "Continua a guardare") { Count = inProgress });
+        if (inMyList > 0) Categories.Add(new CategoryItem(CategoryItem.MyListId, "La mia lista") { Count = inMyList });
         Categories.Add(new CategoryItem(CategoryItem.AllId, "Tutti") { Count = total });
         AddCategories(cats, ids);
     }
@@ -545,11 +546,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             case LibraryMode.Movies:
                 VisibleMovies = cat == null ? []
-                    : GroupVariants(SortMovies(FilterLibrary(_movies, cat, m => m.CategoryId, m => m.HasProgress, m => _positions.GetUpdatedAt(m.Key))));
+                    : GroupVariants(SortMovies(FilterLibrary(_movies, cat, m => m.CategoryId, m => m.HasProgress, m => _positions.GetUpdatedAt(m.Key), m => m.Key)));
                 break;
             case LibraryMode.Series:
                 VisibleSeries = cat == null ? []
-                    : GroupVariants(SortSeries(FilterLibrary(_series, cat, s => s.CategoryId, s => s.HasProgress, s => _positions.GetLastEpisode(s.SeriesId)?.UpdatedAt)));
+                    : GroupVariants(SortSeries(FilterLibrary(_series, cat, s => s.CategoryId, s => s.HasProgress, s => _positions.GetLastEpisode(s.SeriesId)?.UpdatedAt, s => s.Key)));
                 break;
             default:
                 VisibleChannels = cat == null ? []
@@ -561,11 +562,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         BuildGridRows();
     }
 
-    private static List<T> FilterLibrary<T>(List<T> all, CategoryItem cat, Func<T, string?> catId,
-        Func<T, bool> inProgress, Func<T, DateTimeOffset?> lastWatched)
+    private List<T> FilterLibrary<T>(List<T> all, CategoryItem cat, Func<T, string?> catId,
+        Func<T, bool> inProgress, Func<T, DateTimeOffset?> lastWatched, Func<T, string> key)
     {
         if (cat.Id == CategoryItem.AllId) return all;
         if (cat.IsContinue) return all.Where(inProgress).OrderByDescending(x => lastWatched(x) ?? DateTimeOffset.MinValue).ToList();
+        if (cat.IsMyList) return all.Where(x => _positions.InMyList(key(x))).OrderByDescending(x => _positions.MyListAddedAt(key(x))).ToList();
         return all.Where(x => catId(x) == cat.Id).ToList();
     }
 

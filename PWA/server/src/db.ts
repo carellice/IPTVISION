@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS favorites (streamId INTEGER PRIMARY KEY NOT NULL, u I
 CREATE TABLE IF NOT EXISTS positions (key TEXT PRIMARY KEY NOT NULL, p INTEGER NOT NULL, d INTEGER NOT NULL, u INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS watched (key TEXT PRIMARY KEY NOT NULL);
 CREATE TABLE IF NOT EXISTS last_episode (seriesId INTEGER PRIMARY KEY NOT NULL, episodeId TEXT NOT NULL, u INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS my_list (key TEXT PRIMARY KEY NOT NULL, u INTEGER NOT NULL);
 `
 
 // --- accounts: every account has its own database, picked per request -------------------------
@@ -179,6 +180,8 @@ export function state(): UserState {
   for (const r of db.prepare('SELECT seriesId, episodeId, u FROM last_episode').all() as { seriesId: number; episodeId: string; u: number }[]) {
     lastEpisode[String(r.seriesId)] = { id: r.episodeId, u: Number(r.u) }
   }
+  const myList: UserState['myList'] = {}
+  for (const r of db.prepare('SELECT key, u FROM my_list').all() as { key: string; u: number }[]) myList[r.key] = Number(r.u)
   const x = xtreamAccount()
   return {
     revision: revision(),
@@ -186,6 +189,7 @@ export function state(): UserState {
     positions,
     watched: (db.prepare('SELECT key FROM watched').all() as { key: string }[]).map((r) => r.key),
     lastEpisode,
+    myList,
     hideAdult: getMeta('hideAdult') === '1',
     xtream: x ? { server: x.server, username: x.username } : null,
   }
@@ -226,6 +230,11 @@ export function applyOps(ops: Op[]) {
           if (o.on) db.prepare('INSERT OR IGNORE INTO favorites (streamId, u) VALUES (?, ?)').run(o.streamId, now)
           else db.prepare('DELETE FROM favorites WHERE streamId = ?').run(o.streamId)
           break
+        case 'myList':
+          if (!validKey(o.key) || o.key.startsWith('e:')) break
+          if (o.on) db.prepare('INSERT OR IGNORE INTO my_list (key, u) VALUES (?, ?)').run(o.key, now)
+          else db.prepare('DELETE FROM my_list WHERE key = ?').run(o.key)
+          break
         case 'hideAdult':
           setMeta('hideAdult', o.on ? '1' : '0')
           break
@@ -245,6 +254,7 @@ export function importNative(input: {
   positions?: unknown
   watched?: unknown
   lastEpisode?: unknown
+  myList?: unknown
 }) {
   transaction(() => {
     if (Array.isArray(input.favorites)) {
@@ -272,6 +282,11 @@ export function importNative(input: {
         const u = validInt(v.u) ? v.u : Date.now()
         const old = db.prepare('SELECT u FROM last_episode WHERE seriesId = ?').get(sid) as { u: number } | undefined
         if (!old || Number(old.u) < u) db.prepare('INSERT OR REPLACE INTO last_episode (seriesId, episodeId, u) VALUES (?, ?, ?)').run(sid, v.id, u)
+      }
+    }
+    if (input.myList && typeof input.myList === 'object') {
+      for (const [k, u] of Object.entries(input.myList as Record<string, unknown>)) {
+        if (validKey(k) && !k.startsWith('e:')) db.prepare('INSERT OR IGNORE INTO my_list (key, u) VALUES (?, ?)').run(k, validInt(u) ? u : Date.now())
       }
     }
   })

@@ -4,7 +4,7 @@
   var u = IPTV.u, h = u.h, V = IPTV.V, Nav = IPTV.Nav, KEY = Nav.KEY;
   var S = IPTV.Settings, Pos = IPTV.Positions, Player = IPTV.Player, X = IPTV.Xtream, Server = IPTV.Server;
 
-  var ALL = '__all', FAV = '__fav', CONT = '__continue';
+  var ALL = '__all', FAV = '__fav', CONT = '__continue', MINE = '__mylist';
   var SECTIONS = [
     { id: 'Live', title: 'TV in diretta', icon: '📺' },
     { id: 'Movies', title: 'Film', icon: '🎬' },
@@ -152,7 +152,8 @@
     if (!l) return [];
     var list = cat === ALL ? l.items
       : cat === CONT ? l.items.filter(function (m) { return Pos.resumeMs(m.posKey) > 0; }).sort(function (a, b) { return Pos.updatedAt(b.posKey) - Pos.updatedAt(a.posKey); })
-        : l.by[cat] || [];
+        : cat === MINE ? inListOrder(l.items, function (m) { return m.posKey; })
+          : l.by[cat] || [];
     return u.groupVariants(sorted('Movies', list), function (m) { return m.name; });
   }
 
@@ -161,8 +162,48 @@
     if (!l) return [];
     var list = cat === ALL ? l.items
       : cat === CONT ? l.items.filter(function (s) { return Pos.lastEpisode(s.seriesId); }).sort(function (a, b) { return Pos.lastEpisode(b.seriesId).u - Pos.lastEpisode(a.seriesId).u; })
-        : l.by[cat] || [];
+        : cat === MINE ? inListOrder(l.items, listKey)
+          : l.by[cat] || [];
     return u.groupVariants(sorted('Series', list), function (s) { return s.name; });
+  }
+
+  // ---------- La mia lista ----------
+
+  function listKey(it) { return it.kind === 'movie' ? it.posKey : 's:' + it.seriesId; }
+
+  function inListOrder(items, key) {
+    return items.filter(function (it) { return Pos.inMyList(key(it)); })
+      .sort(function (a, b) { return Pos.myListAddedAt(key(b)) - Pos.myListAddedAt(key(a)); });
+  }
+
+  /** Le chiavi di tutte le versioni dello stesso titolo: in lista ne basta una. */
+  function myListKeys(it) {
+    var l = it.kind === 'movie' ? A.movies : A.series;
+    var keys = [listKey(it)];
+    (l ? l.items : []).forEach(function (x) { if (x.name === it.name && keys.indexOf(listKey(x)) < 0) keys.push(listKey(x)); });
+    return keys;
+  }
+
+  function inMyList(it) { return myListKeys(it).some(Pos.inMyList); }
+
+  function toggleMyList(it) {
+    var on = !inMyList(it);
+    if (on) Pos.setMyList(listKey(it), true); else myListKeys(it).forEach(function (k) { Pos.setMyList(k, false); });
+    Pos.save();
+    u.toast(on ? it.name + ' aggiunto alla mia lista' : it.name + ' tolto dalla mia lista');
+  }
+
+  /** Finito un film, o l'ultimo episodio di una serie, il titolo esce dalla "Mia lista". */
+  function leaveMyListIfFinished(p) {
+    if (p.kind === 'movie') myListKeys(p.movie).forEach(function (k) { Pos.setMyList(k, false); });
+    else if (p.kind === 'episode' && p.episode === p.episodes[p.episodes.length - 1]) myListKeys(p.series).forEach(function (k) { Pos.setMyList(k, false); });
+  }
+
+  function myListButton(it) {
+    return V.focusable(h('div', { class: 'btn', text: inMyList(it) ? '✓  Nella mia lista' : '+  La mia lista' }), function () {
+      toggleMyList(it);
+      render(true);
+    });
   }
 
   function catEntries(section) {
@@ -175,6 +216,8 @@
     } else {
       var cont = section === 'Movies' ? moviesFor(CONT).length : seriesFor(CONT).length;
       if (cont) out.push({ id: CONT, name: 'Continua a guardare', count: cont });
+      var mine = section === 'Movies' ? moviesFor(MINE).length : seriesFor(MINE).length;
+      if (mine) out.push({ id: MINE, name: 'La mia lista', count: mine });
       out.push({ id: ALL, name: section === 'Series' ? 'Tutte' : 'Tutti', count: l.items.length });
     }
     l.cats.forEach(function (c) { out.push({ id: c.id, name: c.name, count: (l.by[c.id] || []).length }); });
@@ -535,10 +578,13 @@
         var el = (grid ? V.mediaCard : V.mediaRow)(it, opts);
         el.dataset.key = (section === 'Movies' ? 'm-' + it.streamId : 's-' + it.seriesId);
         if (open === CONT) el.continueEntry = e;
+        el.listItem = it;
         return el;
       });
     }
-    if (open === CONT) content.appendChild(h('div', { class: 'dim', style: 'margin-top:0.6rem;font-size:0.85rem', text: 'Tasto rosso del telecomando: rimuovi il titolo da Continua a guardare.' }));
+    content.appendChild(h('div', { class: 'dim', style: 'margin-top:0.6rem;font-size:0.85rem', text: open === CONT
+      ? 'Tasto rosso del telecomando: rimuovi il titolo da Continua a guardare. Tasto verde: aggiungi o togli dalla mia lista.'
+      : 'Tasto verde del telecomando: aggiungi o togli il titolo dalla mia lista. Finito di guardarlo, esce da solo.' }));
     var target = lazy.ensure(start);
     if (!focusAfterRender || (focusAfterRender.dataset && /^nav-/.test(focusAfterRender.dataset.key || ''))) focusAfterRender = target;
   }
@@ -800,6 +846,7 @@
     var play = V.focusable(h('div', { class: 'btn primary', data: { key: 'play' }, text: resume > 0 ? '▶  Riprendi da ' + u.formatTime(resume) : '▶  Guarda' }), function () { playMovie(m, false); });
     var buttons = [play];
     if (resume > 0) buttons.push(V.focusable(h('div', { class: 'btn', text: '↺  Dall\'inizio' }), function () { playMovie(m, true); }));
+    buttons.push(myListButton(m));
     root.appendChild(h('div', { class: 'detail' }, [
       h('div', { class: 'poster' }, u.art(m.poster, m.initials)),
       h('div', { class: 'grow' }, [
@@ -855,6 +902,7 @@
         function () { playEpisode(s, resume, eps, false); });
       head.lastChild.appendChild(play);
     }
+    head.lastChild.appendChild(myListButton(s));
     var chips = h('div', { class: 'seasons', 'data-enter': 'on' });
     seasons.forEach(function (n) {
       chips.appendChild(V.focusable(h('div', { class: 'chip' + (n === d.season ? ' on' : ''), data: { key: 'season-' + n }, text: 'Stagione ' + n }), function () {
@@ -1185,7 +1233,7 @@
   function savePosition() {
     var p = A.playing;
     if (p && p.kind !== 'live' && Player.active) {
-      Pos.update(p.kind === 'movie' ? p.movie.posKey : p.episode.posKey, Player.position(), Player.duration());
+      if (Pos.update(p.kind === 'movie' ? p.movie.posKey : p.episode.posKey, Player.position(), Player.duration())) leaveMyListIfFinished(p);
     }
     Pos.save();
   }
@@ -1213,8 +1261,9 @@
   Player.onEnded = function () {
     var p = A.playing;
     if (!p) return;
-    if (p.kind === 'movie') { Pos.markWatched(p.movie.posKey); Pos.save(); leavePlayer(); return; }
+    if (p.kind === 'movie') { Pos.markWatched(p.movie.posKey); leaveMyListIfFinished(p); Pos.save(); leavePlayer(); return; }
     Pos.markWatched(p.episode.posKey);
+    leaveMyListIfFinished(p);
     Pos.save();
     var next = episodeOffset(1);
     if (!next) { leavePlayer(); return; }
@@ -1476,6 +1525,11 @@
         else { lastBackAt = Date.now(); u.toast('Premi di nuovo Indietro per uscire'); }
         handled = true;
       }
+    } else if (code === KEY.GREEN && Nav.current() && Nav.current().listItem) {
+      // Tasto verde su un film o una serie: "Mia lista".
+      toggleMyList(Nav.current().listItem);
+      render(true);
+      handled = true;
     } else if (code === KEY.RED) {
       // Tasto rosso su un canale: preferito.
       var cur = Nav.current();

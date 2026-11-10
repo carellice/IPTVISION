@@ -8,16 +8,16 @@ import {
 import { VirtualGrid } from '../components/virtual.tsx'
 import {
   app, channelsFor, closeCategory, entryProgress, guideOf, isGrid, moviesFor, openCategory, openMovieEntry, openSeriesEntry, playChannel,
-  removeMovieFromContinue, removeSeriesFromContinue, seriesFor, setGrid, setSort, sortOf, toggleFavorite, useApp,
+  removeMovieFromContinue, removeSeriesFromContinue, seriesFor, setGrid, setSort, sortOf, toggleFavorite, toggleMyList, useApp,
 } from '../lib/app.ts'
-import { ALL_ID, CONTINUE_ID, FAVORITES_ID, type Section, sectionTitle, sortLabel, sortOptions } from '../lib/library.ts'
+import { ALL_ID, CONTINUE_ID, FAVORITES_ID, MYLIST_ID, type Section, sectionTitle, sortLabel, sortOptions } from '../lib/library.ts'
 
 // ui/Browse.kt: first the categories of a section, then the content of the chosen one,
 // with its sort and list/grid view.
 
 type CatEntry = { id: string; name: string; count: number; icon: IconName }
 
-const catTint = (id: string) => (id === FAVORITES_ID ? 'var(--star)' : id === CONTINUE_ID ? 'var(--accent)' : 'var(--text2)')
+const catTint = (id: string) => (id === FAVORITES_ID ? 'var(--star)' : id === CONTINUE_ID || id === MYLIST_ID ? 'var(--accent)' : 'var(--text2)')
 
 function LibrarySection({ section, entries, unit, count, children }: {
   section: Section
@@ -228,11 +228,13 @@ export function MoviesSection() {
   useApp()
   const lib = app.movies
   const cont = useMemo(() => (lib ? moviesFor(CONTINUE_ID) : []), [lib, app.positionsVersion])
+  const mine = useMemo(() => (lib ? moviesFor(MYLIST_ID) : []), [lib, app.positionsVersion])
   const entries = useMemo<CatEntry[]>(() => lib ? [
     ...(cont.length ? [{ id: CONTINUE_ID, name: 'Continua a guardare', count: cont.length, icon: 'history' as IconName }] : []),
+    ...(mine.length ? [{ id: MYLIST_ID, name: 'La mia lista', count: mine.length, icon: 'bookmark' as IconName }] : []),
     { id: ALL_ID, name: 'Tutti', count: lib.items.length, icon: 'apps' },
     ...lib.categories.map((c) => ({ id: c.id, name: c.name, count: lib.byCategory.get(c.id)?.length ?? 0, icon: 'folder' as IconName })),
-  ] : [], [lib, cont.length])
+  ] : [], [lib, cont.length, mine.length])
   const open = app.open.Movies
   const list = useMemo(() => (open ? moviesFor(open) : []), [lib, open, app.positionsVersion, app.settings.sorts.Movies])
   const [remove, setRemove] = useState<Entry<Movie> | null>(null)
@@ -244,14 +246,14 @@ export function MoviesSection() {
           <EntryList list={list} grid={grid} keyOf={(m) => m.streamId} catId={catId}
             item={(e, g) => {
               const m = e.item
-              // In "Continua a guardare" the long press (or the Menu key) removes the title from the list.
-              const long = catId === CONTINUE_ID ? () => setRemove(e) : undefined
+              // In "Continua a guardare" and "La mia lista" the long press (or the Menu key) removes the title from the list.
+              const long = catId === CONTINUE_ID || catId === MYLIST_ID ? () => setRemove(e) : undefined
               const badge = hasVariants(e) ? variantsText(e) : null
               return g ? <Poster title={m.name} meta={m.meta} url={m.poster} initials={m.initials} progress={entryProgress(e)} badge={badge} onLongClick={long} onClick={() => openMovieEntry(e)} />
                 : <MediaRow title={m.name} meta={m.meta} url={m.poster} initials={m.initials} progress={entryProgress(e)} badge={badge} onLongClick={long} onClick={() => openMovieEntry(e)} />
             }} />
-          <AlertDialog open={remove != null} title="Rimuovere da Continua a guardare?" text={remove?.item.name} confirm="Rimuovi" confirmColor="var(--danger)"
-            onDismiss={() => setRemove(null)} onConfirm={() => { if (remove) removeMovieFromContinue(remove); setRemove(null) }} />
+          <AlertDialog open={remove != null} title={catId === MYLIST_ID ? 'Rimuovere dalla mia lista?' : 'Rimuovere da Continua a guardare?'} text={remove?.item.name} confirm="Rimuovi" confirmColor="var(--danger)"
+            onDismiss={() => setRemove(null)} onConfirm={() => { if (remove) { if (catId === MYLIST_ID) toggleMyList(remove.item); else removeMovieFromContinue(remove) } setRemove(null) }} />
         </>
       )}
     </LibrarySection>
@@ -262,11 +264,13 @@ export function SeriesSection() {
   useApp()
   const lib = app.series
   const cont = useMemo(() => (lib ? seriesFor(CONTINUE_ID) : []), [lib, app.positionsVersion])
+  const mine = useMemo(() => (lib ? seriesFor(MYLIST_ID) : []), [lib, app.positionsVersion])
   const entries = useMemo<CatEntry[]>(() => lib ? [
     ...(cont.length ? [{ id: CONTINUE_ID, name: 'Continua a guardare', count: cont.length, icon: 'history' as IconName }] : []),
+    ...(mine.length ? [{ id: MYLIST_ID, name: 'La mia lista', count: mine.length, icon: 'bookmark' as IconName }] : []),
     { id: ALL_ID, name: 'Tutte', count: lib.items.length, icon: 'apps' },
     ...lib.categories.map((c) => ({ id: c.id, name: c.name, count: lib.byCategory.get(c.id)?.length ?? 0, icon: 'folder' as IconName })),
-  ] : [], [lib, cont.length])
+  ] : [], [lib, cont.length, mine.length])
   const open = app.open.Series
   const list = useMemo(() => (open ? seriesFor(open) : []), [lib, open, app.positionsVersion, app.settings.sorts.Series])
   const [remove, setRemove] = useState<Entry<Series> | null>(null)
@@ -278,13 +282,13 @@ export function SeriesSection() {
           <EntryList list={list} grid={grid} keyOf={(s) => s.seriesId} catId={catId}
             item={(e, g) => {
               const s = e.item
-              const long = catId === CONTINUE_ID ? () => setRemove(e) : undefined
+              const long = catId === CONTINUE_ID || catId === MYLIST_ID ? () => setRemove(e) : undefined
               const badge = hasVariants(e) ? variantsText(e) : null
               return g ? <Poster title={s.name} meta={s.meta} url={s.cover} initials={s.initials} progress={0} badge={badge} onLongClick={long} onClick={() => openSeriesEntry(e)} />
                 : <MediaRow title={s.name} meta={s.meta} url={s.cover} initials={s.initials} progress={0} badge={badge} onLongClick={long} onClick={() => openSeriesEntry(e)} />
             }} />
-          <AlertDialog open={remove != null} title="Rimuovere da Continua a guardare?" text={remove?.item.name} confirm="Rimuovi" confirmColor="var(--danger)"
-            onDismiss={() => setRemove(null)} onConfirm={() => { if (remove) removeSeriesFromContinue(remove); setRemove(null) }} />
+          <AlertDialog open={remove != null} title={catId === MYLIST_ID ? 'Rimuovere dalla mia lista?' : 'Rimuovere da Continua a guardare?'} text={remove?.item.name} confirm="Rimuovi" confirmColor="var(--danger)"
+            onDismiss={() => setRemove(null)} onConfirm={() => { if (remove) { if (catId === MYLIST_ID) toggleMyList(remove.item); else removeSeriesFromContinue(remove) } setRemove(null) }} />
         </>
       )}
     </LibrarySection>

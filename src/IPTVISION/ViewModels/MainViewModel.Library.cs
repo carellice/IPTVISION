@@ -251,6 +251,70 @@ public sealed partial class MainViewModel
         ShowToast($"{item.ItemName} tolto da Continua a guardare");
     }
 
+    // ---------- La mia lista ----------
+
+    /// <summary>Le chiavi di tutte le versioni dello stesso titolo: in lista ne basta una.</summary>
+    private List<string> MyListKeys(ArtworkItem item)
+    {
+        var name = TextHelpers.VariantKey(item.ItemName);
+        IEnumerable<string> keys = item switch
+        {
+            Movie m => _movies.Where(x => TextHelpers.VariantKey(x.Name) == name).Select(x => x.Key).Append(m.Key),
+            Series s => _series.Where(x => TextHelpers.VariantKey(x.Name) == name).Select(x => x.Key).Append(s.Key),
+            _ => [],
+        };
+        return keys.Distinct().ToList();
+    }
+
+    private static string? OwnKey(ArtworkItem item) => item switch { Movie m => m.Key, Series s => s.Key, _ => null };
+
+    public bool InMyList(ArtworkItem item) => MyListKeys(item).Any(_positions.InMyList);
+
+    /// <summary>Aggiunge il film o la serie alla "Mia lista", o lo toglie (tutte le versioni).</summary>
+    public void ToggleMyList(ArtworkItem item)
+    {
+        if (OwnKey(item) is not { } own) return;
+        var on = !InMyList(item);
+        if (on) _positions.SetMyList(own, true);
+        else foreach (var k in MyListKeys(item)) _positions.SetMyList(k, false);
+        _positions.Save(force: true);
+        AfterMyListChanged();
+        if (OpenSeries != null) OnPropertyChanged(nameof(OpenSeriesInMyList));
+        ShowToast(on ? $"{item.ItemName} aggiunto alla mia lista" : $"{item.ItemName} tolto dalla mia lista");
+    }
+
+    /// <summary>La serie aperta nel dettaglio è nella "Mia lista".</summary>
+    public bool OpenSeriesInMyList => OpenSeries != null && InMyList(OpenSeries);
+
+    [RelayCommand]
+    private void ToggleOpenSeriesMyList()
+    {
+        if (OpenSeries != null) ToggleMyList(OpenSeries);
+    }
+
+    private void AfterMyListChanged()
+    {
+        if (Mode == LibraryMode.Live) return;
+        var keep = SelectedCategory?.Id;
+        RebuildCategories();
+        if (keep != null && SelectedCategory?.Id != keep && Categories.FirstOrDefault(c => c.Id == keep) is { } again) SelectedCategory = again;
+        ApplyFilter();
+    }
+
+    /// <summary>Finito un film, o l'ultimo episodio di una serie, il titolo esce dalla "Mia lista".</summary>
+    private void LeaveMyListIfFinished()
+    {
+        List<string> keys = [];
+        if (CurrentMovie is { } m) keys = MyListKeys(m);
+        else if (CurrentEpisode is { } ep && _seriesInfo.TryGetValue(ep.SeriesId, out var info)
+                 && info.Episodes.MaxBy(e => (e.Season, e.Number))?.Id == ep.Id
+                 && _series.FirstOrDefault(s => s.SeriesId == ep.SeriesId) is { } series)
+            keys = MyListKeys(series);
+        var changed = keys.Count(_positions.InMyList);
+        foreach (var k in keys) _positions.SetMyList(k, false);
+        if (changed > 0) AfterMyListChanged();
+    }
+
     // ---------- Dettaglio serie ----------
 
     [RelayCommand]
@@ -261,6 +325,7 @@ public sealed partial class MainViewModel
         var cts = _seriesCts = new CancellationTokenSource();
 
         OpenSeries = s;
+        OnPropertyChanged(nameof(OpenSeriesInMyList));
         OpenSeriesPlot = s.Data.Plot;
         OpenSeriesMeta = s.Meta;
         Seasons = [];
@@ -464,7 +529,7 @@ public sealed partial class MainViewModel
         var pos = Player.IsActive ? Player.Time : PositionMs;
         var len = Player.IsActive ? Player.Length : DurationMs;
         if (pos <= 0 || len <= 0) return;
-        _positions.Update(key, pos, len);
+        if (_positions.Update(key, pos, len)) LeaveMyListIfFinished();
         var progress = _positions.GetProgress(key);
         if (CurrentMovie != null) CurrentMovie.Progress = progress;
         if (CurrentEpisode != null)
@@ -586,6 +651,7 @@ public sealed partial class MainViewModel
     {
         if (!IsVod || CurrentVodKey is not { } key) return;
         _positions.MarkWatched(key);
+        LeaveMyListIfFinished();
         _positions.Save(force: true);
         if (CurrentMovie != null)
         {

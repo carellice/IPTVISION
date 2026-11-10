@@ -13,8 +13,8 @@
   }
 
   function categoryTile(c, onOpen) {
-    var iconClass = c.id === '__fav' ? 'icon star' : c.id === '__continue' ? 'icon cont' : 'icon';
-    var icon = c.id === '__fav' ? '★' : c.id === '__continue' ? '↻' : c.id === '__all' ? '▦' : '▢';
+    var iconClass = c.id === '__fav' ? 'icon star' : c.id === '__continue' || c.id === '__mylist' ? 'icon cont' : 'icon';
+    var icon = c.id === '__fav' ? '★' : c.id === '__continue' ? '↻' : c.id === '__mylist' ? '✚' : c.id === '__all' ? '▦' : '▢';
     return focusable(h('div', { class: 'cat', data: { id: c.id } }, [
       h('div', { class: iconClass, text: icon }),
       h('div', { class: 'count', text: String(c.count) }),
