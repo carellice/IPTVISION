@@ -272,8 +272,29 @@ fun PlayerScreen(vm: AppViewModel) {
         if (tracks) TracksPanel(vm) { tracks = false }
 
         vm.nextEpisodeCountdown?.let { s -> NextEpisodeCard(vm, s, Modifier.align(Alignment.BottomEnd)) }
+            ?: NextEpisodeButton(vm, p, raised = overlay != Overlay.None, Modifier.align(Alignment.BottomEnd))
     }
 }
+
+/**
+ * Nell'ultimo minuto di un episodio, come su Netflix: in basso a destra il pulsante per passare
+ * subito al successivo. Sul TV ha il focus, così basta OK; le frecce continuano a spostarsi nel video.
+ */
+@Composable
+private fun NextEpisodeButton(vm: AppViewModel, p: Playing, raised: Boolean, modifier: Modifier) {
+    val pc = vm.player
+    val dur = pc.durationMs
+    val shown = p is Playing.Ep && dur > 0 && dur - pc.positionMs in 1..NEXT_EPISODE_MS && vm.nextEpisode() != null
+    if (!shown) return
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { if (vm.isTv) runCatching { focus.requestFocus() } }
+    ActionButton(
+        "Prossimo episodio", Icons.Default.SkipNext, primary = true,
+        modifier = modifier.safeDrawingPadding().padding(end = 28.dp, bottom = if (raised) 190.dp else 28.dp).focusRequester(focus),
+    ) { vm.playEpisodeOffset(+1) }
+}
+
+private const val NEXT_EPISODE_MS = 60_000L
 
 @Composable
 private fun TopBar(vm: AppViewModel, p: Playing, modifier: Modifier) {
@@ -337,6 +358,12 @@ private fun InfoBlock(vm: AppViewModel, p: Playing) {
                 ProgressLine(if (dur > 0) pc.positionMs.toFloat() / dur else 0f, Modifier.weight(1f), height = 4.dp)
                 HSpace(12.dp)
                 Text(if (dur > 0) TextHelpers.formatTime(dur) else "--:--", color = C.Text, fontSize = 13.sp)
+            }
+            // A che ora finisce, se si guarda fino in fondo da adesso.
+            if (dur > 0) {
+                VSpace(4.dp)
+                val end = System.currentTimeMillis() + (dur - pc.positionMs).coerceAtLeast(0)
+                Text("Finisce alle ${TextHelpers.clock(end / 1000)}", color = C.Text2, fontSize = 13.sp)
             }
         }
     }
