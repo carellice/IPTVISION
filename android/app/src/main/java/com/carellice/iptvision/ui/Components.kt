@@ -54,7 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
 
 object C {
     val Accent = Color(0xFF3D7BFF)
@@ -180,13 +180,17 @@ fun Artwork(url: String?, initials: String, modifier: Modifier = Modifier, conte
         if (url.isNullOrBlank()) {
             Initials(initials, fontSize)
         } else {
-            SubcomposeAsyncImage(
+            // AsyncImage e non SubcomposeAsyncImage: senza una sottocomposizione per ogni locandina le
+            // liste di migliaia di film scorrono fluide. Le iniziali restano finché l'immagine non c'è.
+            var shown by remember(url) { mutableStateOf(false) }
+            if (!shown) Initials(initials, fontSize)
+            AsyncImage(
                 model = url,
                 contentDescription = null,
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
-                loading = { Initials(initials, fontSize) },
-                error = { Initials(initials, fontSize) },
+                onSuccess = { shown = true },
+                onError = { shown = false },
             )
         }
     }

@@ -28,6 +28,8 @@ data class Movie(
     val added: Long,
 ) {
     val searchKey = TextHelpers.normalize(name)
+    // Calcolata una volta sola: raggruppare migliaia di titoli a ogni apertura della lista era lento.
+    val variantKey = TextHelpers.variantKey(name)
     val initials = TextHelpers.initials(name)
     val key get() = "m:$streamId"
     val ext get() = extension?.takeIf { it.isNotBlank() } ?: "mp4"
@@ -45,6 +47,7 @@ data class Series(
     val genre: String?,
 ) {
     val searchKey = TextHelpers.normalize(name)
+    val variantKey = TextHelpers.variantKey(name)
     val initials = TextHelpers.initials(name)
     val key get() = "s:$seriesId"
     val meta = TextHelpers.joinMeta(year, genre, if (rating > 0) "★ " + String.format(Locale.ROOT, "%.1f", rating) else null)
@@ -232,8 +235,8 @@ data class Entry<T>(val item: T, val variants: List<T>) {
 }
 
 /** Raggruppa le copie dello stesso titolo; resta il primo nell'ordine della lista. */
-fun <T> groupVariants(items: List<T>, name: (T) -> String): List<Entry<T>> {
+fun <T> groupVariants(items: List<T>, variantKey: (T) -> String): List<Entry<T>> {
     val groups = LinkedHashMap<String, MutableList<T>>()
-    for (it in items) groups.getOrPut(TextHelpers.variantKey(name(it))) { ArrayList(1) } += it
+    for (it in items) groups.getOrPut(variantKey(it)) { ArrayList(1) } += it
     return groups.values.map { Entry(it[0], it) }
 }

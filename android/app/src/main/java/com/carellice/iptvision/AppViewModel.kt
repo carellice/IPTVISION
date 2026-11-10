@@ -581,8 +581,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun yearValue(y: String?) = y?.toIntOrNull() ?: 0
 
+    /**
+     * Le liste già ordinate e raggruppate: la lista e il contatore in alto le chiedevano entrambe, e
+     * ognuna rifaceva il lavoro su migliaia di titoli. Chiave: libreria, categoria, ordine e, per
+     * "Continua a guardare", le posizioni.
+     */
+    private val listMemo = object : LinkedHashMap<List<Any?>, List<Entry<*>>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<List<Any?>, List<Entry<*>>>?) = size > 12
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> memo(lib: Any, categoryId: String, sort: Any, build: () -> List<Entry<T>>): List<Entry<T>> {
+        val key = listOf(System.identityHashCode(lib), (lib as Library<*>).items.size, categoryId, sort, if (categoryId == CONTINUE_ID) positionsVersion else 0)
+        return listMemo.getOrPut(key, build) as List<Entry<T>>
+    }
+
     fun moviesFor(categoryId: String): List<Entry<Movie>> {
         val l = movies ?: return emptyList()
+        return memo(l, categoryId, sortOf(Section.Movies)) { buildMovies(l, categoryId) }
+    }
+
+    private fun buildMovies(l: Library<Movie>, categoryId: String): List<Entry<Movie>> {
         val list = when (categoryId) {
             ALL_ID -> l.items
             CONTINUE_ID -> l.items.filter { positions.resumeMs(it.key) > 0 }.sortedByDescending { positions.updatedAt(it.key) ?: 0 }
@@ -596,11 +615,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             ListSort.Rating -> list.sortedWith(compareByDescending<Movie> { it.rating }.thenBy { it.searchKey })
             else -> list
         }
-        return groupVariants(sorted) { it.name }
+        return groupVariants(sorted) { it.variantKey }
     }
 
     fun seriesFor(categoryId: String): List<Entry<Series>> {
         val l = series ?: return emptyList()
+        return memo(l, categoryId, sortOf(Section.Series)) { buildSeries(l, categoryId) }
+    }
+
+    private fun buildSeries(l: Library<Series>, categoryId: String): List<Entry<Series>> {
         val list = when (categoryId) {
             ALL_ID -> l.items
             CONTINUE_ID -> l.items.mapNotNull { s -> positions.lastEpisode(s.seriesId)?.let { s to it.second } }
@@ -614,7 +637,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             ListSort.Rating -> list.sortedWith(compareByDescending<Series> { it.rating }.thenBy { it.searchKey })
             else -> list
         }
-        return groupVariants(sorted) { it.name }
+        return groupVariants(sorted) { it.variantKey }
     }
 
     /** Toglie un film da "Continua a guardare" (tutte le versioni dello stesso titolo). */
@@ -881,8 +904,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Le copie dello stesso titolo diventano un solo risultato.
         return SearchResults(
             if (wants(SearchScope.Channels)) live?.items?.filter { ok(it.searchKey) }?.take(60) ?: emptyList() else emptyList(),
-            if (wants(SearchScope.Movies)) groupVariants(movies?.items?.filter { ok(it.searchKey) } ?: emptyList()) { it.name }.take(60) else emptyList(),
-            if (wants(SearchScope.Series)) groupVariants(series?.items?.filter { ok(it.searchKey) } ?: emptyList()) { it.name }.take(60) else emptyList(),
+            if (wants(SearchScope.Movies)) groupVariants(movies?.items?.filter { ok(it.searchKey) } ?: emptyList()) { it.variantKey }.take(60) else emptyList(),
+            if (wants(SearchScope.Series)) groupVariants(series?.items?.filter { ok(it.searchKey) } ?: emptyList()) { it.variantKey }.take(60) else emptyList(),
             categories,
         )
     }
