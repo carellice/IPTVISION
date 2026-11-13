@@ -143,7 +143,7 @@ export class PlayerController {
     if (!video) return
     video.addEventListener('loadedmetadata', () => this.note(`metadati: ${video.videoWidth}×${video.videoHeight}, durata ${video.duration}`))
     video.addEventListener('stalled', () => this.note('stalled: il browser non riceve dati'))
-    video.addEventListener('playing', () => { this.note('playing') })
+    video.addEventListener('playing', () => { this.note(`playing dopo ${((Date.now() - this.startedAt) / 1000).toFixed(1)} s`) })
     video.addEventListener('playing', () => { this.everPlayed = true; this.lastProgressAt = Date.now(); this.setState('Playing') })
     video.addEventListener('pause', () => { if (this.source && this.userPaused) this.setState('Paused') })
     video.addEventListener('waiting', () => { if (this.state !== 'Reconnecting') this.setState(this.everPlayed ? 'Buffering' : 'Connecting') })
@@ -199,7 +199,7 @@ export class PlayerController {
     if (!this.probe) {
       try {
         this.probe = await api<Probe>(`/api/probe/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}`)
-        this.note(`probe: ${JSON.stringify(this.probe)}`)
+        this.note(`probe in ${((Date.now() - this.startedAt) / 1000).toFixed(1)} s: ${JSON.stringify(this.probe)}`)
       } catch (e) {
         this.note(`probe fallito: ${e instanceof Error ? e.message : e}`)
         if (session === this.session) this.scheduleRetry('file non leggibile')

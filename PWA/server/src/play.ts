@@ -86,7 +86,22 @@ function language(code: string | undefined): string | null {
   } catch { return null }
 }
 
+/** Files already read: reopening, resuming and retrying don't ask the provider again (a few seconds each). */
+const probes = new Map<string, Promise<Probe>>()
+
 export function probe(a: XtreamAccount, kind: Kind, id: string, ext: string): Promise<Probe> {
+  const key = `${a.server} ${a.username} ${kind} ${id} ${ext}`
+  let p = probes.get(key)
+  if (!p) {
+    p = probeFile(a, kind, id, ext)
+    p.catch(() => probes.delete(key))
+    probes.set(key, p)
+    if (probes.size > 500) probes.delete(probes.keys().next().value!)
+  }
+  return p
+}
+
+function probeFile(a: XtreamAccount, kind: Kind, id: string, ext: string): Promise<Probe> {
   return new Promise((resolve, reject) => {
     const child = spawn(FFPROBE, ['-v', 'error', '-user_agent', USER_AGENT, '-print_format', 'json', '-show_format', '-show_streams',
       streamUrl(a, kind, id, ext)], { stdio: ['ignore', 'pipe', 'ignore'] })
@@ -170,7 +185,8 @@ export async function vodHls(res: ServerResponse, owner: string, key: string, a:
   const child = spawn(FFMPEG, [
     // A Raspberry Pi can't convert a whole film at full speed: after a 30 s head start ffmpeg reads
     // at twice real time, enough to stay ahead without loading the CPU and the SD card.
-    ...input, '-readrate', '2', '-readrate_initial_burst', '30',
+    // The streams are already known from the probe: ffmpeg looks at 1 MB instead of 5 before starting.
+    ...input, '-probesize', '1000000', '-analyzeduration', '1000000', '-readrate', '2', '-readrate_initial_burst', '30',
     ...(start > 0 ? ['-ss', String(start)] : []), '-i', streamUrl(a, kind, id, ext),
     '-map', '0:v:0?', '-map', `0:a:${audio}?`, ...v,
     ...(aacCopy ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-ac', '2', '-b:a', '192k']), '-sn', '-dn',
