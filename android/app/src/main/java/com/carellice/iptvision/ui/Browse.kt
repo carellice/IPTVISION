@@ -124,18 +124,20 @@ private fun CategoryBrowser(vm: AppViewModel, section: Section, entries: List<Ca
     Column(Modifier.fillMaxSize()) {
         SectionTitle(section.title, if (entries.size == 1) "1 categoria" else "${entries.size} categorie", Modifier.padding(start = 4.dp, bottom = 10.dp))
         if (wide) {
+            val state = rememberLazyGridState(initialFirstVisibleItemIndex = lastIndex)
+            val gf = rememberGridFocus(entries)
             LazyVerticalGrid(
-                state = rememberLazyGridState(initialFirstVisibleItemIndex = lastIndex),
+                state = state,
                 columns = GridCells.Adaptive(200.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(8.dp),
-                modifier = Modifier.fillMaxSize().dpadThrottle(),
+                modifier = Modifier.fillMaxSize().dpadGrid(state, gf, entries.size),
             ) {
                 itemsIndexed(entries, key = { _, c -> c.id }) { i, c ->
                     Column(
                         Modifier.fillMaxWidth().height(96.dp)
-                            .initialFocus(last != null && i == lastIndex, vm.isTv)
+                            .gridItem(gf, i, last != null && i == lastIndex && vm.isTv)
                             .tvClickable { vm.openCategory(section, c.id) }
                             .padding(14.dp),
                         verticalArrangement = Arrangement.SpaceBetween,
@@ -259,16 +261,18 @@ fun LiveSection(vm: AppViewModel) {
         val playingId = (vm.playing as? Playing.Live)?.channel?.streamId ?: vm.settings.lastStreamId
         val start = list.indexOfFirst { it.streamId == playingId }.coerceAtLeast(0)
         if (grid) {
+            val state = rememberLazyGridState(initialFirstVisibleItemIndex = start)
+            val gf = rememberGridFocus(list)
             LazyVerticalGrid(
-                state = rememberLazyGridState(initialFirstVisibleItemIndex = start),
+                state = state,
                 columns = GridCells.Adaptive(if (LocalWide.current) 170.dp else 108.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(10.dp),
-                modifier = Modifier.fillMaxSize().dpadThrottle(),
+                modifier = Modifier.fillMaxSize().dpadGrid(state, gf, list.size),
             ) {
                 itemsIndexed(list, key = { _, c -> c.streamId }) { i, ch ->
-                    ChannelTile(vm, ch, list, ch.streamId == playingId, Modifier.initialFocus(i == start, vm.isTv))
+                    ChannelTile(vm, ch, list, ch.streamId == playingId, Modifier.gridItem(gf, i, i == start && vm.isTv))
                 }
             }
         } else {
@@ -437,16 +441,18 @@ private fun <T> EntryList(
     // Tornando dalla scheda si riparte dal titolo aperto, già in vista.
     val start = remember(list) { vm.lastEntry[section]?.let { k -> list.indexOfFirst { key(it.item) == k } }?.coerceAtLeast(0) ?: 0 }
     if (grid) {
+        val state = rememberLazyGridState(initialFirstVisibleItemIndex = start)
+        val gf = rememberGridFocus(list)
         LazyVerticalGrid(
-            state = rememberLazyGridState(initialFirstVisibleItemIndex = start),
+            state = state,
             columns = GridCells.Adaptive(if (wide) 150.dp else 110.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
             // Spazio attorno per il riquadro che si ingrandisce quando ha il focus.
             contentPadding = PaddingValues(12.dp),
-            modifier = Modifier.fillMaxSize().dpadThrottle(),
+            modifier = Modifier.fillMaxSize().dpadGrid(state, gf, list.size),
         ) {
-            itemsIndexed(list, key = { _, e -> key(e.item) }) { i, e -> item(e, Modifier.initialFocus(i == start, vm.isTv), true) }
+            itemsIndexed(list, key = { _, e -> key(e.item) }) { i, e -> item(e, Modifier.gridItem(gf, i, i == start && vm.isTv), true) }
         }
     } else {
         LazyColumn(state = rememberLazyListState(initialFirstVisibleItemIndex = start), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {

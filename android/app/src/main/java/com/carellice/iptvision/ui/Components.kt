@@ -2,6 +2,14 @@ package com.carellice.iptvision.ui
 
 import android.content.pm.PackageManager
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.animation.core.animateFloatAsState
@@ -225,17 +233,77 @@ fun Modifier.dpadLeavable(): Modifier {
 }
 
 /**
- * Griglie col telecomando: tenendo premuto ▲ o ▼ il focus correva più veloce della griglia, la riga dopo
- * non era ancora pronta e il focus si impallava o finiva a destra. Qui le ripetizioni passano al massimo
- * una ogni [gapMs] millisecondi.
+ * Griglie col telecomando: ▲ e ▼ li gestisce la griglia, per indice. La ricerca del focus di Compose
+ * cercava il riquadro sotto solo tra quelli già pronti: se la riga dopo non lo era ancora, o col riquadro
+ * ingrandito, il focus finiva a destra o tornava su. Uso: [rememberGridFocus], [dpadGrid] sulla griglia
+ * e [gridItem] su ogni riquadro.
  */
+class GridFocus {
+    private val requesters = HashMap<Int, FocusRequester>()
+    var focused = -1
+    // Il riquadro chiesto e non ancora raggiunto: i tasti premuti in fretta partono da lì, non vanno persi.
+    var pending = -1
+    var started = false
+    fun requester(i: Int) = requesters.getOrPut(i) { FocusRequester() }
+}
+
 @Composable
-fun Modifier.dpadThrottle(gapMs: Long = 140): Modifier {
+fun rememberGridFocus(key: Any?) = remember(key) { GridFocus() }
+
+/** Il riquadro [i]; con [initial] prende il focus all'apertura, una volta sola e non a ogni ritorno in vista. */
+@Composable
+fun Modifier.gridItem(g: GridFocus, i: Int, initial: Boolean): Modifier {
+    if (initial && !g.started) LaunchedEffect(Unit) {
+        delay(80)
+        g.started = true
+        runCatching { g.requester(i).requestFocus() }
+    }
+    return focusRequester(g.requester(i)).onFocusChanged {
+        if (it.isFocused) {
+            g.focused = i
+            if (g.pending == i) g.pending = -1
+        }
+    }
+}
+
+/** Tenendo premuto, le ripetizioni passano al massimo una ogni [gapMs] millisecondi, il tempo di scorrere. */
+@Composable
+fun Modifier.dpadGrid(state: LazyGridState, g: GridFocus, count: Int, gapMs: Long = 120): Modifier {
+    val scope = rememberCoroutineScope()
     var last by remember { mutableLongStateOf(0L) }
     return onPreviewKeyEvent { e ->
         if (e.type != KeyEventType.KeyDown || (e.key != Key.DirectionDown && e.key != Key.DirectionUp)) return@onPreviewKeyEvent false
+        val items = state.layoutInfo.visibleItemsInfo
+        val from = if (g.pending in 0 until count) g.pending else g.focused
+        if (from !in 0 until count || items.isEmpty()) return@onPreviewKeyEvent false
         val now = e.nativeKeyEvent.eventTime
-        if (e.nativeKeyEvent.repeatCount > 0 && now - last < gapMs) true else { last = now; false }
+        if (e.nativeKeyEvent.repeatCount > 0 && now - last < gapMs) return@onPreviewKeyEvent true
+        last = now
+        val cols = items.maxOf { it.column } + 1
+        val down = e.key == Key.DirectionDown
+        var to = if (down) from + cols else from - cols
+        // Dalla prima riga si sale al resto della schermata; dall'ultima non si va oltre.
+        if (to < 0) return@onPreviewKeyEvent false
+        if (to >= count) {
+            if (from / cols == (count - 1) / cols) return@onPreviewKeyEvent true
+            to = count - 1
+        }
+        g.pending = to
+        scope.launch {
+            if (state.layoutInfo.visibleItemsInfo.none { it.index == to }) {
+                // La riga non è ancora pronta: si scorre di una riga, o direttamente fin lì se è lontana.
+                val step = items.first().size.height + state.layoutInfo.mainAxisItemSpacing
+                state.scrollBy(if (down) step.toFloat() else -step.toFloat())
+                if (state.layoutInfo.visibleItemsInfo.none { it.index == to }) state.scrollToItem(to)
+            }
+            repeat(3) {
+                if (g.pending != to) return@launch // raggiunto, o già superato da un altro tasto
+                runCatching { g.requester(to).requestFocus() }
+                withFrameNanos { }
+            }
+            if (g.pending == to) g.pending = -1
+        }
+        true
     }
 }
 
