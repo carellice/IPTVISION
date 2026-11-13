@@ -4,6 +4,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -53,17 +55,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.focusGroup
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
@@ -106,10 +102,12 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(C.Bg)) {
         val wide = maxWidth >= 720.dp
+        val short = maxHeight < 500.dp
         androidx.compose.runtime.CompositionLocalProvider(LocalWide provides wide) {
             if (wide) {
                 Row(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-                    SideNav(vm)
+                    // Telefono in orizzontale: largo ma basso, il menu scorre e l'orologio sparisce.
+                    SideNav(vm, compact = short)
                     Column(Modifier.weight(1f).fillMaxHeight().padding(start = 8.dp, end = 24.dp, top = 20.dp)) {
                         Content(vm, onVoiceSearch)
                     }
@@ -152,51 +150,43 @@ private fun Content(vm: AppViewModel, onVoiceSearch: () -> Unit) {
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun SideNav(vm: AppViewModel) {
+private fun SideNav(vm: AppViewModel, compact: Boolean) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { if (vm.isTv) runCatching { first.requestFocus() } }
-    // La sezione cambia solo quando ci si sposta con ▲ ▼ dentro il menu. Prima cambiava a ogni focus,
-    // anche quando il focus ci finiva da solo (categoria aperta o chiusa) e si saltava a "TV in diretta".
-    var moving by remember { mutableStateOf(false) }
     Column(
         Modifier.width(220.dp).fillMaxHeight().background(C.Panel)
             // Entrando con ◀ si torna sulla sezione aperta, non sulla voce più vicina.
             .focusProperties { onEnter = { first.requestFocus() } }
             .focusGroup()
-            .onPreviewKeyEvent { e ->
-                if (e.type == KeyEventType.KeyDown) moving = e.key == Key.DirectionUp || e.key == Key.DirectionDown
-                false
-            }
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 6.dp, top = 8.dp, bottom = 18.dp)) {
-            Image(painterResource(R.drawable.logo), null, Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)))
-            HSpace(10.dp)
-            Text("IPTVISION", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 19.sp)
-        }
-        vm.sections.forEach { s ->
-            val selected = vm.section == s
-            Row(
-                Modifier.fillMaxWidth()
-                    .then(if (selected) Modifier.focusRequester(first) else Modifier)
-                    .tvClickable(
-                        focusScale = 1.02f,
-                        background = if (selected) C.AccentSoft else Color.Transparent,
-                        focusedBackground = C.SurfacePressed,
-                        // Col telecomando basta spostarsi sulla voce per aprire la sezione.
-                        onFocus = { if (vm.isTv && moving) { moving = false; vm.section = s } },
-                    ) { vm.section = s }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(s.icon(), null, tint = if (selected) C.Accent else C.Text2, modifier = Modifier.size(22.dp))
-                HSpace(12.dp)
-                Text(s.title, color = if (selected) C.Text else C.Text2, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 6.dp, top = if (compact) 0.dp else 8.dp, bottom = if (compact) 6.dp else 18.dp)) {
+                Image(painterResource(R.drawable.logo), null, Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)))
+                HSpace(10.dp)
+                Text("IPTVISION", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+            }
+            vm.sections.forEach { s ->
+                val selected = vm.section == s
+                Row(
+                    Modifier.fillMaxWidth()
+                        .then(if (selected) Modifier.focusRequester(first) else Modifier)
+                        .tvClickable(
+                            focusScale = 1.02f,
+                            background = if (selected) C.AccentSoft else Color.Transparent,
+                            focusedBackground = C.SurfacePressed,
+                        ) { vm.section = s } // Col telecomando si scorre il menu e si apre la sezione solo con OK.
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(s.icon(), null, tint = if (selected) C.Accent else C.Text2, modifier = Modifier.size(22.dp))
+                    HSpace(12.dp)
+                    Text(s.title, color = if (selected) C.Text else C.Text2, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+                }
             }
         }
-        Box(Modifier.weight(1f))
-        Clock()
+        if (!compact) Clock()
         ServerNetworkLine(vm, Modifier.padding(horizontal = 6.dp))
     }
 }
