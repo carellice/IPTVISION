@@ -14,7 +14,7 @@ export type Source = { kind: 'live'; id: number } | { kind: 'movie' | 'series'; 
 
 type Probe = {
   duration: number
-  video: { codec: string; height: number; tenBit?: boolean } | null
+  video: { codec: string; height: number; tenBit?: boolean; detail?: string } | null
   audio: { index: number; codec: string; label: string }[]
   direct: boolean
 }
@@ -116,7 +116,7 @@ export class PlayerController {
       ['Stato', `${this.state} · tentativo ${this.attempt}`],
       ['Modalità', `${mode}${this.reencode ? ' · ricodifica H.264' : ''}`],
       ['Sorgente', this.source ? `${this.source.kind} ${this.source.id}${'ext' in this.source ? '.' + this.source.ext : ''}` : '-'],
-      ['Video (file)', pr?.video ? `${pr.video.codec} ${pr.video.height}p${pr.video.tenBit ? ' 10 bit' : ''}` : pr ? 'nessuno' : '-'],
+      ['Video (file)', pr?.video ? `${pr.video.codec} ${pr.video.height}p${pr.video.tenBit ? ' 10 bit' : ''}${pr.video.detail ? ` (${pr.video.detail})` : ''}` : pr ? 'nessuno' : '-'],
       ['Audio (file)', pr ? pr.audio.map((a) => `${a.codec} ${a.label}`).join(', ') || 'nessuno' : '-'],
       ['Durata (file)', pr ? `${Math.round(pr.duration)} s` : '-'],
       ['Indirizzo', v?.currentSrc ? new URL(v.currentSrc).pathname + new URL(v.currentSrc).search : '-'],
@@ -207,6 +207,8 @@ export class PlayerController {
       }
       if (session !== this.session) return
       if (!this.reencode && !browserDecodes(video, this.probe.video)) this.reencode = true
+      // HLS carries only H.264 and HEVC: anything else is re-encoded for Safari and webOS.
+      if (nativeHls(video) && this.probe.video && !['h264', 'hevc'].includes(this.probe.video.codec)) this.reencode = true
       // Safari plays the provider's MP4 only if its server answers Range exactly: HLS always works.
       if (this.reencode || nativeHls(video)) this.probe = { ...this.probe, direct: false }
       this.durationMs = Math.round(this.probe.duration * 1000)

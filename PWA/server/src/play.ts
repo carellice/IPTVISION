@@ -71,7 +71,7 @@ export function live(req: IncomingMessage, res: ServerResponse, owner: string, a
 export type Probe = {
   duration: number
   /** [tenBit]: 10-bit pictures, which browsers don't decode in H.264. */
-  video: { codec: string; height: number; tenBit: boolean } | null
+  video: { codec: string; height: number; tenBit: boolean; detail: string } | null
   audio: { index: number; codec: string; label: string }[]
   /** The browser can read the file as it is (MP4, H.264, AAC/MP3). */
   direct: boolean
@@ -97,7 +97,7 @@ export function probe(a: XtreamAccount, kind: Kind, id: string, ext: string): Pr
     child.on('exit', () => {
       clearTimeout(timer)
       try {
-        const j = JSON.parse(out) as { format?: { duration?: string; format_name?: string }; streams?: { codec_type: string; codec_name: string; height?: number; pix_fmt?: string; tags?: Record<string, string> }[] }
+        const j = JSON.parse(out) as { format?: { duration?: string; format_name?: string }; streams?: { codec_type: string; codec_name: string; height?: number; width?: number; pix_fmt?: string; profile?: string; level?: number; field_order?: string; r_frame_rate?: string; codec_tag_string?: string; tags?: Record<string, string> }[] }
         const streams = j.streams ?? []
         const v = streams.find((s) => s.codec_type === 'video' && s.codec_name !== 'mjpeg' && s.codec_name !== 'png')
         const audio = streams.filter((s) => s.codec_type === 'audio').map((s, index) => {
@@ -107,7 +107,7 @@ export function probe(a: XtreamAccount, kind: Kind, id: string, ext: string): Pr
         const mp4 = /mp4|mov/.test(j.format?.format_name ?? '')
         const tenBit = /10|12/.test(v?.pix_fmt ?? '')
         const direct = mp4 && (!v || (v.codec_name === 'h264' && !tenBit)) && audio.every((s) => s.codec === 'aac' || s.codec === 'mp3') && audio.length <= 1
-        resolve({ duration: Number(j.format?.duration) || 0, video: v ? { codec: v.codec_name, height: v.height ?? 0, tenBit } : null, audio, direct })
+        resolve({ duration: Number(j.format?.duration) || 0, video: v ? { codec: v.codec_name, height: v.height ?? 0, tenBit, detail: [j.format?.format_name, v.codec_tag_string, v.profile, v.level, v.pix_fmt, v.field_order, `${v.width}×${v.height}`, v.r_frame_rate].filter((x) => x != null && x !== '').join(' · ') } : null, audio, direct })
       } catch {
         reject(new Error('Impossibile leggere il file dal server IPTV'))
       }
@@ -153,9 +153,12 @@ export async function vodHls(res: ServerResponse, owner: string, a: XtreamAccoun
   const dir = join(hlsRoot, createHash('sha256').update(owner).digest('hex').slice(0, 16))
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(dir, { recursive: true })
+  // Re-encoding must keep up with playback on a small home server: fastest preset, at most 720p.
+  // Copied H.264 gets its SPS/PPS before every keyframe: files with open GOPs (MKV) have them only
+  // in the header, and after a seek Safari would never see them (black picture, size 0×0).
   const v = h264
-    ? ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-pix_fmt', 'yuv420p', '-g', '48', '-vf', "scale='min(1920,iw)':-2"]
-    : ['-c:v', 'copy', ...(hevc ? ['-tag:v', 'hvc1'] : [])]
+    ? ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-g', '48', '-vf', "scale='min(1280,iw)':-2"]
+    : hevc ? ['-c:v', 'copy', '-tag:v', 'hvc1'] : ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb,dump_extra=freq=keyframe']
   // HEVC in HLS only works in fMP4 segments; everything else in MPEG-TS, which every TV reads.
   const seg = hevc && !h264 ? ['-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4'] : ['-hls_segment_type', 'mpegts']
   const child = spawn(FFMPEG, [
