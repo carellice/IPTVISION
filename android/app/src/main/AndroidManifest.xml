@@ -3,6 +3,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Ricerca vocale su Android TV: l'app ascolta da sé col microfono del telecomando. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Aggiornamenti: l'APK scaricato dalle release di GitHub si installa dall'app. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
