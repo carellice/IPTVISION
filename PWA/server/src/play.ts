@@ -1,4 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { XtreamAccount } from './db.ts'
 import { pipeUpstream } from './relay.ts'
@@ -18,6 +22,8 @@ const running = new Map<string, ChildProcess>()
 function stopFor(owner: string) {
   const old = running.get(owner)
   if (old) { old.kill('SIGKILL'); running.delete(owner) }
+  const h = hlsRuns.get(owner)
+  if (h) { clearInterval(h.timer); h.child.kill('SIGKILL'); rmSync(h.dir, { recursive: true, force: true }); hlsRuns.delete(owner) }
 }
 
 const input = ['-hide_banner', '-loglevel', 'error', '-user_agent', USER_AGENT,
@@ -126,6 +132,75 @@ export function vod(req: IncomingMessage, res: ServerResponse, owner: string, a:
 export function raw(req: IncomingMessage, res: ServerResponse, owner: string, a: XtreamAccount, kind: Kind, id: string, ext: string) {
   stopFor(owner)
   return pipeUpstream(req, res, streamUrl(a, kind, id, ext))
+}
+
+// --- HLS for Safari (iPhone, iPad, Mac) and LG webOS: their <video> doesn't play a fragmented MP4
+// of unknown length coming from a pipe, but plays HLS by itself. ffmpeg writes the segments to a
+// temporary folder; it stops when the browser asks for nothing for two minutes (pause, closed tab).
+
+type HlsRun = { child: ChildProcess; dir: string; lastUse: number; timer: NodeJS.Timeout }
+const hlsRuns = new Map<string, HlsRun>()
+const hlsRoot = join(tmpdir(), 'iptvision-hls')
+
+/** Starts the conversion and answers with the playlist once its first segment is ready. */
+export async function vodHls(res: ServerResponse, owner: string, a: XtreamAccount, kind: Kind, id: string, ext: string,
+  start: number, audio: number, hevc: boolean, h264 = false) {
+  stopFor(owner)
+  const dir = join(hlsRoot, createHash('sha256').update(owner).digest('hex').slice(0, 16))
+  rmSync(dir, { recursive: true, force: true })
+  mkdirSync(dir, { recursive: true })
+  const v = h264
+    ? ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-pix_fmt', 'yuv420p', '-g', '48', '-vf', "scale='min(1920,iw)':-2"]
+    : ['-c:v', 'copy', ...(hevc ? ['-tag:v', 'hvc1'] : [])]
+  // HEVC in HLS only works in fMP4 segments; everything else in MPEG-TS, which every TV reads.
+  const seg = hevc && !h264 ? ['-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4'] : ['-hls_segment_type', 'mpegts']
+  const child = spawn(FFMPEG, [
+    ...input, ...(start > 0 ? ['-ss', String(start)] : []), '-i', streamUrl(a, kind, id, ext),
+    '-map', '0:v:0?', '-map', `0:a:${audio}?`, ...v, '-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-sn', '-dn',
+    '-f', 'hls', '-hls_time', '4', '-hls_list_size', '0', '-hls_playlist_type', 'event', ...seg,
+    '-hls_flags', 'temp_file+independent_segments', '-hls_base_url', '/api/hls-seg/', join(dir, 'index.m3u8'),
+  ], { stdio: ['ignore', 'ignore', 'pipe'] })
+  let errors = ''
+  child.stderr!.on('data', (d: Buffer) => { errors = (errors + d.toString()).slice(-2000) })
+  child.on('error', () => { /* answered below: no playlist */ })
+  const run: HlsRun = { child, dir, lastUse: Date.now(), timer: setInterval(() => {
+    if (Date.now() - run.lastUse > 120_000) stopFor(owner)
+  }, 15_000) }
+  hlsRuns.set(owner, run)
+  let exited = false
+  child.on('exit', (code) => {
+    exited = true
+    if (code && code !== 255 && errors) console.warn('ffmpeg hls:', errors.trim().split('\n').slice(-3).join(' | '))
+  })
+  const file = join(dir, 'index.m3u8')
+  for (let i = 0; i < 300 && !existsSync(file) && !exited && hlsRuns.get(owner) === run; i++) await new Promise((r) => setTimeout(r, 100))
+  if (!existsSync(file)) {
+    if (hlsRuns.get(owner) === run) stopFor(owner)
+    res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
+    res.end('Impossibile convertire il file')
+    return
+  }
+  res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' })
+  res.end(playlist(file))
+}
+
+// An EVENT playlist would start near its end in Safari: playback starts from its beginning.
+const playlist = (file: string) => readFileSync(file, 'utf8').replace('#EXTM3U', '#EXTM3U\n#EXT-X-START:TIME-OFFSET=0,PRECISE=YES')
+
+/** The playlist as it grows and its segments, for the browser that started the conversion. */
+export function hlsFile(res: ServerResponse, owner: string, name: string) {
+  const run = hlsRuns.get(owner)
+  const file = run && /^[\w.-]{1,40}$/.test(name) ? join(run.dir, name) : ''
+  if (!run || !existsSync(file)) { res.writeHead(404); res.end(); return }
+  run.lastUse = Date.now()
+  if (name.endsWith('.m3u8')) {
+    res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' })
+    res.end(playlist(file))
+    return
+  }
+  const body = readFileSync(file)
+  res.writeHead(200, { 'Content-Type': name.endsWith('.ts') ? 'video/mp2t' : 'video/mp4', 'Content-Length': body.length, 'Cache-Control': 'no-store' })
+  res.end(body)
 }
 
 export function stopAll(owner: string) {

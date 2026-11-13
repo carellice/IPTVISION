@@ -40,7 +40,17 @@ function browserDecodes(video: HTMLVideoElement, v: Probe['video']): boolean {
   return video.canPlayType(t) === 'probably'
 }
 
-export type Track = { index: number; label: string; selected: boolean }
+/**
+ * Safari (iPhone, iPad, Mac) and LG webOS don't play a fragmented MP4 of unknown length streamed
+ * by ffmpeg, but play HLS by themselves: for them the server converts to HLS instead.
+ */
+function nativeHls(video: HTMLVideoElement): boolean {
+  const ua = navigator.userAgent
+  const webkit = /AppleWebKit/.test(ua) && !/Chrome|Chromium|CriOS|Android/.test(ua)
+  return (webkit || /Web0S|webOS|NetCast/i.test(ua) || /CriOS|FxiOS|EdgiOS/.test(ua)) && video.canPlayType('application/vnd.apple.mpegurl') !== ''
+}
+
+export type Track ={ index: number; label: string; selected: boolean }
 
 export class PlayerController {
   state: PlaybackState = 'Idle'
@@ -162,7 +172,7 @@ export class PlayerController {
     } else {
       this.offsetSec = startSec
       const codec = this.reencode ? '&video=h264' : this.probe.video?.codec === 'hevc' ? '&hevc=1' : ''
-      video.src = `/api/play/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}&start=${startSec}&audio=${this.audio}${codec}`
+      video.src = `/api/${nativeHls(video) ? 'hls' : 'play'}/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}&start=${startSec}&audio=${this.audio}${codec}`
     }
     this.go(video)
   }
