@@ -18,6 +18,9 @@ const FFPROBE = process.env.FFPROBE ?? 'ffprobe'
 
 /** One stream per browser: many providers allow a single connection per account. */
 const running = new Map<string, ChildProcess>()
+/** The last ffmpeg messages of each browser, shown by the player's info panel. */
+const lastErrors = new Map<string, string>()
+export const errorsFor = (owner: string) => lastErrors.get(owner) ?? ''
 
 function stopFor(owner: string) {
   const old = running.get(owner)
@@ -40,6 +43,7 @@ function run(req: IncomingMessage, res: ServerResponse, owner: string, args: str
   })
   child.on('exit', (code) => {
     if (running.get(owner) === child) running.delete(owner)
+    if (errors) lastErrors.set(owner, `${new Date().toISOString()} ffmpeg (uscita ${code}): ${errors.trim()}`)
     if (code && code !== 255 && errors) console.warn('ffmpeg:', errors.trim().split('\n').slice(-3).join(' | '))
   })
   // The browser may hang up at any moment (seek, next channel): never let that reach the server.
@@ -170,6 +174,7 @@ export async function vodHls(res: ServerResponse, owner: string, a: XtreamAccoun
   let exited = false
   child.on('exit', (code) => {
     exited = true
+    if (errors) lastErrors.set(owner, `${new Date().toISOString()} ffmpeg hls (uscita ${code}): ${errors.trim()}`)
     if (code && code !== 255 && errors) console.warn('ffmpeg hls:', errors.trim().split('\n').slice(-3).join(' | '))
   })
   const file = join(dir, 'index.m3u8')
@@ -178,6 +183,7 @@ export async function vodHls(res: ServerResponse, owner: string, a: XtreamAccoun
     if (hlsRuns.get(owner) === run) stopFor(owner)
     res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
     res.end('Impossibile convertire il file')
+    lastErrors.set(owner, `${new Date().toISOString()} ffmpeg hls: nessuna playlist dopo 30 s. ${errors.trim()}`)
     return
   }
   res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' })

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react'
+import { api } from '../lib/api.ts'
 import { AnimatePresence, motion } from 'framer-motion'
 import { progressAt, timeRange } from '../../../shared/epg.ts'
 import { clock, episodeLabel, episodeTitle, formatTime } from '../../../shared/text.ts'
@@ -22,6 +23,7 @@ export function Player() {
   const [interaction, setInteraction] = useState(0)
   const [panel, setPanel] = useState(false)
   const [tracks, setTracks] = useState(false)
+  const [info, setInfo] = useState(false)
   const [digits, setDigits] = useState('')
   const [full, setFull] = useState(!!document.fullscreenElement)
   const live = p?.kind === 'Live'
@@ -147,7 +149,7 @@ export function Player() {
             {/* Shades top and bottom to read the text on any picture. */}
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '35%', background: 'linear-gradient(#000000CC, transparent)' }} />
             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(transparent, #000000EE)' }} />
-            <TopBar full={full} />
+            <TopBar full={full} onInfo={() => setInfo(true)} />
             <div className="safe" style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
               <div style={{ padding: '18px 28px', pointerEvents: 'auto' }} onClick={(e) => e.stopPropagation()}>
                 <InfoBlock />
@@ -172,6 +174,7 @@ export function Player() {
       </AnimatePresence>
 
       {tracks && <TracksPanel close={() => setTracks(false)} />}
+      {info && <InfoPanel close={() => setInfo(false)} />}
 
       {app.nextEpisodeCountdown != null && <NextEpisodeCard seconds={app.nextEpisodeCountdown} />}
     </div>
@@ -183,7 +186,7 @@ function toggleFull() {
   else document.documentElement.requestFullscreen?.().catch(() => {})
 }
 
-function TopBar({ full }: { full: boolean }) {
+function TopBar({ full, onInfo }: { full: boolean; onInfo: () => void }) {
   const p = app.playing!
   const title = p.kind === 'Live' ? 'TV in diretta' : p.kind === 'Film' ? 'Film' : p.series.name
   return (
@@ -194,6 +197,9 @@ function TopBar({ full }: { full: boolean }) {
         </Clickable>
         <div style={{ width: 8 }} />
         <div className="ellipsis" style={{ flex: 1, color: 'var(--text2)', fontSize: 14 }}>{title}</div>
+        <Clickable onClick={onInfo} title="Informazioni tecniche" radius="50%" background="transparent" style={{ padding: 8, marginRight: 8 }}>
+          <Icon name="info_outline" color="#fff" />
+        </Clickable>
         {player.videoSize && <><Badge text={player.videoSize} /><div style={{ width: 12 }} /></>}
         <Clickable onClick={toggleFull} title={full ? 'Esci da schermo intero' : 'Schermo intero'} radius="50%" background="transparent" style={{ padding: 8, marginRight: 8 }}>
           <Icon name={full ? 'fullscreen_exit' : 'fullscreen'} color="#fff" />
@@ -360,6 +366,51 @@ function TracksPanel({ close }: { close: () => void }) {
         ))}
         <div style={{ color: 'var(--text2)', fontWeight: 700, padding: '14px 6px 6px' }}>Sottotitoli</div>
         <TrackRow label="Disattivati" selected onClick={close} />
+      </div>
+    </div>
+  )
+}
+
+/** Technical details of the playback, to understand why a film doesn't play on a device. */
+function InfoPanel({ close }: { close: () => void }) {
+  const [server, setServer] = useState('')
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    const load = () => api<{ ffmpeg: string }>('/api/play/log').then((r) => setServer(r.ffmpeg)).catch((e) => setServer(`non disponibile: ${e instanceof Error ? e.message : e}`))
+    load()
+    const t = window.setInterval(load, 3000)
+    return () => clearInterval(t)
+  }, [])
+  const rows = player.details()
+  const text = [...rows.map(([k, v]) => `${k}: ${v}`), '', 'Registro:', ...player.log, '', `Server: ${server || 'nessun errore'}`].join('\n')
+  const copy = () => {
+    navigator.clipboard?.writeText(text).then(() => setCopied(true)).catch(() => { /* not allowed: the text can be selected */ })
+  }
+  const mono: CSSProperties = { fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text' }
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#00000099', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={(e) => { e.stopPropagation(); close() }}>
+      <div className="scroll" onClick={(e) => e.stopPropagation()}
+        style={{ width: 640, maxWidth: 'calc(100% - 32px)', maxHeight: 'calc(100% - 32px)', borderRadius: 16, background: 'var(--panel)', padding: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ flex: 1, color: 'var(--text2)', fontWeight: 700, padding: 6 }}>Informazioni tecniche</div>
+          <Clickable onClick={copy} background="transparent" style={{ padding: '8px 12px' }}>
+            <div style={{ color: 'var(--accent2)', fontWeight: 600 }}>{copied ? 'Copiato' : 'Copia'}</div>
+          </Clickable>
+          <Clickable onClick={close} title="Chiudi" radius="50%" background="transparent" style={{ padding: 8 }}>
+            <Icon name="close" color="var(--text)" />
+          </Clickable>
+        </div>
+        {rows.map(([k, v]) => (
+          <div key={k} style={{ display: 'flex', gap: 10, padding: '0 6px' }}>
+            <div style={{ width: 120, flexShrink: 0, color: 'var(--text3)', fontSize: 13 }}>{k}</div>
+            <div style={mono}>{v}</div>
+          </div>
+        ))}
+        <div style={{ color: 'var(--text2)', fontWeight: 700, padding: '10px 6px 0' }}>Registro</div>
+        <div style={{ ...mono, padding: '0 6px' }}>{player.log.join('\n') || 'vuoto'}</div>
+        <div style={{ color: 'var(--text2)', fontWeight: 700, padding: '10px 6px 0' }}>Server (ffmpeg)</div>
+        <div style={{ ...mono, padding: '0 6px' }}>{server || 'nessun errore'}</div>
       </div>
     </div>
   )

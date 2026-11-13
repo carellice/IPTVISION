@@ -398,6 +398,10 @@ route('GET', '/api/raw/:kind/:id', async (req, res, p, url, user) => {
   await play.raw(req, res, user.token, requireXtream(), kindOf(p[0]), safeId(p[1]), safeExt(url.searchParams.get('ext')))
 })
 
+route('GET', '/api/play/log', (_req, res, _p, _u, user) => {
+  json(res, 200, { ffmpeg: play.errorsFor(user.token) })
+})
+
 route('POST', '/api/play/stop', (_req, res, _p, _u, user) => {
   play.stopAll(user.token)
   json(res, 200, { ok: true })

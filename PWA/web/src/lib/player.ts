@@ -59,6 +59,8 @@ export class PlayerController {
   durationMs = 0
   videoSize = ''
   audioTracks: Track[] = []
+  /** What happened during this playback, shown by the player's info panel. */
+  log: string[] = []
 
   /** A film or an episode reached its end. */
   onEnded: (() => void) | null = null
@@ -93,6 +95,44 @@ export class PlayerController {
 
   private emit() { this.onChange?.() }
 
+  private note(text: string) {
+    const t = new Date().toLocaleTimeString('it-IT')
+    this.log = [...this.log.slice(-79), `${t} ${text}`]
+  }
+
+  /** Technical details for the info panel: what the browser got and how it is doing. */
+  details(): [string, string][] {
+    const v = this.video
+    const q = v?.getVideoPlaybackQuality?.()
+    const can = (t: string) => {
+      let mse = '-'
+      try { mse = window.MediaSource?.isTypeSupported(t) ? 'sì' : 'no' } catch { /* old browser */ }
+      return `canPlay "${v?.canPlayType(t) ?? ''}" · MSE ${mse}`
+    }
+    const pr = this.probe
+    const mode = !this.source ? '-' : this.ts ? 'mpegts.js' : pr?.direct ? 'diretto (file originale)' : v && nativeHls(v) ? 'HLS dal server' : 'MP4 dal server'
+    const buffered = v && v.buffered.length ? `${v.buffered.start(0).toFixed(1)}–${v.buffered.end(v.buffered.length - 1).toFixed(1)} s` : '-'
+    return [
+      ['Stato', `${this.state} · tentativo ${this.attempt}`],
+      ['Modalità', `${mode}${this.reencode ? ' · ricodifica H.264' : ''}`],
+      ['Sorgente', this.source ? `${this.source.kind} ${this.source.id}${'ext' in this.source ? '.' + this.source.ext : ''}` : '-'],
+      ['Video (file)', pr?.video ? `${pr.video.codec} ${pr.video.height}p${pr.video.tenBit ? ' 10 bit' : ''}` : pr ? 'nessuno' : '-'],
+      ['Audio (file)', pr ? pr.audio.map((a) => `${a.codec} ${a.label}`).join(', ') || 'nessuno' : '-'],
+      ['Durata (file)', pr ? `${Math.round(pr.duration)} s` : '-'],
+      ['Indirizzo', v?.currentSrc ? new URL(v.currentSrc).pathname + new URL(v.currentSrc).search : '-'],
+      ['Elemento video', v ? `ready ${v.readyState} · network ${v.networkState} · ${v.paused ? 'in pausa' : 'in riproduzione'}` : '-'],
+      ['Immagine', v ? `${v.videoWidth}×${v.videoHeight}` : '-'],
+      ['Tempo', v ? `${v.currentTime.toFixed(1)} s · durata ${Number.isFinite(v.duration) ? v.duration.toFixed(1) : v.duration} · offset ${this.offsetSec} s` : '-'],
+      ['Buffer', buffered],
+      ['Fotogrammi', q ? `${q.totalVideoFrames} totali · ${q.droppedVideoFrames} persi` : '-'],
+      ['Errore', v?.error ? `${v.error.code} ${v.error.message}` : 'nessuno'],
+      ['H.264', can('video/mp4; codecs="avc1.640028"')],
+      ['HEVC', can('video/mp4; codecs="hvc1.1.6.L150.90"')],
+      ['HLS nativo', v ? `"${v.canPlayType('application/vnd.apple.mpegurl')}" · usato ${nativeHls(v) ? 'sì' : 'no'}` : '-'],
+      ['Browser', navigator.userAgent],
+    ]
+  }
+
   private setState(s: PlaybackState) {
     if (this.state !== s) { this.state = s; this.emit() }
   }
@@ -101,11 +141,15 @@ export class PlayerController {
     if (this.video === video) return
     this.video = video
     if (!video) return
+    video.addEventListener('loadedmetadata', () => this.note(`metadati: ${video.videoWidth}×${video.videoHeight}, durata ${video.duration}`))
+    video.addEventListener('stalled', () => this.note('stalled: il browser non riceve dati'))
+    video.addEventListener('playing', () => { this.note('playing') })
     video.addEventListener('playing', () => { this.everPlayed = true; this.lastProgressAt = Date.now(); this.setState('Playing') })
     video.addEventListener('pause', () => { if (this.source && this.userPaused) this.setState('Paused') })
     video.addEventListener('waiting', () => { if (this.state !== 'Reconnecting') this.setState(this.everPlayed ? 'Buffering' : 'Connecting') })
     video.addEventListener('ended', () => this.ended())
     video.addEventListener('error', () => {
+      if (this.source) this.note(`errore video ${video.error?.code ?? '?'} ${video.error?.message ?? ''}`)
       if (!this.source || this.ts) return
       // The browser can't decode the video: the next attempt has it re-encoded by the server.
       const code = video.error?.code
@@ -132,6 +176,7 @@ export class PlayerController {
     this.audio = 0
     this.reencode = false
     this.audioTracks = []
+    this.log = []
     this.start()
   }
 
@@ -154,7 +199,9 @@ export class PlayerController {
     if (!this.probe) {
       try {
         this.probe = await api<Probe>(`/api/probe/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}`)
-      } catch {
+        this.note(`probe: ${JSON.stringify(this.probe)}`)
+      } catch (e) {
+        this.note(`probe fallito: ${e instanceof Error ? e.message : e}`)
         if (session === this.session) this.scheduleRetry('file non leggibile')
         return
       }
@@ -175,6 +222,7 @@ export class PlayerController {
       const codec = this.reencode ? '&video=h264' : this.probe.video?.codec === 'hevc' ? '&hevc=1' : ''
       video.src = `/api/${nativeHls(video) ? 'hls' : 'play'}/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}&start=${startSec}&audio=${this.audio}${codec}`
     }
+    this.note(`apro ${video.src}`)
     this.go(video)
   }
 
@@ -240,6 +288,7 @@ export class PlayerController {
     this.setState('Reconnecting')
     const delay = Math.min(15_000, 1000 << Math.min(this.attempt - 1, 4))
     console.warn(`Riconnessione (${reason}), tentativo ${this.attempt} tra ${delay}ms`)
+    this.note(`riconnessione (${reason}), tentativo ${this.attempt} tra ${delay} ms`)
     this.release()
     this.retryTimer = window.setTimeout(() => { if (this.source) this.start() }, delay)
   }
@@ -283,6 +332,7 @@ export class PlayerController {
   private useH264(): boolean {
     if (this.reencode) return false
     this.reencode = true
+    this.note('passo alla ricodifica H.264')
     if (this.probe) this.probe = { ...this.probe, direct: false }
     return true
   }
