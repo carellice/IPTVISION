@@ -58,7 +58,7 @@ fun ServerDialog(vm: AppViewModel) {
 
     Dialog(onDismissRequest = { if (!vm.serverBusy) { vm.serverDialog = false; vm.serverError = null } }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
-            Modifier.padding(24.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Panel)
+            Modifier.padding(24.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).material(C.Panel)
                 .verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

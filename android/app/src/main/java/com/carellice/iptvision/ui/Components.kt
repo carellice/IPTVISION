@@ -58,27 +58,89 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.res.imageResource
+import com.carellice.iptvision.R
 
-object C {
-    val Accent = Color(0xFF3D7BFF)
-    val Accent2 = Color(0xFF00C2FF)
-    val Bg = Color(0xFF0A0B0F)
-    val Panel = Color(0xFF111318)
-    val Surface = Color(0xFF191C23)
-    val SurfaceHover = Color(0xFF21252E)
-    val SurfacePressed = Color(0xFF2A2F3A)
-    val Stroke = Color(0xFF20242D)
-    val StrokeStrong = Color(0xFF2E3340)
-    val Text = Color(0xFFF1F3F7)
-    val Text2 = Color(0xFF9099A8)
-    val Text3 = Color(0xFF5C6473)
-    val AccentSoft = Color(0x223D7BFF)
-    val Danger = Color(0xFFFF5D6C)
-    val Star = Color(0xFFFFC94D)
-    val Live = Color(0xFFFF4D5E)
+/** Stile grafico scelto nelle impostazioni: cambia al volo colori e materiali di tutta l'app. */
+object Skin {
+    var skeuo by mutableStateOf(false)
 }
 
-val AppColors: ColorScheme = darkColorScheme(
+/** Colori dell'app: quelli dello stile moderno o, con lo stile skeuomorfico, toni caldi di pelle e metallo. */
+object C {
+    private fun pick(classic: Long, skeuo: Long) = Color(if (Skin.skeuo) skeuo else classic)
+    val Accent get() = pick(0xFF3D7BFF, 0xFF3D82F5)
+    val Accent2 get() = pick(0xFF00C2FF, 0xFF6FB2FF)
+    val Bg get() = pick(0xFF0A0B0F, 0xFF232529)
+    val Panel get() = pick(0xFF111318, 0xFF2A2729)
+    val Surface get() = pick(0xFF191C23, 0xFF34373E)
+    val SurfaceHover get() = pick(0xFF21252E, 0xFF3E4149)
+    val SurfacePressed get() = pick(0xFF2A2F3A, 0xFF464A54)
+    val Stroke get() = pick(0xFF20242D, 0xFF0E0F11)
+    val StrokeStrong get() = pick(0xFF2E3340, 0xFF0A0B0C)
+    val Text get() = pick(0xFFF1F3F7, 0xFFF3F0E8)
+    val Text2 get() = pick(0xFF9099A8, 0xFFABA69C)
+    val Text3 get() = pick(0xFF5C6473, 0xFF7F7B72)
+    val AccentSoft get() = pick(0x223D7BFF, 0x403D82F5)
+    val Danger get() = pick(0xFFFF5D6C, 0xFFFF6B6B)
+    val Star get() = pick(0xFFFFC94D, 0xFFFFCB45)
+    val Live get() = pick(0xFFFF4D5E, 0xFFFF3B30)
+}
+
+/** Materiali dello stile skeuomorfico: lino, pelle, metallo spazzolato, plastica blu lucida, bordi in rilievo. */
+object Skeuo {
+    val Gloss = Brush.verticalGradient(
+        0f to Color(0xFF8CC0FF), 0.48f to Color(0xFF4F94F8), 0.5f to Color(0xFF2A6EE6), 1f to Color(0xFF3C86F4),
+    )
+    val GlossEdge = Color(0xFF163E8C)
+    /** Filo di luce in alto e ombra in basso: il bordo di una piastra in rilievo. */
+    val Bevel = Brush.verticalGradient(0f to Color(0xFF70757F), 0.1f to Color(0xFF1A1B1F), 1f to Color(0xFF0A0B0C))
+    /** Pozzetto incassato: scuro in alto, luce sul bordo inferiore. */
+    val InsetEdge = Brush.verticalGradient(0f to Color(0xFF030304), 0.85f to Color(0xFF141518), 1f to Color(0xFF4A4D55))
+    val Stitch = Color(0x73B8A78A)
+
+    /** Piastra del colore dato: più chiara in alto, come illuminata dall'alto. */
+    fun plate(c: Color): Brush = Brush.verticalGradient(listOf(lerp(c, Color.White, 0.07f), lerp(c, Color.Black, 0.18f)))
+
+    @Composable
+    fun texture(id: Int): Brush {
+        val bmp = ImageBitmap.imageResource(id)
+        return remember(bmp) { ShaderBrush(ImageShader(bmp, TileMode.Repeated, TileMode.Repeated)) }
+    }
+}
+
+/**
+ * Sfondo di schermate e pannelli: il colore nello stile moderno, il materiale in quello skeuomorfico
+ * (lino per lo sfondo, pelle per i pannelli).
+ */
+@Composable
+fun Modifier.material(color: Color): Modifier = when {
+    !Skin.skeuo -> background(color)
+    color == C.Bg -> background(color).background(Skeuo.texture(R.drawable.skeuo_linen))
+    color == C.Panel -> background(color).background(Skeuo.texture(R.drawable.skeuo_leather))
+    else -> background(color)
+}
+
+/** Barra di navigazione: metallo spazzolato con un filo di luce sul bordo. */
+@Composable
+fun Modifier.metalBar(): Modifier = if (!Skin.skeuo) background(C.Panel) else this
+    .background(Color(0xFF40444C))
+    .background(Skeuo.texture(R.drawable.skeuo_metal))
+    .drawBehind { drawLine(Color(0x59FFFFFF), Offset(0f, 0f), Offset(size.width, 0f), 2f) }
+
+private fun appColors(): ColorScheme = darkColorScheme(
     primary = C.Accent,
     onPrimary = Color.White,
     secondary = C.Accent2,
@@ -96,7 +158,11 @@ val AppColors: ColorScheme = darkColorScheme(
 )
 
 @Composable
-fun IptvTheme(content: @Composable () -> Unit) = MaterialTheme(colorScheme = AppColors, content = content)
+fun IptvTheme(content: @Composable () -> Unit) = MaterialTheme(colorScheme = appColors()) {
+    if (!Skin.skeuo) content()
+    // Testo inciso nel materiale: un'ombra scura sopra le lettere.
+    else ProvideTextStyle(LocalTextStyle.current.copy(shadow = Shadow(Color(0xB3000000), Offset(0f, -2f), 0f)), content)
+}
 
 /**
  * Elemento cliccabile che si usa allo stesso modo col dito e col telecomando:
@@ -116,6 +182,9 @@ fun Modifier.tvClickable(
 ): Modifier {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) focusScale else 1f, label = "focus")
+    val fill = if (focused) focusedBackground else background
+    val skeuo = Skin.skeuo && fill.alpha > 0.3f
+    val gloss = skeuo && fill == C.Accent
     return this
         .scale(scale)
         .onFocusChanged {
@@ -125,8 +194,15 @@ fun Modifier.tvClickable(
         .onPreviewKeyEvent { e ->
             if (onLongClick != null && e.type == KeyEventType.KeyUp && e.key == Key.Menu) { onLongClick(); true } else false
         }
+        .then(if (skeuo) Modifier.shadow(3.dp, shape, clip = false) else Modifier)
         .clip(shape)
-        .background(if (focused) focusedBackground else background)
+        .then(
+            when {
+                gloss -> Modifier.background(Skeuo.Gloss).border(1.dp, Skeuo.GlossEdge, shape)
+                skeuo -> Modifier.background(Skeuo.plate(fill)).then(if (focused) Modifier else Modifier.border(1.dp, Skeuo.Bevel, shape))
+                else -> Modifier.background(fill)
+            },
+        )
         .border(if (focused) 2.dp else 0.dp, if (focused) Color.White else Color.Transparent, shape)
         .combinedClickable(onLongClick = onLongClick, onClick = onClick)
 }

@@ -539,7 +539,7 @@ fun VariantDialog(vm: AppViewModel) {
     }
     androidx.compose.ui.window.Dialog(onDismissRequest = { vm.variantChoice = null }) {
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Panel).padding(20.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).material(C.Panel).padding(20.dp),
         ) {
             Text("Scegli la versione", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(choice.title, color = C.Text2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

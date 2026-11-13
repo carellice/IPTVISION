@@ -789,6 +789,13 @@
       box.appendChild(h('div', { class: 'dim', style: 'margin:0.3rem 0', text: 'Spento: il TV si collega direttamente al provider IPTV.' }));
       box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Collega il server' }), function () { push('server', {}); }));
     }
+    box.appendChild(h('div', { class: 'group-title', text: 'Aspetto' }));
+    box.appendChild(settingRow('Stile skeuomorfico', 'Pelle, lino, metallo spazzolato e pulsanti lucidi al posto dello stile moderno.',
+      S.get('skin') === 'skeuo', function () {
+        var on = S.get('skin') !== 'skeuo';
+        S.set('skin', on ? 'skeuo' : 'classic');
+        document.documentElement.classList.toggle('skeuo', on);
+      }));
     box.appendChild(h('div', { class: 'group-title', text: 'Riproduzione' }));
     box.appendChild(settingRow('Formato HLS (m3u8) per la TV in diretta', 'Di solito MPEG-TS è più stabile; prova HLS se un canale non parte.',
       S.get('outputFormat') === 'm3u8', function () { S.set('outputFormat', S.get('outputFormat') === 'm3u8' ? 'ts' : 'm3u8'); }));

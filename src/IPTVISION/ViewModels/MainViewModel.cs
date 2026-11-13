@@ -822,6 +822,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Stile skeuomorfico al posto di quello moderno: si salva e il programma si riapre con il nuovo stile.</summary>
+    public bool IsSkeuo
+    {
+        get => _settings.Skin == "skeuo";
+        set
+        {
+            if (IsSkeuo == value) return;
+            _settings.Skin = value ? "skeuo" : "classic";
+            OnPropertyChanged();
+            SaveNow();
+            App.Restart();
+        }
+    }
+
     private static bool IsHiddenCategory(Category c) => c.Name.Contains("xxx", StringComparison.OrdinalIgnoreCase);
 
     private (List<Category>, List<T>) WithoutHidden<T>(List<Category> cats, List<T> items, Func<T, string?> categoryOf)

@@ -67,12 +67,14 @@
         </Grid.RowDefinitions>
 
         <!-- ======================= Barra del titolo ======================= -->
-        <Grid x:Name="TitleBar" Background="{StaticResource PanelBrush}">
+        <Grid x:Name="TitleBar" Background="{StaticResource TitleBarBrush}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
+            <Border Grid.ColumnSpan="3" Background="{StaticResource TitleBarShade}" BorderBrush="{StaticResource TitleBarEdge}"
+                    BorderThickness="0,0,0,1" IsHitTestVisible="False" />
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
                 <Image Source="pack://application:,,,/Assets/logo.png" Width="18" Height="18"
@@ -122,16 +124,14 @@
         <!-- ======================= Accesso ======================= -->
         <Grid Grid.Row="1" Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
             <Grid.Background>
-                <RadialGradientBrush Center="0.5,0.32" GradientOrigin="0.5,0.32" RadiusX="0.7" RadiusY="0.8">
-                    <GradientStop Color="#1A2A55" Offset="0" />
-                    <GradientStop Color="#0A0B0F" Offset="1" />
-                </RadialGradientBrush>
+                <StaticResource ResourceKey="LoginBgBrush" />
             </Grid.Background>
+            <Border Background="{StaticResource BackdropGlowBrush}" IsHitTestVisible="False" />
 
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <Border Width="420" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40"
-                        Background="#E6111318" BorderBrush="{StaticResource StrokeStrongBrush}" BorderThickness="1"
-                        CornerRadius="18" Padding="36,34">
+                        Background="{StaticResource LoginCardBrush}" BorderBrush="{StaticResource LoginCardStroke}" BorderThickness="1"
+                        CornerRadius="18" Padding="36,34" Effect="{DynamicResource CardEffect}">
                     <StackPanel>
                         <Image Source="pack://application:,,,/Assets/logo.png" Width="60" Height="60"
                                RenderOptions.BitmapScalingMode="HighQuality" HorizontalAlignment="Left" />
@@ -270,6 +270,9 @@
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
+                    <!-- Cucitura lungo il bordo (solo stile skeuomorfico: altrove è trasparente) -->
+                    <Line Grid.RowSpan="5" HorizontalAlignment="Right" Margin="0,4,5,4" Y1="0" Y2="1" Stretch="Fill"
+                          Stroke="{StaticResource StitchBrush}" StrokeThickness="1.2" StrokeDashArray="3 2.5" IsHitTestVisible="False" />
 
                     <!-- Ricerca unica: canali, film e serie -->
                     <Grid Margin="14,6,14,10">
@@ -290,7 +293,7 @@
                     </Grid>
 
                     <!-- Sezioni: TV / Film / Serie -->
-                    <Border Grid.Row="1" Margin="14,0,14,10" Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="3"
+                    <Border Grid.Row="1" Margin="14,0,14,10" Background="{StaticResource SegmentTrackBrush}" CornerRadius="10" Padding="3"
                             Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
                         <UniformGrid Columns="3">
                             <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsLiveMode}" ToolTip="TV in diretta (Ctrl+1)">
@@ -315,7 +318,7 @@
                     </Border>
 
                     <!-- Ambito della ricerca: tutto oppure solo canali, film o serie -->
-                    <Border Grid.Row="1" Margin="14,0,14,8" Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="2"
+                    <Border Grid.Row="1" Margin="14,0,14,8" Background="{StaticResource SegmentTrackBrush}" CornerRadius="10" Padding="2"
                             Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}}">
                         <UniformGrid Columns="4">
                             <RadioButton Style="{StaticResource SegmentButton}" GroupName="scope" IsChecked="{Binding IsScopeAll}" Content="Tutto" />
@@ -345,7 +348,7 @@
                                            VerticalAlignment="Center" MaxWidth="110" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Button>
-                        <Border Grid.Column="3" Background="{StaticResource SurfaceBrush}" CornerRadius="9" Margin="4,0,0,0" Padding="1">
+                        <Border Grid.Column="3" Background="{StaticResource SegmentTrackBrush}" CornerRadius="9" Margin="4,0,0,0" Padding="1">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton Style="{StaticResource SegmentButton}" GroupName="view" Width="32" ToolTip="Elenco"
                                              IsChecked="{Binding IsGridView, Converter={StaticResource InvertBool}}">
@@ -1166,9 +1169,22 @@
                                         </StackPanel>
                                     </Border>
 
+                                    <TextBlock Text="ASPETTO" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock Text="Stile grafico" Style="{StaticResource FieldLabel}" />
+                                    <Border Background="{StaticResource SegmentTrackBrush}" CornerRadius="9" Padding="2">
+                                        <UniformGrid Columns="2">
+                                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="skin" Content="Moderno"
+                                                         IsChecked="{Binding IsSkeuo, Converter={StaticResource InvertBool}}" />
+                                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="skin" Content="Skeuomorfico"
+                                                         IsChecked="{Binding IsSkeuo}" />
+                                        </UniformGrid>
+                                    </Border>
+                                    <TextBlock Text="Cambiando stile IPTVISION si riapre da solo e riprende il canale." Foreground="{StaticResource TextTertiaryBrush}"
+                                               FontSize="11.5" Margin="2,7,0,6" TextWrapping="Wrap" />
+
                                     <TextBlock Text="RIPRODUZIONE" Style="{StaticResource SectionTitle}" />
                                     <TextBlock Text="Formato del flusso" Style="{StaticResource FieldLabel}" />
-                                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="9" Padding="2">
+                                    <Border Background="{StaticResource SegmentTrackBrush}" CornerRadius="9" Padding="2">
                                         <UniformGrid Columns="2">
                                             <RadioButton Style="{StaticResource SegmentButton}" GroupName="fmt" Content="MPEG-TS (consigliato)"
                                                          IsChecked="{Binding UseHls, Converter={StaticResource InvertBool}}" />
@@ -1178,7 +1194,7 @@
                                     </Border>
 
                                     <TextBlock Text="Buffer di rete" Style="{StaticResource FieldLabel}" Margin="2,16,0,7" />
-                                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="9" Padding="2">
+                                    <Border Background="{StaticResource SegmentTrackBrush}" CornerRadius="9" Padding="2">
                                         <UniformGrid Columns="4">
                                             <RadioButton Style="{StaticResource SegmentButton}" GroupName="buf" Content="Basso"
                                                          ToolTip="0,8 s · cambio canale più rapido"
@@ -1710,17 +1726,14 @@
         <Grid x:Name="TvLayer" Grid.RowSpan="2" Visibility="{Binding ShowTvLayer, Converter={StaticResource BoolToVis}}"
               TextElement.Foreground="White" Cursor="None">
             <Grid.Background>
-                <RadialGradientBrush Center="0.2,0" GradientOrigin="0.2,0" RadiusX="1.1" RadiusY="1.2">
-                    <GradientStop Color="#1B2A52" Offset="0" />
-                    <GradientStop Color="#0C0E14" Offset="0.55" />
-                    <GradientStop Color="#08090D" Offset="1" />
-                </RadialGradientBrush>
+                <StaticResource ResourceKey="TvBgBrush" />
             </Grid.Background>
             <Grid.Resources>
                 <!-- Riquadro con evidenza quando selezionato -->
                 <Style x:Key="TvCard" TargetType="Border">
-                    <Setter Property="Background" Value="#161921" />
-                    <Setter Property="BorderBrush" Value="#00FFFFFF" />
+                    <Setter Property="Background" Value="{StaticResource TvCardBrush}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource TvCardStroke}" />
+                    <Setter Property="Effect" Value="{DynamicResource TvCardEffect}" />
                     <Setter Property="BorderThickness" Value="3" />
                     <Setter Property="CornerRadius" Value="16" />
                     <Setter Property="Margin" Value="12" />
@@ -1728,7 +1741,7 @@
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsTvFocused}" Value="True">
                             <Setter Property="BorderBrush" Value="White" />
-                            <Setter Property="Background" Value="#252A36" />
+                            <Setter Property="Background" Value="{StaticResource TvCardFocusBrush}" />
                             <Setter Property="Panel.ZIndex" Value="10" />
                             <Setter Property="Effect">
                                 <Setter.Value>
@@ -1756,8 +1769,9 @@
                 </Style>
 
                 <Style x:Key="TvWideCard" TargetType="Border">
-                    <Setter Property="Background" Value="#161921" />
-                    <Setter Property="BorderBrush" Value="#00FFFFFF" />
+                    <Setter Property="Background" Value="{StaticResource TvCardBrush}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource TvCardStroke}" />
+                    <Setter Property="Effect" Value="{DynamicResource TvCardEffect}" />
                     <Setter Property="BorderThickness" Value="3" />
                     <Setter Property="CornerRadius" Value="16" />
                     <Setter Property="Margin" Value="12" />
@@ -1765,7 +1779,7 @@
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsTvFocused}" Value="True">
                             <Setter Property="BorderBrush" Value="White" />
-                            <Setter Property="Background" Value="#252A36" />
+                            <Setter Property="Background" Value="{StaticResource TvCardFocusBrush}" />
                             <Setter Property="Panel.ZIndex" Value="10" />
                             <Setter Property="Effect">
                                 <Setter.Value>
@@ -1800,7 +1814,7 @@
                     <Setter Property="TextElement.Foreground" Value="#8F98A8" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsActive}" Value="True">
-                            <Setter Property="Background" Value="#262B36" />
+                            <Setter Property="Background" Value="{StaticResource TvPillActiveBrush}" />
                             <Setter Property="TextElement.Foreground" Value="White" />
                         </DataTrigger>
                         <DataTrigger Binding="{Binding IsTvFocused}" Value="True">
@@ -2007,6 +2021,8 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
+            <Border Grid.RowSpan="6" Background="{StaticResource BackdropGlowBrush}" IsHitTestVisible="False" />
+
             <!-- Intestazione -->
             <Grid Margin="64,36,64,0">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -2015,7 +2031,7 @@
                                VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Border Background="#262B36" CornerRadius="22" Padding="18,9" Margin="0,0,28,0" VerticalAlignment="Center"
+                    <Border Background="{StaticResource TvPillActiveBrush}" CornerRadius="22" Padding="18,9" Margin="0,0,28,0" VerticalAlignment="Center"
                             Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVis}}">
                         <StackPanel Orientation="Horizontal">
                             <Ellipse Width="9" Height="9" Fill="{StaticResource LiveBrush}" VerticalAlignment="Center" />
@@ -2068,7 +2084,7 @@
 
             <!-- Ricerca (schermata Cerca) -->
             <Grid Grid.Row="3" Margin="64,16,64,8" Visibility="{Binding IsTvSearchScreen, Converter={StaticResource BoolToVis}}">
-                <Border CornerRadius="16" BorderThickness="3" Background="#161921">
+                <Border CornerRadius="16" BorderThickness="3" Background="{StaticResource InsetWellBrush}">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="BorderBrush" Value="#2E3340" />
@@ -2168,11 +2184,13 @@
             </StackPanel>
 
             <!-- Legenda comandi -->
-            <Border Grid.Row="5" Background="#C0080A0E" Padding="64,16">
+            <Border Grid.Row="5" Background="{StaticResource TvLegendBrush}" Padding="64,16">
                 <StackPanel Orientation="Horizontal" TextElement.FontSize="15" TextElement.Foreground="#99A3B5">
                     <StackPanel.Resources>
                         <Style x:Key="Key" TargetType="Border">
-                            <Setter Property="Background" Value="#2A2F3A" />
+                            <Setter Property="Background" Value="{StaticResource KeyCapBrush}" />
+                            <Setter Property="BorderBrush" Value="{StaticResource KeyCapStroke}" />
+                            <Setter Property="BorderThickness" Value="1" />
                             <Setter Property="CornerRadius" Value="6" />
                             <Setter Property="Padding" Value="9,3" />
                             <Setter Property="Margin" Value="0,0,10,0" />

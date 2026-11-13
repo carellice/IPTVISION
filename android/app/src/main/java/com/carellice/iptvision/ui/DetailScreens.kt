@@ -60,7 +60,7 @@ import com.carellice.iptvision.data.TextHelpers
 
 @Composable
 private fun DetailFrame(vm: AppViewModel, content: @Composable (wide: Boolean) -> Unit) {
-    BoxWithConstraints(Modifier.fillMaxSize().background(C.Bg).statusBarsPadding().navigationBarsPadding()) {
+    BoxWithConstraints(Modifier.fillMaxSize().material(C.Bg).statusBarsPadding().navigationBarsPadding()) {
         val wide = maxWidth >= 720.dp
         Column(Modifier.fillMaxSize().padding(horizontal = if (wide) 40.dp else 16.dp, vertical = 12.dp)) {
             if (!vm.isTv) IconButton(onClick = { vm.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro", tint = C.Text) }

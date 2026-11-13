@@ -40,6 +40,33 @@
         <GradientStop Color="#00000000" Offset="1" />
     </LinearGradientBrush>
 
+    <!-- Superfici che lo stile skeuomorfico (Skeuo.xaml) ridefinisce: qui i valori dello stile moderno. -->
+    <SolidColorBrush x:Key="TitleBarBrush" Color="#111318" />
+    <SolidColorBrush x:Key="TitleBarShade" Color="Transparent" />
+    <SolidColorBrush x:Key="TitleBarEdge" Color="Transparent" />
+    <RadialGradientBrush x:Key="LoginBgBrush" Center="0.5,0.32" GradientOrigin="0.5,0.32" RadiusX="0.7" RadiusY="0.8">
+        <GradientStop Color="#1A2A55" Offset="0" />
+        <GradientStop Color="#0A0B0F" Offset="1" />
+    </RadialGradientBrush>
+    <SolidColorBrush x:Key="BackdropGlowBrush" Color="Transparent" />
+    <SolidColorBrush x:Key="LoginCardBrush" Color="#E6111318" />
+    <SolidColorBrush x:Key="LoginCardStroke" Color="#2E3340" />
+    <RadialGradientBrush x:Key="TvBgBrush" Center="0.2,0" GradientOrigin="0.2,0" RadiusX="1.1" RadiusY="1.2">
+        <GradientStop Color="#1B2A52" Offset="0" />
+        <GradientStop Color="#0C0E14" Offset="0.55" />
+        <GradientStop Color="#08090D" Offset="1" />
+    </RadialGradientBrush>
+    <SolidColorBrush x:Key="TvCardBrush" Color="#161921" />
+    <SolidColorBrush x:Key="TvCardFocusBrush" Color="#252A36" />
+    <SolidColorBrush x:Key="TvCardStroke" Color="#00FFFFFF" />
+    <SolidColorBrush x:Key="TvPillActiveBrush" Color="#262B36" />
+    <SolidColorBrush x:Key="InsetWellBrush" Color="#161921" />
+    <SolidColorBrush x:Key="TvLegendBrush" Color="#C0080A0E" />
+    <SolidColorBrush x:Key="KeyCapBrush" Color="#2A2F3A" />
+    <SolidColorBrush x:Key="KeyCapStroke" Color="Transparent" />
+    <SolidColorBrush x:Key="StitchBrush" Color="Transparent" />
+    <SolidColorBrush x:Key="SegmentTrackBrush" Color="#191C23" />
+
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="DisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>

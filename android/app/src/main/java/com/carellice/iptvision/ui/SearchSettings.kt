@@ -186,6 +186,12 @@ fun SettingsSection(vm: AppViewModel) {
 
         ServerGroup(vm)
 
+        Group("Aspetto")
+        Toggle("Stile skeuomorfico", "Pelle, lino, metallo spazzolato e pulsanti lucidi al posto dello stile moderno.", Skin.skeuo) {
+            vm.settings.skin = if (it) "skeuo" else "classic"
+            Skin.skeuo = it
+        }
+
         Group("Riproduzione")
         Toggle("Formato HLS (m3u8) per la TV in diretta", "Di solito MPEG-TS è più stabile; prova HLS se un canale non parte.", vm.settings.outputFormat == "m3u8") {
             vm.settings.outputFormat = if (it) "m3u8" else "ts"

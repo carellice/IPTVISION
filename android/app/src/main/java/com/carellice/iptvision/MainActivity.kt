@@ -29,6 +29,8 @@ import androidx.compose.ui.input.key.type
 import com.carellice.iptvision.ui.C
 import com.carellice.iptvision.ui.HomeScreen
 import com.carellice.iptvision.ui.IptvTheme
+import com.carellice.iptvision.ui.Skin
+import com.carellice.iptvision.ui.material
 import com.carellice.iptvision.ui.LoginScreen
 import com.carellice.iptvision.ui.MovieDetailScreen
 import com.carellice.iptvision.ui.PlayerScreen
@@ -79,6 +81,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
+        Skin.skeuo = vm.settings.skin == "skeuo"
         setContent {
             IptvTheme {
                 // Ricerca vocale: su Android TV è il microfono del telecomando, sul telefono quello di Google.
@@ -110,7 +113,7 @@ class MainActivity : ComponentActivity() {
                 BackHandler(enabled = vm.canGoBack) { vm.back() }
 
                 Box(
-                    Modifier.fillMaxSize().background(C.Bg).onPreviewKeyEvent { e ->
+                    Modifier.fillMaxSize().material(C.Bg).onPreviewKeyEvent { e ->
                         // Indietro del telecomando: si naviga subito, senza che Compose lo usi prima per togliere il focus.
                         // Il player gestisce da sé il proprio.
                         val handled = e.key == Key.Back && vm.screen != Screen.Player && vm.canGoBack

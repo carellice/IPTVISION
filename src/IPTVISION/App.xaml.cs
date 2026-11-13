@@ -20,6 +20,12 @@ public partial class App : Application
         // Una sola istanza: due player sullo stesso account consumerebbero due connessioni.
         var mutexName = AppPaths.Profile == null ? "IPTVISION.SingleInstance" : "IPTVISION.SingleInstance." + AppPaths.Hash(AppPaths.Profile);
         _singleInstance = new Mutex(true, mutexName, out var isFirst);
+        // Dopo il cambio di stile la vecchia istanza si sta chiudendo: si aspetta che liberi il posto.
+        if (!isFirst && e.Args.Contains(RestartArg))
+        {
+            try { isFirst = _singleInstance.WaitOne(TimeSpan.FromSeconds(15)); }
+            catch (AbandonedMutexException) { isFirst = true; }
+        }
         if (!isFirst)
         {
             NativeMethods.ActivateExistingWindow("IPTVISION");
@@ -36,6 +42,8 @@ public partial class App : Application
         try
         {
             var settings = SettingsService.Load();
+            if (settings.Skin == "skeuo")
+                Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Themes/Skeuo.xaml") });
             var vm = new MainViewModel(settings);
             var window = new MainWindow(vm);
             MainWindow = window;
@@ -47,6 +55,15 @@ public partial class App : Application
             MessageBox.Show($"IPTVISION non è riuscito ad avviarsi:\n\n{ex.Message}", "IPTVISION", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    private const string RestartArg = "--restart";
+
+    /// <summary>Riapre il programma (per esempio dopo il cambio di stile grafico): la nuova istanza aspetta la chiusura di questa.</summary>
+    public static void Restart()
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!, RestartArg) { UseShellExecute = false });
+        Current.MainWindow?.Close();
     }
 
     private static void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)

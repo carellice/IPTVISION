@@ -27,6 +27,8 @@ public sealed class AppSettings
     public bool AutoCheckUpdates { get; set; } = true;
     /// <summary>Nasconde le categorie con "XXX" nel nome (canali, film e serie).</summary>
     public bool HideAdult { get; set; }
+    /// <summary>Stile grafico: "classic" (moderno) o "skeuo" (skeuomorfico). Si applica all'avvio.</summary>
+    public string Skin { get; set; } = "classic";
 
     /// <summary>Ordinamento scelto per ogni sezione ("Live", "Movies", "Series").</summary>
     public Dictionary<string, string> ListSort { get; set; } = [];

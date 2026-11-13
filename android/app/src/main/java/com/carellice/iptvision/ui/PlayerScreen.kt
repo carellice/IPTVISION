@@ -454,7 +454,7 @@ private fun TracksPanel(vm: AppViewModel, close: () -> Unit) {
     LaunchedEffect(Unit) { delay(50); runCatching { first.requestFocus() } }
     Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable(onClick = close), contentAlignment = Alignment.Center) {
         LazyColumn(
-            Modifier.width(420.dp).clip(RoundedCornerShape(16.dp)).background(C.Panel).padding(16.dp),
+            Modifier.width(420.dp).clip(RoundedCornerShape(16.dp)).material(C.Panel).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             item { Text("Audio", color = C.Text2, fontWeight = FontWeight.Bold, modifier = Modifier.padding(6.dp)) }

@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { ActionButton, Clickable, Dialog, SectionTitle, Switch, TextButton, TextField, toast } from '../components/ui.tsx'
 import { api } from '../lib/api.ts'
 import { NetworkStatus } from '../components/network.tsx'
+import { isSkeuo, setSkeuo } from '../lib/skin.ts'
 import { type XtreamList, addXtreamList, app, clearCache, logoutXtream, refreshAll, setHideAdult, updateSettings, useApp, switchXtreamList } from '../lib/app.ts'
 
 // SettingsSection (ui/SearchSettings.kt) plus what the browser version adds: the account on the
@@ -20,6 +21,7 @@ export function SettingsSection() {
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [update, setUpdate] = useState<string | null>(null)
+  const [skeuo, setSkeuoState] = useState(isSkeuo)
 
   useEffect(() => {
     api<{ expiresAt: number | null }>('/api/xtream/info')
@@ -88,6 +90,10 @@ export function SettingsSection() {
           </div>
         )}
         <Row><ActionButton text="Aggiungi lista" icon="list" onClick={addXtreamList} /></Row>
+
+        <Group title="Aspetto" />
+        <Toggle title="Stile skeuomorfico" subtitle="Pelle, lino, metallo spazzolato e pulsanti lucidi al posto dello stile moderno."
+          checked={skeuo} onChange={(v) => { setSkeuo(v); setSkeuoState(v) }} />
 
         <Group title="Riproduzione" />
         <Toggle title="Riprendi l'ultimo canale all'avvio" subtitle="Apri l'app e il canale riparte da dov'eri rimasto."

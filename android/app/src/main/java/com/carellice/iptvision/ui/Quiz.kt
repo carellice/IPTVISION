@@ -45,7 +45,7 @@ fun QuizDialog(vm: AppViewModel) {
     val result = remember(done, round, vm.movies, vm.series) { if (done && !loading) vm.recommend(answers.toMap()) else null }
 
     Dialog(onDismissRequest = { vm.quizOpen = false }) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Panel).padding(20.dp)) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).material(C.Panel).padding(20.dp)) {
             Text("Cosa guardo?", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(if (done) "I nostri consigli" else "Domanda ${step + 1} di ${Quiz.questions.size}", color = C.Text2, fontSize = 13.sp)
             VSpace(14.dp)

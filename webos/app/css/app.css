@@ -234,3 +234,102 @@ body.playing #player-ui { display: block; }
 /* ---------- Avvisi ---------- */
 #toast { position: absolute; left: 50%; bottom: 3rem; -webkit-transform: translateX(-50%); transform: translateX(-50%); background: rgba(17, 19, 24, 0.95); padding: 0.8rem 1.4rem; border-radius: 0.8rem; display: none; z-index: 60; }
 #toast.show { display: block; }
+
+/* =====================================================================================================
+   Stile skeuomorfico (Impostazioni > Aspetto, classe "skeuo" sulla radice): lino per lo sfondo, pelle per
+   il menu, piastre in rilievo, pozzetti incassati per i campi, plastica blu lucida per ciò che è scelto e
+   testo inciso. Solo proprietà che Chromium 53 conosce (webOS 4).
+   ===================================================================================================== */
+.skeuo {
+  --bg: #232529;
+  --panel: #2a2729;
+  --surface: #34373e;
+  --surface-hover: #3e4149;
+  --surface-pressed: #1d1e22;
+  --stroke: #0a0b0c;
+  --text: #f3f0e8;
+  --text2: #aba69c;
+  --text3: #7f7b72;
+  --accent: #3d82f5;
+  --accent2: #6fb2ff;
+}
+.skeuo body { background: #232529 url(../img/skeuo/linen.png); text-shadow: 0 -0.05rem 0 rgba(0, 0, 0, 0.7); }
+.skeuo .login { background: #232529 url(../img/skeuo/linen.png); }
+.skeuo .login-box {
+  width: 48rem; background: #2a2729 url(../img/skeuo/leather.png); padding: 2.2rem 2.4rem; border-radius: 1.2rem;
+  box-shadow: inset 0 0.05rem 0 rgba(255, 255, 255, 0.12), 0 0 0 0.05rem #000, 0 0.8rem 2rem rgba(0, 0, 0, 0.7);
+}
+
+/* Piastre in rilievo */
+.skeuo .btn, .skeuo .cat, .skeuo .list .item, .skeuo .setting, .skeuo .chip, .skeuo .toggle, .skeuo .dialog .opt {
+  background: -webkit-linear-gradient(top, #3e4149, #2c2e34);
+  background: linear-gradient(#3e4149, #2c2e34);
+  box-shadow: inset 0 0.05rem 0 rgba(255, 255, 255, 0.14), 0 0 0 0.05rem #0a0b0c, 0 0.12rem 0.3rem rgba(0, 0, 0, 0.55);
+}
+.skeuo .f.focused {
+  background: -webkit-linear-gradient(top, #4c5160, #30333b);
+  background: linear-gradient(#4c5160, #30333b);
+  box-shadow: inset 0 0.05rem 0 rgba(255, 255, 255, 0.2), 0 0 0 0.05rem #000, 0 0 1.2rem rgba(61, 130, 245, 0.6);
+}
+
+/* Plastica blu lucida: pulsante principale, scelta attiva, voce di menu aperta, interruttori accesi */
+.skeuo .btn.primary, .skeuo .chip.on, .skeuo .toggle.on, .skeuo .nav-item.active, .skeuo .switch.on, .skeuo .progress i {
+  background: -webkit-linear-gradient(top, #8cc0ff, #4f94f8 48%, #2a6ee6 50%, #3c86f4);
+  background: linear-gradient(#8cc0ff, #4f94f8 48%, #2a6ee6 50%, #3c86f4);
+  color: #fff;
+  text-shadow: 0 -0.05rem 0 rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0.05rem 0 rgba(255, 255, 255, 0.55), 0 0 0 0.05rem #163e8c, 0 0.12rem 0.3rem rgba(0, 0, 0, 0.5);
+}
+.skeuo .progress i { box-shadow: none; }
+
+/* Menu laterale: pelle con la cucitura lungo il bordo */
+.skeuo .rail {
+  background: #2a2729 url(../img/skeuo/leather.png); position: relative; z-index: 1;
+  box-shadow: inset -0.05rem 0 0 #000, 0.2rem 0 0.6rem rgba(0, 0, 0, 0.5);
+}
+.skeuo .rail:after {
+  content: ''; position: absolute; top: 0.4rem; bottom: 0.4rem; right: 0.3rem;
+  border-right: 0.08rem dashed rgba(184, 167, 138, 0.45);
+}
+
+/* Campi incassati */
+.skeuo .field input, .skeuo .search-row input {
+  background: -webkit-linear-gradient(top, #121316, #1d1f23);
+  background: linear-gradient(#121316, #1d1f23);
+  border-color: transparent;
+  box-shadow: inset 0 0.12rem 0.3rem rgba(0, 0, 0, 0.75), inset 0 0 0 0.05rem #050506, 0 0.05rem 0 rgba(255, 255, 255, 0.09);
+}
+.skeuo .field input.focused, .skeuo .search-row input.focused { border-color: rgba(61, 130, 245, 0.7); }
+
+/* Interruttore: binario incassato e levetta metallica */
+.skeuo .switch {
+  background: -webkit-linear-gradient(top, #141518, #2a2c31);
+  background: linear-gradient(#141518, #2a2c31);
+  box-shadow: inset 0 0.12rem 0.3rem rgba(0, 0, 0, 0.75), 0 0.05rem 0 rgba(255, 255, 255, 0.08);
+}
+.skeuo .switch i, .skeuo .switch.on i {
+  top: 0.1rem; width: 1.5rem; height: 1.5rem;
+  background: -webkit-radial-gradient(45% 25%, circle, #fff, #d9dce2 45%, #9ca1ab);
+  background: radial-gradient(circle at 45% 25%, #fff, #d9dce2 45%, #9ca1ab);
+  box-shadow: 0 0 0 0.05rem #2a2c31, 0 0.1rem 0.15rem rgba(0, 0, 0, 0.7);
+}
+.skeuo .switch i { left: 0.1rem; }
+.skeuo .switch.on i { left: 1.6rem; }
+
+/* Barre di avanzamento: una scanalatura */
+.skeuo .progress { background: #08090a; box-shadow: inset 0 0.05rem 0.1rem rgba(0, 0, 0, 0.9), 0 0.05rem 0 rgba(255, 255, 255, 0.08); }
+
+/* Copertine e loghi: cartoncini stampati con l'ombra */
+.skeuo .card .art, .skeuo .detail .poster, .skeuo .thumb {
+  box-shadow: 0 0 0 0.05rem #000, 0 0.2rem 0.5rem rgba(0, 0, 0, 0.6);
+}
+.skeuo .group-title { color: #8e897f; }
+.skeuo .badge { background: -webkit-linear-gradient(top, #4a4e57, #2e3036); background: linear-gradient(#4a4e57, #2e3036); box-shadow: 0 0 0 0.05rem #0a0a0c; }
+
+/* Finestre e pannelli sopra il video: fogli di pelle */
+.skeuo .dialog, .skeuo .p-panel, .skeuo .p-next-card {
+  background: #2a2729 url(../img/skeuo/leather.png);
+  box-shadow: inset 0 0.05rem 0 rgba(255, 255, 255, 0.12), 0 0 0 0.05rem #000, 0 0.8rem 2rem rgba(0, 0, 0, 0.7);
+}
+.skeuo .p-controls .btn { background: rgba(40, 42, 48, 0.85); }
+.skeuo #toast { background: -webkit-linear-gradient(top, #4a4e57, #2e3036); background: linear-gradient(#4a4e57, #2e3036); box-shadow: 0 0 0 0.05rem #000, 0 0.4rem 1rem rgba(0, 0, 0, 0.6); }

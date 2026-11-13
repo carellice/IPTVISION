@@ -100,7 +100,7 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
         if (vm.section == Section.Movies) vm.ensureMovies()
         if (vm.section == Section.Series) vm.ensureSeries()
     }
-    BoxWithConstraints(Modifier.fillMaxSize().background(C.Bg)) {
+    BoxWithConstraints(Modifier.fillMaxSize().material(C.Bg)) {
         val wide = maxWidth >= 720.dp
         val short = maxHeight < 500.dp
         androidx.compose.runtime.CompositionLocalProvider(LocalWide provides wide) {
@@ -115,7 +115,7 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
             } else {
                 Column(Modifier.fillMaxSize().statusBarsPadding()) {
                     Column(Modifier.weight(1f).padding(horizontal = 14.dp).padding(top = 12.dp)) { Content(vm, onVoiceSearch) }
-                    NavigationBar(containerColor = C.Panel) {
+                    NavigationBar(Modifier.metalBar(), containerColor = Color.Transparent) {
                         vm.sections.forEach { s ->
                             NavigationBarItem(
                                 selected = vm.section == s,
@@ -154,7 +154,7 @@ private fun SideNav(vm: AppViewModel, compact: Boolean) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { if (vm.isTv) runCatching { first.requestFocus() } }
     Column(
-        Modifier.width(220.dp).fillMaxHeight().background(C.Panel)
+        Modifier.width(220.dp).fillMaxHeight().material(C.Panel)
             // Entrando con ◀ si torna sulla sezione aperta, non sulla voce più vicina.
             .focusProperties { onEnter = { first.requestFocus() } }
             .focusGroup()

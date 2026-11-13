@@ -53,6 +53,11 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
         get() = p.getBoolean("autoCheckUpdates", true)
         set(v) = p.edit().putBoolean("autoCheckUpdates", v).apply()
 
+    /** Stile grafico: "classic" (moderno) o "skeuo" (skeuomorfico, vedi ui/Components.kt). */
+    var skin: String
+        get() = p.getString("skin", "classic") ?: "classic"
+        set(v) = p.edit().putString("skin", v).apply()
+
     /** Nasconde le categorie con "XXX" nel nome (canali, film e serie). */
     var hideAdult: Boolean
         get() = p.getBoolean("hideAdult", false)
