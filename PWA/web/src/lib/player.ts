@@ -160,7 +160,8 @@ export class PlayerController {
       }
       if (session !== this.session) return
       if (!this.reencode && !browserDecodes(video, this.probe.video)) this.reencode = true
-      if (this.reencode) this.probe = { ...this.probe, direct: false }
+      // Safari plays the provider's MP4 only if its server answers Range exactly: HLS always works.
+      if (this.reencode || nativeHls(video)) this.probe = { ...this.probe, direct: false }
       this.durationMs = Math.round(this.probe.duration * 1000)
       this.audioTracks = this.probe.audio.map((a) => ({ index: a.index, label: a.label, selected: a.index === this.audio }))
       this.emit()
@@ -271,7 +272,11 @@ export class PlayerController {
       return
     }
     const limit = this.isLive && this.everPlayed ? 12_000 : this.isLive ? 25_000 : this.everPlayed ? 20_000 : 35_000
-    if (Date.now() - this.lastProgressAt > limit) this.scheduleRetry('flusso bloccato')
+    if (Date.now() - this.lastProgressAt > limit) {
+      // A film that never started: the browser can't really show its video (black screen).
+      if (!this.isLive && !this.everPlayed) this.useH264()
+      this.scheduleRetry('flusso bloccato')
+    }
   }
 
   /** Re-encodes the video in H.264 from the next attempt on; false when it already is. */
