@@ -142,13 +142,19 @@ export function raw(req: IncomingMessage, res: ServerResponse, owner: string, a:
 // of unknown length coming from a pipe, but plays HLS by itself. ffmpeg writes the segments to a
 // temporary folder; it stops when the browser asks for nothing for two minutes (pause, closed tab).
 
-type HlsRun = { child: ChildProcess; dir: string; lastUse: number; timer: NodeJS.Timeout }
+type HlsRun = { key: string; child: ChildProcess; dir: string; lastUse: number; timer: NodeJS.Timeout; exited: boolean; errors: string }
 const hlsRuns = new Map<string, HlsRun>()
 const hlsRoot = join(tmpdir(), 'iptvision-hls')
 
-/** Starts the conversion and answers with the playlist once its first segment is ready. */
-export async function vodHls(res: ServerResponse, owner: string, a: XtreamAccount, kind: Kind, id: string, ext: string,
+/**
+ * Starts the conversion and answers with the playlist once its first segment is ready. Safari reloads
+ * the playlist from this same address every few seconds: the same request ([key]) gets the running
+ * conversion's playlist instead of restarting it.
+ */
+export async function vodHls(res: ServerResponse, owner: string, key: string, a: XtreamAccount, kind: Kind, id: string, ext: string,
   start: number, audio: number, hevc: boolean, h264 = false) {
+  const same = hlsRuns.get(owner)
+  if (same?.key === key) { same.lastUse = Date.now(); return answerPlaylist(res, owner, same) }
   stopFor(owner)
   const dir = join(hlsRoot, createHash('sha256').update(owner).digest('hex').slice(0, 16))
   rmSync(dir, { recursive: true, force: true })
@@ -167,26 +173,28 @@ export async function vodHls(res: ServerResponse, owner: string, a: XtreamAccoun
     '-f', 'hls', '-hls_time', '4', '-hls_list_size', '0', '-hls_playlist_type', 'event', ...seg,
     '-hls_flags', 'temp_file+independent_segments', '-hls_base_url', '/api/hls-seg/', join(dir, 'index.m3u8'),
   ], { stdio: ['ignore', 'ignore', 'pipe'] })
-  let errors = ''
-  child.stderr!.on('data', (d: Buffer) => { errors = (errors + d.toString()).slice(-2000) })
   child.on('error', () => { /* answered below: no playlist */ })
-  const run: HlsRun = { child, dir, lastUse: Date.now(), timer: setInterval(() => {
+  const run: HlsRun = { key, child, dir, lastUse: Date.now(), exited: false, errors: '', timer: setInterval(() => {
     if (Date.now() - run.lastUse > 120_000) stopFor(owner)
   }, 15_000) }
+  child.stderr!.on('data', (d: Buffer) => { run.errors = (run.errors + d.toString()).slice(-2000) })
   hlsRuns.set(owner, run)
-  let exited = false
   child.on('exit', (code) => {
-    exited = true
-    if (errors) lastErrors.set(owner, `${new Date().toISOString()} ffmpeg hls (uscita ${code}): ${errors.trim()}`)
-    if (code && code !== 255 && errors) console.warn('ffmpeg hls:', errors.trim().split('\n').slice(-3).join(' | '))
+    run.exited = true
+    if (run.errors) lastErrors.set(owner, `${new Date().toISOString()} ffmpeg hls (uscita ${code}): ${run.errors.trim()}`)
+    if (code && code !== 255 && run.errors) console.warn('ffmpeg hls:', run.errors.trim().split('\n').slice(-3).join(' | '))
   })
-  const file = join(dir, 'index.m3u8')
-  for (let i = 0; i < 300 && !existsSync(file) && !exited && hlsRuns.get(owner) === run; i++) await new Promise((r) => setTimeout(r, 100))
+  return answerPlaylist(res, owner, run)
+}
+
+async function answerPlaylist(res: ServerResponse, owner: string, run: HlsRun) {
+  const file = join(run.dir, 'index.m3u8')
+  for (let i = 0; i < 300 && !existsSync(file) && !run.exited && hlsRuns.get(owner) === run; i++) await new Promise((r) => setTimeout(r, 100))
   if (!existsSync(file)) {
     if (hlsRuns.get(owner) === run) stopFor(owner)
     res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
     res.end('Impossibile convertire il file')
-    lastErrors.set(owner, `${new Date().toISOString()} ffmpeg hls: nessuna playlist dopo 30 s. ${errors.trim()}`)
+    lastErrors.set(owner, `${new Date().toISOString()} ffmpeg hls: nessuna playlist dopo 30 s. ${run.errors.trim()}`)
     return
   }
   res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' })

@@ -222,7 +222,10 @@ export class PlayerController {
     } else {
       this.offsetSec = startSec
       const codec = this.reencode ? '&video=h264' : this.probe.video?.codec === 'hevc' ? '&hevc=1' : ''
-      video.src = `/api/${nativeHls(video) ? 'hls' : 'play'}/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}&start=${startSec}&audio=${this.audio}${codec}`
+      // [s]: each attempt is a new conversion; Safari's playlist reloads repeat the same address.
+      video.src = nativeHls(video)
+        ? `/api/hls/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}&start=${startSec}&audio=${this.audio}${codec}&s=${session}`
+        : `/api/play/${src.kind}/${encodeURIComponent(src.id)}?ext=${src.ext}&start=${startSec}&audio=${this.audio}${codec}`
     }
     this.note(`apro ${video.src}`)
     this.go(video)

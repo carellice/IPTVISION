@@ -386,7 +386,7 @@ route('GET', '/api/play/:kind/:id', (req, res, p, url, user) => {
 })
 
 route('GET', '/api/hls/:kind/:id', async (_req, res, p, url, user) => {
-  await play.vodHls(res, user.token, requireXtream(), kindOf(p[0]), safeId(p[1]), safeExt(url.searchParams.get('ext')),
+  await play.vodHls(res, user.token, url.pathname + url.search, requireXtream(), kindOf(p[0]), safeId(p[1]), safeExt(url.searchParams.get('ext')),
     intParam(url, 'start'), intParam(url, 'audio'), url.searchParams.get('hevc') === '1', url.searchParams.get('video') === 'h264')
 })
 
