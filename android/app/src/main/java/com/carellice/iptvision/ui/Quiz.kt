@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -55,7 +54,7 @@ fun QuizDialog(vm: AppViewModel) {
                 Text(q.text, color = C.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 VSpace(10.dp)
                 key(step) {
-                    LazyColumn(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(4.dp)) {
+                    LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(4.dp)) {
                         itemsIndexed(q.options) { i, o ->
                             Text(
                                 o.label, color = C.Text, fontSize = 15.sp,
@@ -75,7 +74,7 @@ fun QuizDialog(vm: AppViewModel) {
             } else {
                 result.note?.let { Text(it, color = C.Text2, fontSize = 13.sp); VSpace(8.dp) }
                 key(round) {
-                    LazyColumn(Modifier.heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(4.dp)) {
+                    LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(4.dp)) {
                         itemsIndexed(result.picks) { i, p ->
                             val (poster, initials, meta, kind) = when (p) {
                                 is Quiz.Pick.Film -> listOf(p.movie.poster, p.movie.initials, p.movie.meta, "Film")
