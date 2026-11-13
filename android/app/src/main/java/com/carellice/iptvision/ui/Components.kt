@@ -32,6 +32,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -144,6 +145,21 @@ fun Modifier.dpadLeavable(): Modifier {
             Key.DirectionUp -> fm.moveFocus(FocusDirection.Up)
             else -> false
         }
+    }
+}
+
+/**
+ * Griglie col telecomando: tenendo premuto ▲ o ▼ il focus correva più veloce della griglia, la riga dopo
+ * non era ancora pronta e il focus si impallava o finiva a destra. Qui le ripetizioni passano al massimo
+ * una ogni [gapMs] millisecondi.
+ */
+@Composable
+fun Modifier.dpadThrottle(gapMs: Long = 140): Modifier {
+    var last by remember { mutableLongStateOf(0L) }
+    return onPreviewKeyEvent { e ->
+        if (e.type != KeyEventType.KeyDown || (e.key != Key.DirectionDown && e.key != Key.DirectionUp)) return@onPreviewKeyEvent false
+        val now = e.nativeKeyEvent.eventTime
+        if (e.nativeKeyEvent.repeatCount > 0 && now - last < gapMs) true else { last = now; false }
     }
 }
 

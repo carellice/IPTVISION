@@ -130,7 +130,7 @@ private fun CategoryBrowser(vm: AppViewModel, section: Section, entries: List<Ca
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(8.dp),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().dpadThrottle(),
             ) {
                 itemsIndexed(entries, key = { _, c -> c.id }) { i, c ->
                     Column(
@@ -265,7 +265,7 @@ fun LiveSection(vm: AppViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(10.dp),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().dpadThrottle(),
             ) {
                 itemsIndexed(list, key = { _, c -> c.streamId }) { i, ch ->
                     ChannelTile(vm, ch, list, ch.streamId == playingId, Modifier.initialFocus(i == start, vm.isTv))
@@ -444,7 +444,7 @@ private fun <T> EntryList(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             // Spazio attorno per il riquadro che si ingrandisce quando ha il focus.
             contentPadding = PaddingValues(12.dp),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().dpadThrottle(),
         ) {
             itemsIndexed(list, key = { _, e -> key(e.item) }) { i, e -> item(e, Modifier.initialFocus(i == start, vm.isTv), true) }
         }
