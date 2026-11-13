@@ -152,7 +152,7 @@ const hlsRoot = join(tmpdir(), 'iptvision-hls')
  * conversion's playlist instead of restarting it.
  */
 export async function vodHls(res: ServerResponse, owner: string, key: string, a: XtreamAccount, kind: Kind, id: string, ext: string,
-  start: number, audio: number, hevc: boolean, h264 = false) {
+  start: number, audio: number, hevc: boolean, h264 = false, aacCopy = false) {
   const same = hlsRuns.get(owner)
   if (same?.key === key) { same.lastUse = Date.now(); return answerPlaylist(res, owner, same) }
   stopFor(owner)
@@ -168,9 +168,13 @@ export async function vodHls(res: ServerResponse, owner: string, key: string, a:
   // HEVC in HLS only works in fMP4 segments; everything else in MPEG-TS, which every TV reads.
   const seg = hevc && !h264 ? ['-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4'] : ['-hls_segment_type', 'mpegts']
   const child = spawn(FFMPEG, [
-    ...input, ...(start > 0 ? ['-ss', String(start)] : []), '-i', streamUrl(a, kind, id, ext),
-    '-map', '0:v:0?', '-map', `0:a:${audio}?`, ...v, '-c:a', 'aac', '-ac', '2', '-b:a', '192k', '-sn', '-dn',
-    '-f', 'hls', '-hls_time', '4', '-hls_list_size', '0', '-hls_playlist_type', 'event', ...seg,
+    // A Raspberry Pi can't convert a whole film at full speed: after a 30 s head start ffmpeg reads
+    // at twice real time, enough to stay ahead without loading the CPU and the SD card.
+    ...input, '-readrate', '2', '-readrate_initial_burst', '30',
+    ...(start > 0 ? ['-ss', String(start)] : []), '-i', streamUrl(a, kind, id, ext),
+    '-map', '0:v:0?', '-map', `0:a:${audio}?`, ...v,
+    ...(aacCopy ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-ac', '2', '-b:a', '192k']), '-sn', '-dn',
+    '-f', 'hls', '-hls_time', '2', '-hls_list_size', '0', '-hls_playlist_type', 'event', ...seg,
     '-hls_flags', 'temp_file+independent_segments', '-hls_base_url', '/api/hls-seg/', join(dir, 'index.m3u8'),
   ], { stdio: ['ignore', 'ignore', 'pipe'] })
   child.on('error', () => { /* answered below: no playlist */ })
