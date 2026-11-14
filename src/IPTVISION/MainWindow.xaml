@@ -375,9 +375,9 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Border Width="30" Height="30" CornerRadius="8" Background="{StaticResource SurfaceBrush}">
+                                    <Border Width="30" Height="30" CornerRadius="8" Background="{StaticResource CategoryTileBrush}">
                                         <TextBlock x:Name="Glyph" Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="12"
-                                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                                                   Foreground="{StaticResource CategoryGlyphBrush}" />
                                     </Border>
                                     <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13.5" FontWeight="SemiBold" Margin="10,0,8,0"
                                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
@@ -1172,11 +1172,13 @@
                                     <TextBlock Text="ASPETTO" Style="{StaticResource SectionTitle}" />
                                     <TextBlock Text="Stile grafico" Style="{StaticResource FieldLabel}" />
                                     <Border Background="{StaticResource SegmentTrackBrush}" CornerRadius="9" Padding="2">
-                                        <UniformGrid Columns="2">
+                                        <UniformGrid Columns="3">
                                             <RadioButton Style="{StaticResource SegmentButton}" GroupName="skin" Content="Moderno"
-                                                         IsChecked="{Binding IsSkeuo, Converter={StaticResource InvertBool}}" />
+                                                         IsChecked="{Binding IsClassicSkin}" />
                                             <RadioButton Style="{StaticResource SegmentButton}" GroupName="skin" Content="Skeuomorfico"
                                                          IsChecked="{Binding IsSkeuo}" />
+                                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="skin" Content="Modern UI"
+                                                         IsChecked="{Binding IsMetro}" />
                                         </UniformGrid>
                                     </Border>
                                     <TextBlock Text="Cambiando stile IPTVISION si riapre da solo e riprende il canale." Foreground="{StaticResource TextTertiaryBrush}"

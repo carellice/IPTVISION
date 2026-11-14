@@ -138,16 +138,17 @@ private fun CategoryBrowser(vm: AppViewModel, section: Section, entries: List<Ca
                     Column(
                         Modifier.fillMaxWidth().height(96.dp)
                             .gridItem(gf, i, last != null && i == lastIndex && vm.isTv)
-                            .tvClickable { vm.openCategory(section, c.id) }
+                            // Modern UI: le categorie sono tessere nel colore d'accento.
+                            .tvClickable(background = if (Skin.metro) C.Accent else C.Surface) { vm.openCategory(section, c.id) }
                             .padding(14.dp),
                         verticalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(c.icon, null, tint = catTint(c.id), modifier = Modifier.size(20.dp))
+                            Icon(c.icon, null, tint = if (Skin.metro) Color.White else catTint(c.id), modifier = Modifier.size(20.dp))
                             Box(Modifier.weight(1f))
-                            Text(c.count.toString(), color = C.Text3, fontSize = 13.sp)
+                            Text(c.count.toString(), color = if (Skin.metro) Color.White else C.Text3, fontSize = 13.sp)
                         }
-                        Text(c.name, color = C.Text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(c.name, color = C.Text, fontWeight = if (Skin.metro) FontWeight.Normal else FontWeight.SemiBold, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -229,13 +230,13 @@ private fun SortButton(vm: AppViewModel, section: Section, compact: Boolean) {
 @Composable
 private fun ViewToggle(vm: AppViewModel, section: Section) {
     val grid = vm.isGrid(section)
-    Row(Modifier.clip(RoundedCornerShape(10.dp)).padding(1.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(Modifier.clip(skinCorners(10.dp)).padding(1.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         listOf(false to Icons.AutoMirrored.Filled.ViewList, true to Icons.Default.GridView).forEach { (g, icon) ->
             val sel = g == grid
             Box(
                 Modifier.tvClickable(shape = RoundedCornerShape(10.dp), background = if (sel) C.AccentSoft else C.Surface) { vm.setGrid(section, g) }
                     .padding(9.dp),
-            ) { Icon(icon, if (g) "Griglia" else "Elenco", tint = if (sel) C.Accent else C.Text2, modifier = Modifier.size(20.dp)) }
+            ) { Icon(icon, if (g) "Griglia" else "Elenco", tint = if (sel) (if (Skin.metro) Color.White else C.Accent) else C.Text2, modifier = Modifier.size(20.dp)) }
         }
     }
 }
@@ -300,7 +301,7 @@ fun ChannelRow(vm: AppViewModel, ch: Channel, playlist: List<Channel>, current: 
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Artwork(ch.logo, ch.initials, Modifier.size(width = 72.dp, height = 48.dp).clip(RoundedCornerShape(8.dp)), ContentScale.Fit, 15)
+        Artwork(ch.logo, ch.initials, Modifier.size(width = 72.dp, height = 48.dp).clip(skinCorners(8.dp)), ContentScale.Fit, 15)
         HSpace(12.dp)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -337,7 +338,7 @@ private fun ChannelTile(vm: AppViewModel, ch: Channel, playlist: List<Channel>, 
         ) { vm.playChannel(ch, playlist) }.padding(8.dp),
     ) {
         Box {
-            Artwork(ch.logo, ch.initials, Modifier.fillMaxWidth().aspectRatio(16f / 10f).clip(RoundedCornerShape(8.dp)), ContentScale.Fit, 18)
+            Artwork(ch.logo, ch.initials, Modifier.fillMaxWidth().aspectRatio(16f / 10f).clip(skinCorners(8.dp)), ContentScale.Fit, 18)
             if (ch.streamId in vm.favorites) Icon(Icons.Default.Star, null, tint = C.Star, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(16.dp))
         }
         VSpace(6.dp)
@@ -468,7 +469,7 @@ fun Poster(
 ) {
     Column(modifier.tvClickable(focusScale = 1.06f, background = Color.Transparent, focusedBackground = C.Surface, onLongClick = onLongClick, onClick = onClick).padding(4.dp)) {
         Box {
-            Artwork(url, initials, Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)), fontSize = 22)
+            Artwork(url, initials, Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(skinCorners(10.dp)), fontSize = 22)
             if (progress > 0f && progress < 1f) ProgressLine(progress, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(6.dp))
             Column(Modifier.align(Alignment.TopEnd).padding(6.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (badge != null) Badge(badge, Color(0xD0111318))
@@ -489,7 +490,7 @@ fun MediaRow(
     modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
 ) {
     Row(modifier.fillMaxWidth().tvClickable(focusScale = 1.02f, onLongClick = onLongClick, onClick = onClick).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Artwork(url, initials, Modifier.width(52.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)), ContentScale.Crop, 14)
+        Artwork(url, initials, Modifier.width(52.dp).aspectRatio(2f / 3f).clip(skinCorners(6.dp)), ContentScale.Crop, 14)
         HSpace(14.dp)
         Column(Modifier.weight(1f)) {
             Text(title, color = C.Text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -545,7 +546,7 @@ fun VariantDialog(vm: AppViewModel) {
     }
     androidx.compose.ui.window.Dialog(onDismissRequest = { vm.variantChoice = null }) {
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).material(C.Panel).padding(20.dp),
+            Modifier.fillMaxWidth().clip(skinCorners(18.dp)).material(C.Panel).padding(20.dp),
         ) {
             Text("Scegli la versione", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(choice.title, color = C.Text2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -556,7 +557,7 @@ fun VariantDialog(vm: AppViewModel) {
                         Modifier.fillMaxWidth().initialFocus(i == 0, true).tvClickable(focusScale = 1.02f, onClick = o.open).padding(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Artwork(o.url, o.initials, Modifier.width(44.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)), ContentScale.Crop, 12)
+                        Artwork(o.url, o.initials, Modifier.width(44.dp).aspectRatio(2f / 3f).clip(skinCorners(6.dp)), ContentScale.Crop, 12)
                         HSpace(12.dp)
                         Column(Modifier.weight(1f)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

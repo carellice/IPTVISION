@@ -80,32 +80,44 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.imageResource
 import com.carellice.iptvision.R
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.foundation.shape.CircleShape
 
 /** Stile grafico scelto nelle impostazioni: cambia al volo colori e materiali di tutta l'app. */
 object Skin {
     var skeuo by mutableStateOf(false)
+    /** Modern UI (Windows Phone): nero, piatto, angoli vivi, sezioni come voci del pivot (HomeScreen). */
+    var metro by mutableStateOf(false)
+
+    fun set(skin: String) {
+        skeuo = skin == "skeuo"
+        metro = skin == "metro"
+    }
 }
 
 /** Colori dell'app: quelli dello stile moderno o, con lo stile skeuomorfico, toni caldi di pelle e metallo. */
 object C {
-    private fun pick(classic: Long, skeuo: Long) = Color(if (Skin.skeuo) skeuo else classic)
-    val Accent get() = pick(0xFF3D7BFF, 0xFF3D82F5)
-    val Accent2 get() = pick(0xFF00C2FF, 0xFF6FB2FF)
-    val Bg get() = pick(0xFF0A0B0F, 0xFF232529)
-    val Panel get() = pick(0xFF111318, 0xFF2A2729)
-    val Surface get() = pick(0xFF191C23, 0xFF34373E)
-    val SurfaceHover get() = pick(0xFF21252E, 0xFF3E4149)
-    val SurfacePressed get() = pick(0xFF2A2F3A, 0xFF464A54)
-    val Stroke get() = pick(0xFF20242D, 0xFF0E0F11)
-    val StrokeStrong get() = pick(0xFF2E3340, 0xFF0A0B0C)
-    val Text get() = pick(0xFFF1F3F7, 0xFFF3F0E8)
-    val Text2 get() = pick(0xFF9099A8, 0xFFABA69C)
-    val Text3 get() = pick(0xFF5C6473, 0xFF7F7B72)
-    val AccentSoft get() = pick(0x223D7BFF, 0x403D82F5)
-    val Danger get() = pick(0xFFFF5D6C, 0xFFFF6B6B)
-    val Star get() = pick(0xFFFFC94D, 0xFFFFCB45)
-    val Live get() = pick(0xFFFF4D5E, 0xFFFF3B30)
+    private fun pick(classic: Long, skeuo: Long, metro: Long) = Color(if (Skin.metro) metro else if (Skin.skeuo) skeuo else classic)
+    val Accent get() = pick(0xFF3D7BFF, 0xFF3D82F5, 0xFF1BA1E2)
+    val Accent2 get() = pick(0xFF00C2FF, 0xFF6FB2FF, 0xFF1BA1E2)
+    val Bg get() = pick(0xFF0A0B0F, 0xFF232529, 0xFF000000)
+    val Panel get() = pick(0xFF111318, 0xFF2A2729, 0xFF1F1F1F)
+    val Surface get() = pick(0xFF191C23, 0xFF34373E, 0xFF1F1F1F)
+    val SurfaceHover get() = pick(0xFF21252E, 0xFF3E4149, 0xFF2B2B2B)
+    val SurfacePressed get() = pick(0xFF2A2F3A, 0xFF464A54, 0xFF1BA1E2)
+    val Stroke get() = pick(0xFF20242D, 0xFF0E0F11, 0xFF262626)
+    val StrokeStrong get() = pick(0xFF2E3340, 0xFF0A0B0C, 0xFF3D3D3D)
+    val Text get() = pick(0xFFF1F3F7, 0xFFF3F0E8, 0xFFFFFFFF)
+    val Text2 get() = pick(0xFF9099A8, 0xFFABA69C, 0xFFA6A6A6)
+    val Text3 get() = pick(0xFF5C6473, 0xFF7F7B72, 0xFF6B6B6B)
+    val AccentSoft get() = pick(0x223D7BFF, 0x403D82F5, 0xFF1BA1E2)
+    val Danger get() = pick(0xFFFF5D6C, 0xFFFF6B6B, 0xFFE51400)
+    val Star get() = pick(0xFFFFC94D, 0xFFFFCB45, 0xFFF0A30A)
+    val Live get() = pick(0xFFFF4D5E, 0xFFFF3B30, 0xFFE51400)
 }
+
+/** Angoli arrotondati, o vivi nello stile Modern UI. */
+fun skinCorners(r: Dp): Shape = if (Skin.metro) RectangleShape else RoundedCornerShape(r)
 
 /** Materiali dello stile skeuomorfico: lino, pelle, metallo spazzolato, plastica blu lucida, bordi in rilievo. */
 object Skeuo {
@@ -190,6 +202,12 @@ fun Modifier.tvClickable(
 ): Modifier {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) focusScale else 1f, label = "focus")
+    // Modern UI: angoli vivi (i cerchi restano); pulsanti e pillole sul fondo scuro col bordo bianco, righe e schede piatte.
+    val metroButton = Skin.metro && background == C.Surface && (shape == RoundedCornerShape(10.dp) || shape == RoundedCornerShape(50))
+    // === e non ==: CircleShape è uguale a RoundedCornerShape(50), e le pillole devono diventare rettangoli.
+    val keepRound = shape === CircleShape || (shape == RoundedCornerShape(50) && background != C.Surface && background != C.Accent)
+    val shape = if (Skin.metro && !keepRound) RectangleShape else shape
+    val background = if (Skin.metro && background == C.Surface) Color.Transparent else background
     val fill = if (focused) focusedBackground else background
     val skeuo = Skin.skeuo && fill.alpha > 0.3f
     val gloss = skeuo && fill == C.Accent
@@ -211,6 +229,7 @@ fun Modifier.tvClickable(
                 else -> Modifier.background(fill)
             },
         )
+        .then(if (metroButton && !focused) Modifier.border(2.dp, Color.White, shape) else Modifier)
         .border(if (focused) 2.dp else 0.dp, if (focused) Color.White else Color.Transparent, shape)
         .combinedClickable(onLongClick = onLongClick, onClick = onClick)
 }
@@ -367,7 +386,7 @@ private fun Initials(text: String, fontSize: Int) {
 
 @Composable
 fun ProgressLine(progress: Float, modifier: Modifier = Modifier, color: Color = C.Accent, height: Dp = 3.dp) {
-    Box(modifier.height(height).clip(RoundedCornerShape(2.dp)).background(C.StrokeStrong)) {
+    Box(modifier.height(height).clip(if (Skin.metro) RectangleShape else RoundedCornerShape(2.dp)).background(C.StrokeStrong)) {
         Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(height).background(color))
     }
 }
@@ -464,7 +483,8 @@ fun Empty(text: String, modifier: Modifier = Modifier.fillMaxSize()) {
 @Composable
 fun SectionTitle(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text(title, color = C.Text, fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // Modern UI: il pivot in alto nomina già la sezione, resta il sottotitolo.
+        if (!(Skin.metro && com.carellice.iptvision.Section.entries.any { it.title == title })) Text(title, color = C.Text, fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (subtitle != null) Text(subtitle, color = C.Text2, fontSize = 13.sp)
     }
 }
@@ -476,7 +496,7 @@ fun Badge(text: String, color: Color = C.SurfacePressed) {
         color = C.Text,
         fontSize = 11.sp,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(color).padding(horizontal = 6.dp, vertical = 2.dp),
+        modifier = Modifier.clip(if (Skin.metro) RectangleShape else RoundedCornerShape(4.dp)).background(color).padding(horizontal = 6.dp, vertical = 2.dp),
     )
 }
 

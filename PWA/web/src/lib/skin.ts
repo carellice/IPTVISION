@@ -1,14 +1,27 @@
-// Graphic style of this browser: the current one or skeuomorphic (styles.css, html[data-skin="skeuo"]).
+// Graphic style of this browser: the current one, skeuomorphic or Modern UI (styles.css, html[data-skin]).
+import { useSyncExternalStore } from 'react'
+
 const KEY = 'iptvision.skin'
 
+export type Skin = 'classic' | 'skeuo' | 'metro'
+
 export function applySkin() {
-  try { if (localStorage.getItem(KEY) === 'skeuo') document.documentElement.dataset.skin = 'skeuo' } catch { /* private mode */ }
+  try {
+    const s = localStorage.getItem(KEY)
+    if (s === 'skeuo' || s === 'metro') document.documentElement.dataset.skin = s
+  } catch { /* private mode */ }
 }
 
-export const isSkeuo = () => document.documentElement.dataset.skin === 'skeuo'
+export const getSkin = (): Skin => (document.documentElement.dataset.skin as Skin | undefined) ?? 'classic'
 
-export function setSkeuo(on: boolean) {
-  if (on) document.documentElement.dataset.skin = 'skeuo'
-  else delete document.documentElement.dataset.skin
-  try { localStorage.setItem(KEY, on ? 'skeuo' : 'classic') } catch { /* private mode */ }
+const listeners = new Set<() => void>()
+
+export function setSkin(s: Skin) {
+  if (s === 'classic') delete document.documentElement.dataset.skin
+  else document.documentElement.dataset.skin = s
+  try { localStorage.setItem(KEY, s) } catch { /* private mode */ }
+  listeners.forEach((l) => l())
 }
+
+/** The skin as React state: Modern UI also changes the layout (pivot instead of the bars). */
+export const useSkin = () => useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l) }, getSkin)

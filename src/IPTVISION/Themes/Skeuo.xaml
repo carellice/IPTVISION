@@ -26,6 +26,7 @@
         <GradientStop Color="#3E4149" Offset="0" />
         <GradientStop Color="#2C2E34" Offset="1" />
     </LinearGradientBrush>
+    <StaticResource x:Key="CategoryTileBrush" ResourceKey="SurfaceBrush" />
     <LinearGradientBrush x:Key="SurfaceHoverBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="#4A4E57" Offset="0" />
         <GradientStop Color="#34373E" Offset="1" />
@@ -39,6 +40,7 @@
     <SolidColorBrush x:Key="StrokeStrongBrush" Color="#08090A" />
     <SolidColorBrush x:Key="TextBrush" Color="#F3F0E8" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="#ABA69C" />
+    <StaticResource x:Key="CategoryGlyphBrush" ResourceKey="TextSecondaryBrush" />
     <SolidColorBrush x:Key="TextTertiaryBrush" Color="#7A766E" />
     <SolidColorBrush x:Key="AccentBrush" Color="#3D82F5" />
     <SolidColorBrush x:Key="AccentSoftBrush" Color="#403D82F5" />

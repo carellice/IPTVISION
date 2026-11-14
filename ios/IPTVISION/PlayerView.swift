@@ -158,7 +158,7 @@ struct PlayerView: View {
                 Button("Guarda ora") { countdown = nil; model.playNextEpisode() }.buttonStyle(.borderedProminent)
             }
             .padding()
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Theme.corner(14)))
             .padding(.bottom, 40)
         }
     }

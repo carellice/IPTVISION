@@ -45,7 +45,7 @@ fun QuizDialog(vm: AppViewModel) {
     val result = remember(done, round, vm.movies, vm.series) { if (done && !loading) vm.recommend(answers.toMap()) else null }
 
     Dialog(onDismissRequest = { vm.quizOpen = false }) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).material(C.Panel).padding(20.dp)) {
+        Column(Modifier.fillMaxWidth().clip(skinCorners(18.dp)).material(C.Panel).padding(20.dp)) {
             Text("Cosa guardo?", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(if (done) "I nostri consigli" else "Domanda ${step + 1} di ${Quiz.questions.size}", color = C.Text2, fontSize = 13.sp)
             VSpace(14.dp)
@@ -84,7 +84,7 @@ fun QuizDialog(vm: AppViewModel) {
                                 Modifier.fillMaxWidth().initialFocus(i == 0, true).tvClickable(focusScale = 1.02f) { vm.openPick(p) }.padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Artwork(poster, initials ?: "", Modifier.width(44.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)), ContentScale.Crop, 12)
+                                Artwork(poster, initials ?: "", Modifier.width(44.dp).aspectRatio(2f / 3f).clip(skinCorners(6.dp)), ContentScale.Crop, 12)
                                 HSpace(12.dp)
                                 Column(Modifier.weight(1f)) {
                                     Text(p.name, color = C.Text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)

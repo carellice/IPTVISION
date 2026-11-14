@@ -65,7 +65,7 @@ fun LoginScreen(vm: AppViewModel) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(painterResource(R.drawable.logo), null, Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)))
+                Image(painterResource(R.drawable.logo), null, Modifier.size(52.dp).clip(skinCorners(12.dp)))
                 HSpace(14.dp)
                 Column {
                     Text("IPTVISION", color = C.Text, fontSize = 28.sp, fontWeight = FontWeight.Bold)

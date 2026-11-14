@@ -325,7 +325,7 @@ private fun InfoBlock(vm: AppViewModel, p: Playing) {
             val ch = p.channel
             val (now, next) = vm.epg.nowNext(ch)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Artwork(ch.logo, ch.initials, Modifier.size(width = 96.dp, height = 64.dp).clip(RoundedCornerShape(10.dp)), ContentScale.Fit, 18)
+                Artwork(ch.logo, ch.initials, Modifier.size(width = 96.dp, height = 64.dp).clip(skinCorners(10.dp)), ContentScale.Fit, 18)
                 HSpace(16.dp)
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -432,7 +432,7 @@ private fun ChannelPanel(vm: AppViewModel, p: Playing.Live, close: () -> Unit) {
                         }.padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Artwork(ch.logo, ch.initials, Modifier.size(width = 54.dp, height = 36.dp).clip(RoundedCornerShape(6.dp)), ContentScale.Fit, 12)
+                    Artwork(ch.logo, ch.initials, Modifier.size(width = 54.dp, height = 36.dp).clip(skinCorners(6.dp)), ContentScale.Fit, 12)
                     HSpace(10.dp)
                     Column(Modifier.weight(1f)) {
                         Text((if (ch.num > 0) "${ch.num}  " else "") + ch.name, color = C.Text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -454,7 +454,7 @@ private fun TracksPanel(vm: AppViewModel, close: () -> Unit) {
     LaunchedEffect(Unit) { delay(50); runCatching { first.requestFocus() } }
     Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable(onClick = close), contentAlignment = Alignment.Center) {
         LazyColumn(
-            Modifier.width(420.dp).clip(RoundedCornerShape(16.dp)).material(C.Panel).padding(16.dp),
+            Modifier.width(420.dp).clip(skinCorners(16.dp)).material(C.Panel).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             item { Text("Audio", color = C.Text2, fontWeight = FontWeight.Bold, modifier = Modifier.padding(6.dp)) }
@@ -481,7 +481,7 @@ private fun NextEpisodeCard(vm: AppViewModel, seconds: Int, modifier: Modifier) 
     val next = vm.nextEpisode() ?: return
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    Column(modifier.safeDrawingPadding().padding(28.dp).width(360.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xEE111318)).padding(18.dp)) {
+    Column(modifier.safeDrawingPadding().padding(28.dp).width(360.dp).clip(skinCorners(16.dp)).background(Color(0xEE111318)).padding(18.dp)) {
         Text("Prossimo episodio tra $seconds s", color = C.Text2, fontSize = 13.sp)
         Text("${next.label} · ${next.displayTitle}", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
         VSpace(12.dp)

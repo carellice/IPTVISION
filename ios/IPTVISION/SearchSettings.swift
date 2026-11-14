@@ -50,7 +50,7 @@ private struct ResultRow: View {
     var body: some View {
         HStack(spacing: 12) {
             RemoteImage(url: image, placeholder: TextHelpers.initials(title))
-                .frame(width: 44, height: 66).clipShape(RoundedRectangle(cornerRadius: 6))
+                .frame(width: 44, height: 66).clipShape(RoundedRectangle(cornerRadius: Theme.corner(6)))
             VStack(alignment: .leading) {
                 Text(title).lineLimit(2)
                 if !meta.isEmpty { Text(meta).font(.caption).foregroundStyle(.secondary) }
@@ -62,6 +62,7 @@ private struct ResultRow: View {
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @State var adding = false
+    @AppStorage("skin") private var skin = "classic"
 
     private static let dateFormat: DateFormatter = {
         let f = DateFormatter()
@@ -91,6 +92,17 @@ struct SettingsView: View {
                 Button { adding = true } label: { Label("Aggiungi lista", systemImage: "plus") }
             }
             ServerSettingsSection()
+            Section {
+                Picker("Stile grafico", selection: $skin) {
+                    Text("Moderno").tag("classic")
+                    Text("Modern UI").tag("metro")
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Aspetto")
+            } footer: {
+                Text(skin == "metro" ? "Lo stile di Windows Phone: nero, piatto, angoli vivi, titoli grandi e sezioni da scorrere in alto." : "Lo stile di sempre, con le schede in basso.")
+            }
             Section {
                 Toggle("Nascondi XXX", isOn: $model.hideAdult)
                 Picker("Formato della diretta", selection: $model.outputFormat) {

@@ -206,3 +206,117 @@ html[data-skin='skeuo'] [style*='min-width: 200px'][style*='var(--panel)'] {
 }
 
 html[data-skin='skeuo'] .scroll::-webkit-scrollbar-thumb { background: linear-gradient(90deg, #6a6f7a, #454952); box-shadow: inset 0 0 0 1px #0a0b0c; }
+
+/* ===================================================================================================
+   Modern UI (Impostazioni > Aspetto): the Windows Phone look. Pure black, one flat accent color, no
+   rounded corners, no shadows or gradients, Segoe light type, outlined buttons that fill with the
+   accent when pressed, the tilt effect on touch and the turnstile when a screen opens. Home.tsx swaps
+   the bars for a pivot; the other screens keep their layout and the rules below flatten them.
+   =================================================================================================== */
+html[data-skin='metro'] {
+  --accent: #1ba1e2;
+  --accent2: #1ba1e2;
+  --bg: #000;
+  --panel: #1f1f1f;
+  --surface: #1f1f1f;
+  --surfaceHover: #2b2b2b;
+  --surfacePressed: #1ba1e2;
+  --stroke: #2b2b2b;
+  --strokeStrong: #3d3d3d;
+  --text: #fff;
+  --text2: #a6a6a6;
+  --text3: #6b6b6b;
+  --accentSoft: #1ba1e2;
+  --danger: #e51400;
+  --star: #f0a30a;
+  --live: #e51400;
+}
+
+html[data-skin='metro'] body {
+  font-family: 'Segoe UI', 'Segoe WP', 'Selawik', 'Roboto', system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+/* Square corners everywhere, except round things (dots, app bar buttons) */
+html[data-skin='metro'] *:not([style*='border-radius: 50%']) { border-radius: 0 !important; }
+html[data-skin='metro'] * { box-shadow: none !important; text-shadow: none !important; }
+
+/* Tilt effect instead of the ripple */
+html[data-skin='metro'] .click { transition: transform 120ms cubic-bezier(0.1, 0.9, 0.2, 1), background-color 80ms; transform-origin: center; }
+html[data-skin='metro'] .click::after { display: none; }
+html[data-skin='metro'] .click:active { transform: perspective(500px) rotateX(5deg) scale(0.97); }
+html[data-skin='metro'] .click:focus-visible { outline: 3px solid #fff; outline-offset: -3px; box-shadow: none; }
+
+/* Rows and cards on --surface: flat on the black, the text carries them */
+html[data-skin='metro'] .click[style*='background: var(--surface)'] { background: transparent !important; }
+
+/* Category cards on wide screens: live tiles in the accent color, name at the bottom left */
+html[data-skin='metro'] .click[style*='height: 96px'][style*='var(--surface)'] { background: var(--accent) !important; }
+html[data-skin='metro'] .click[style*='height: 96px'][style*='var(--surface)'] div { color: #fff !important; font-weight: 400 !important; }
+html[data-skin='metro'] .click[style*='height: 96px'][style*='var(--surface)'] svg { fill: #fff !important; }
+
+/* Buttons (ActionButton 10px, Pill 999px): outlined white, accent when pressed or selected */
+html[data-skin='metro'] .click[style*='border-radius: 10px'][style*='var(--surface)'],
+html[data-skin='metro'] .click[style*='border-radius: 999px'][style*='var(--surface)'] { outline: 2px solid #fff; outline-offset: -2px; }
+html[data-skin='metro'] .click[style*='border-radius: 10px'][style*='var(--surface)']:active,
+html[data-skin='metro'] .click[style*='border-radius: 999px'][style*='var(--surface)']:active,
+html[data-skin='metro'] .click[style*='background: var(--accent)'] { background: var(--accent) !important; outline: 2px solid var(--accent); outline-offset: -2px; }
+html[data-skin='metro'] .click[style*='var(--surface)']:active { background: #1f1f1f !important; }
+html[data-skin='metro'] .click[style*='background: var(--accentSoft)'] div,
+html[data-skin='metro'] .click[style*='background: var(--accentSoft)'] span { color: #fff !important; }
+html[data-skin='metro'] .click[style*='background: var(--accentSoft)'] svg { fill: #fff !important; }
+
+/* Login screens: black, no gradient */
+html[data-skin='metro'] [style*='linear-gradient(to bottom'] { background: #000 !important; }
+
+/* Big titles: light and lowercase like the pivot items */
+html[data-skin='metro'] [style*='font-size: 26px'][style*='font-weight: 700'] {
+  font-weight: 300 !important;
+  font-size: 30px !important;
+  text-transform: lowercase;
+}
+html[data-skin='metro'] [style*='font-weight: 700'] { font-weight: 600 !important; }
+
+/* Text fields: white box with black text when focused, like the phone */
+html[data-skin='metro'] div:has(> div > input):not(:has(div div input)) {
+  background: #c8c8c8 !important;
+  border: 2px solid #c8c8c8 !important;
+  padding: 0 !important;
+}
+html[data-skin='metro'] div:has(> div > input):focus-within { background: #fff !important; border-color: var(--accent) !important; }
+html[data-skin='metro'] input { color: #000 !important; }
+html[data-skin='metro'] input::placeholder { color: #555; }
+html[data-skin='metro'] div:has(> div > input) label { background: transparent !important; color: #333 !important; }
+html[data-skin='metro'] div:has(> div > input) label[style*='top: -10px'] { top: -28px !important; color: var(--text2) !important; }
+html[data-skin='metro'] div:has(> div > input) svg { fill: #333 !important; }
+
+/* Toggle switch: rectangular track, solid block thumb */
+html[data-skin='metro'] [style*='width: 52px; height: 32px'] {
+  width: 60px !important; height: 26px !important;
+  background: #000 !important;
+  border: 2px solid #fff !important;
+}
+html[data-skin='metro'] [style*='width: 52px; height: 32px'] > div {
+  width: 14px !important; height: 26px !important; top: -2px !important; left: -2px !important;
+  background: #fff !important;
+  transform: translateX(var(--metro-thumb, 0)) !important;
+}
+html[data-skin='metro'] [style*='width: 52px; height: 32px'][style*='var(--accent)'] { background: #000 !important; box-shadow: inset 0 0 0 3px #000, inset 0 0 0 40px var(--accent) !important; }
+html[data-skin='metro'] [style*='width: 52px; height: 32px'][style*='var(--accent)'] > div { --metro-thumb: 46px; }
+
+/* Progress: thin flat line */
+html[data-skin='metro'] [style*='background: var(--strokeStrong)'][style*='overflow: hidden'] { background: #333 !important; }
+
+/* Dialogs and menus: a flat sheet with an accent edge on top */
+html[data-skin='metro'] [style*='border-radius: 28px'][style*='var(--panel)'],
+html[data-skin='metro'] [style*='min-width: 200px'][style*='var(--panel)'] { border-top: 3px solid var(--accent); }
+
+/* Turnstile: each screen swings in from the left edge */
+@keyframes metro-turnstile {
+  from { opacity: 0; transform: perspective(1200px) rotateY(-75deg); }
+  to { opacity: 1; transform: none; }
+}
+html[data-skin='metro'] .app > div:not(:has(video)) { animation: metro-turnstile 380ms cubic-bezier(0.1, 0.9, 0.2, 1) both; transform-origin: left center; }
+
+html[data-skin='metro'] .scroll::-webkit-scrollbar { width: 4px; }
+html[data-skin='metro'] .scroll::-webkit-scrollbar-thumb { background: #555; }

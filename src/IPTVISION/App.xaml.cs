@@ -44,6 +44,20 @@ public partial class App : Application
             var settings = SettingsService.Load();
             if (settings.Skin == "skeuo")
                 Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Themes/Skeuo.xaml") });
+            if (settings.Skin == "metro")
+            {
+                Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Themes/Metro.xaml") });
+                // Modern UI: angoli vivi e niente ombre anche dove MainWindow li scrive a mano. I cerchi (lati uguali, raggio pari a metà) restano.
+                // SizeChanged e non Loaded: WPF manda Loaded solo ai rami che hanno un gestore proprio.
+                EventManager.RegisterClassHandler(typeof(System.Windows.Controls.Border), FrameworkElement.SizeChangedEvent, new SizeChangedEventHandler((s, _) =>
+                {
+                    var b = (System.Windows.Controls.Border)s;
+                    if (b.CornerRadius == default && b.Effect == null) return;
+                    var round = b.ActualWidth > 0 && Math.Abs(b.ActualWidth - b.ActualHeight) < 1 && b.CornerRadius.TopLeft >= b.ActualWidth / 2 - 1;
+                    if (!round) b.CornerRadius = new CornerRadius(0);
+                    b.Effect = null;
+                }));
+            }
             var vm = new MainViewModel(settings);
             var window = new MainWindow(vm);
             MainWindow = window;

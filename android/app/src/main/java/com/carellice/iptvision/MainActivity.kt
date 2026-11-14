@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
-        Skin.skeuo = vm.settings.skin == "skeuo"
+        Skin.set(vm.settings.skin)
         setContent {
             IptvTheme {
                 // Ricerca vocale: su Android TV è il microfono del telecomando, sul telefono quello di Google.

@@ -459,14 +459,17 @@
     else { A.screen = 'login'; render(); }
   }
 
+  /** Stile Modern UI: il menu diventa il pivot in alto (vedi app.css, classe "metro"). */
+  function metro() { return document.documentElement.classList.contains('metro'); }
+
   function renderHome() {
     // data-enter: entrando nel menu dal contenuto si torna sulla sezione aperta (vedi nav.js).
     var rail = h('div', { class: 'rail', 'data-enter': 'active' }, [h('div', { class: 'brand' }, [h('img', { src: 'img/largeIcon.png', alt: '' }), h('h1', { text: 'IPTVISION' })])]);
     var activeItem = null;
     SECTIONS.forEach(function (s) {
-      var el = V.focusable(h('div', { class: 'nav-item' + (A.section === s.id ? ' active' : ''), data: { key: 'nav-' + s.id } }, s.icon + '  ' + s.title), function () {
-        // OK sulla voce di menu: si entra nel contenuto.
-        Nav.move('right');
+      var el = V.focusable(h('div', { class: 'nav-item' + (A.section === s.id ? ' active' : ''), data: { key: 'nav-' + s.id } }, [h('span', { class: 'ni', text: s.icon }), '  ', h('span', { class: 'nt', text: s.title })]), function () {
+        // OK sulla voce di menu: si entra nel contenuto (sotto il pivot nello stile Modern UI).
+        Nav.move(metro() ? 'down' : 'right');
       }, function () {
         // Col telecomando basta spostarsi sulla voce per aprire la sezione.
         if (A.section !== s.id) { A.section = s.id; render(false, root.querySelector('[data-key="nav-' + s.id + '"]')); }
@@ -484,7 +487,8 @@
       renderSearch(content);
       // Dal menu, ▶ porta alla casella di ricerca e non ai filtri sotto.
       Array.prototype.forEach.call(rail.querySelectorAll('.nav-item'), function (el) {
-        el.nav = { right: function () { return content.querySelector('[data-key="search-input"]'); } };
+        var toInput = function () { return content.querySelector('[data-key="search-input"]'); };
+        el.nav = metro() ? { down: toInput } : { right: toInput };
       });
     } else if (A.section === 'Settings') renderSettings(content);
     else {
@@ -790,12 +794,22 @@
       box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Collega il server' }), function () { push('server', {}); }));
     }
     box.appendChild(h('div', { class: 'group-title', text: 'Aspetto' }));
-    box.appendChild(settingRow('Stile skeuomorfico', 'Pelle, lino, metallo spazzolato e pulsanti lucidi al posto dello stile moderno.',
-      S.get('skin') === 'skeuo', function () {
-        var on = S.get('skin') !== 'skeuo';
-        S.set('skin', on ? 'skeuo' : 'classic');
-        document.documentElement.classList.toggle('skeuo', on);
+    var skin = S.get('skin');
+    var skins = h('div', { class: 'seasons' });
+    [['classic', 'Moderno'], ['skeuo', 'Skeuomorfico'], ['metro', 'Modern UI']].forEach(function (o) {
+      var on = skin === o[0] || (o[0] === 'classic' && skin !== 'skeuo' && skin !== 'metro');
+      skins.appendChild(V.focusable(h('div', { class: 'chip' + (on ? ' on' : ''), data: { key: 'skin-' + o[0] }, text: o[1] }), function () {
+        S.set('skin', o[0]);
+        document.documentElement.classList.toggle('skeuo', o[0] === 'skeuo');
+        document.documentElement.classList.toggle('metro', o[0] === 'metro');
+        render(false, root.querySelector('[data-key="skin-' + o[0] + '"]'));
       }));
+    });
+    box.appendChild(skins);
+    box.appendChild(h('div', { class: 'dim', style: 'margin:0 0 0.6rem', text: {
+      skeuo: 'Pelle, lino, metallo spazzolato e pulsanti lucidi.',
+      metro: 'Lo stile di Windows Phone: nero, piatto, angoli vivi, titoli grandi e sezioni in alto.',
+    }[skin] || 'Lo stile di sempre: scuro, arrotondato, menu di lato.' }));
     box.appendChild(h('div', { class: 'group-title', text: 'Riproduzione' }));
     box.appendChild(settingRow('Formato HLS (m3u8) per la TV in diretta', 'Di solito MPEG-TS è più stabile; prova HLS se un canale non parte.',
       S.get('outputFormat') === 'm3u8', function () { S.set('outputFormat', S.get('outputFormat') === 'm3u8' ? 'ts' : 'm3u8'); }));

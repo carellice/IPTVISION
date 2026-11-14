@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { uiIcons } from '../lib/icons.gen.ts'
 import { spring, tween } from './motion.ts'
+import { useSkin } from '../lib/skin.ts'
+import { sectionTitle } from '../lib/library.ts'
 
 // The components of ui/Components.kt and the Material 3 pieces the app uses, hand built.
 
@@ -168,9 +170,11 @@ export function Empty({ text, style }: { text: string; style?: CSSProperties }) 
 }
 
 export function SectionTitle({ title, subtitle, style }: { title: string; subtitle?: string | null; style?: CSSProperties }) {
+  // Modern UI: the pivot header above already names the section, only the subtitle stays.
+  const pivot = useSkin() === 'metro' && Object.values(sectionTitle).includes(title)
   return (
     <div style={style}>
-      <div className="ellipsis" style={{ color: 'var(--text)', fontSize: 26, fontWeight: 700 }}>{title}</div>
+      {!pivot && <div className="ellipsis" style={{ color: 'var(--text)', fontSize: 26, fontWeight: 700 }}>{title}</div>}
       {subtitle != null && <div style={{ color: 'var(--text2)', fontSize: 13 }}>{subtitle}</div>}
     </div>
   )

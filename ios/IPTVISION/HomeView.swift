@@ -4,6 +4,10 @@ struct HomeView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
+        if Theme.metro { PivotHome() } else { tabs }
+    }
+
+    private var tabs: some View {
         TabView {
             NavigationStack { LiveCategories() }
                 .tabItem { Label(AppSection.live.title, systemImage: AppSection.live.icon) }
@@ -15,6 +19,53 @@ struct HomeView: View {
                 .tabItem { Label(AppSection.search.title, systemImage: AppSection.search.icon) }
             NavigationStack { SettingsView() }
                 .tabItem { Label(AppSection.settings.title, systemImage: AppSection.settings.icon) }
+        }
+    }
+}
+
+/// Modern UI (pivot di Windows Phone): nome dell'app in maiuscoletto, le sezioni come grandi voci minuscole
+/// (quella aperta in bianco), le pagine che si scorrono di lato col dito o si aprono toccando la voce.
+struct PivotHome: View {
+    @State private var section: AppSection = .live
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("IPTVISION").font(.system(size: 14, weight: .semibold)).kerning(1).padding(.horizontal, 14).padding(.top, 6)
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .firstTextBaseline, spacing: 20) {
+                        ForEach(AppSection.allCases) { s in
+                            Text(s.pivotTitle)
+                                .font(.system(size: 44, weight: .light))
+                                .foregroundStyle(s == section ? Color.white : Color.white.opacity(0.4))
+                                .id(s)
+                                .onTapGesture { withAnimation(.easeOut(duration: 0.3)) { section = s } }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+                .onChange(of: section) { s in withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo(s, anchor: .leading) } }
+            }
+            TabView(selection: $section) {
+                NavigationStack { LiveCategories().navigationBarTitleDisplayMode(.inline) }.tag(AppSection.live)
+                NavigationStack { MovieCategories().navigationBarTitleDisplayMode(.inline) }.tag(AppSection.movies)
+                NavigationStack { SeriesCategories().navigationBarTitleDisplayMode(.inline) }.tag(AppSection.series)
+                NavigationStack { SearchView().navigationBarTitleDisplayMode(.inline) }.tag(AppSection.search)
+                NavigationStack { SettingsView().navigationBarTitleDisplayMode(.inline) }.tag(AppSection.settings)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+        }
+        .background(Color.black.ignoresSafeArea())
+    }
+}
+
+extension AppSection {
+    /// Voce del pivot: minuscola e corta.
+    var pivotTitle: String {
+        switch self {
+        case .live: "tv"
+        case .series: "serie"
+        default: title.lowercased()
         }
     }
 }
@@ -122,7 +173,7 @@ struct ChannelRow: View {
                 RemoteImage(url: channel.logo, placeholder: channel.initials, contentMode: .fit)
                     .frame(width: 56, height: 40)
                     .background(Theme.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.corner(8)))
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
                         if channel.num > 0 { Text("\(channel.num)").font(.caption.monospacedDigit()).foregroundStyle(.secondary) }

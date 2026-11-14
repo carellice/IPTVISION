@@ -25,11 +25,11 @@
     homeServer: null, homeRevision: -1, own: null,
     // Liste IPTV salvate: { alias, server, username, password, expiresAt } (secondi Unix, null = nessuna scadenza).
     lists: [],
-    // Stile grafico: 'classic' (moderno) o 'skeuo' (skeuomorfico, vedi app.css).
+    // Stile grafico: 'classic' (moderno), 'skeuo' (skeuomorfico) o 'metro' (Modern UI), vedi app.css.
     skin: 'classic',
   };
   Object.keys(defaults).forEach(function (k) { if (settings[k] === undefined) settings[k] = defaults[k]; });
-  if (settings.skin === 'skeuo') document.documentElement.className += ' skeuo';
+  if (settings.skin === 'skeuo' || settings.skin === 'metro') document.documentElement.className += ' ' + settings.skin;
 
   function sameList(a, b) {
     return String(a.server || '').toLowerCase() === String(b.server || '').toLowerCase() && a.username === b.username;

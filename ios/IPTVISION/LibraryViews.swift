@@ -90,7 +90,7 @@ struct Poster: View {
             RemoteImage(url: url, placeholder: TextHelpers.initials(title))
                 .aspectRatio(2 / 3, contentMode: .fit)
                 .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.corner(10)))
                 .overlay(alignment: .topTrailing) {
                     if let badge {
                         Text(badge).font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 3)
@@ -198,7 +198,7 @@ struct MovieDetail: View {
                     RemoteImage(url: movie.poster, placeholder: TextHelpers.initials(movie.name))
                         .aspectRatio(2 / 3, contentMode: .fit)
                         .frame(width: 130)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.corner(12)))
                     VStack(alignment: .leading, spacing: 6) {
                         Text(movie.name).font(.title2.bold())
                         Text(TextHelpers.joinMeta(info?.year ?? movie.year, info?.duration, info?.resolution, movie.rating > 0 ? String(format: "★ %.1f", movie.rating) : nil))
@@ -262,7 +262,7 @@ struct SeriesDetail: View {
                     RemoteImage(url: show.cover, placeholder: TextHelpers.initials(show.name))
                         .aspectRatio(2 / 3, contentMode: .fit)
                         .frame(width: 130)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.corner(12)))
                     VStack(alignment: .leading, spacing: 6) {
                         Text(show.name).font(.title2.bold())
                         Text(show.meta).font(.subheadline).foregroundStyle(.secondary)
@@ -322,7 +322,7 @@ struct EpisodeRow: View {
             RemoteImage(url: episode.image, placeholder: episode.label)
                 .aspectRatio(16 / 9, contentMode: .fill)
                 .frame(width: 120, height: 68)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.corner(8)))
                 .overlay(alignment: .bottom) { if progress > 0 && progress < 1 { ProgressLine(value: progress).padding(4) } }
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(episode.number). \(episode.displayTitle)").font(.subheadline.weight(.semibold)).lineLimit(2)

@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
 import com.carellice.iptvision.AppViewModel
 import com.carellice.iptvision.SearchScope
@@ -94,17 +95,17 @@ fun SearchSection(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                     focusedBorderColor = C.Accent, unfocusedBorderColor = C.StrokeStrong,
                     focusedContainerColor = C.Panel, unfocusedContainerColor = C.Panel,
                 ),
-                shape = RoundedCornerShape(14.dp),
+                shape = skinCorners(14.dp),
                 modifier = Modifier.weight(1f).tvTyping(typing).dpadLeavable(),
             )
             HSpace(10.dp)
             Row(
-                Modifier.tvClickable(shape = RoundedCornerShape(14.dp), background = C.AccentSoft, onClick = onVoiceSearch).padding(16.dp),
-            ) { Icon(Icons.Default.Mic, "Ricerca vocale", tint = C.Accent) }
+                Modifier.tvClickable(shape = skinCorners(14.dp), background = C.AccentSoft, onClick = onVoiceSearch).padding(16.dp),
+            ) { Icon(Icons.Default.Mic, "Ricerca vocale", tint = if (Skin.metro) Color.White else C.Accent) }
             HSpace(10.dp)
             Row(
-                Modifier.tvClickable(shape = RoundedCornerShape(14.dp), background = C.AccentSoft, onClick = vm::openQuiz).padding(16.dp),
-            ) { Icon(Icons.Default.Lightbulb, "Cosa guardo?", tint = C.Accent) }
+                Modifier.tvClickable(shape = skinCorners(14.dp), background = C.AccentSoft, onClick = vm::openQuiz).padding(16.dp),
+            ) { Icon(Icons.Default.Lightbulb, "Cosa guardo?", tint = if (Skin.metro) Color.White else C.Accent) }
         }
         VSpace(10.dp)
         // Dove cercare: tutto insieme oppure solo canali, film o serie.
@@ -156,7 +157,7 @@ private fun Header(title: String, count: Int) {
 @Composable
 private fun Hit(title: String, meta: String, kind: String, url: String?, initials: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().tvClickable(focusScale = 1.02f, onClick = onClick).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Artwork(url, initials, Modifier.size(width = 48.dp, height = 72.dp).clip(RoundedCornerShape(6.dp)), ContentScale.Crop, 14)
+        Artwork(url, initials, Modifier.size(width = 48.dp, height = 72.dp).clip(skinCorners(6.dp)), ContentScale.Crop, 14)
         HSpace(12.dp)
         Column(Modifier.weight(1f)) {
             Text(title, color = C.Text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -187,10 +188,23 @@ fun SettingsSection(vm: AppViewModel) {
         ServerGroup(vm)
 
         Group("Aspetto")
-        Toggle("Stile skeuomorfico", "Pelle, lino, metallo spazzolato e pulsanti lucidi al posto dello stile moderno.", Skin.skeuo) {
-            vm.settings.skin = if (it) "skeuo" else "classic"
-            Skin.skeuo = it
+        val skin = vm.settings.skin
+        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("classic" to "Moderno", "skeuo" to "Skeuomorfico", "metro" to "Modern UI").forEach { (key, label) ->
+                Pill(label, selected = skin == key || (key == "classic" && skin !in listOf("skeuo", "metro"))) {
+                    vm.settings.skin = key
+                    Skin.set(key)
+                }
+            }
         }
+        Text(
+            when (Skin.metro to Skin.skeuo) {
+                (true to false) -> "Lo stile di Windows Phone: nero, piatto, angoli vivi, titoli grandi e sezioni da scorrere in alto."
+                (false to true) -> "Pelle, lino, metallo spazzolato e pulsanti lucidi."
+                else -> "Lo stile di sempre: scuro, arrotondato, menu in basso o di lato."
+            },
+            color = C.Text3, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp),
+        )
 
         Group("Riproduzione")
         Toggle("Formato HLS (m3u8) per la TV in diretta", "Di solito MPEG-TS è più stabile; prova HLS se un canale non parte.", vm.settings.outputFormat == "m3u8") {

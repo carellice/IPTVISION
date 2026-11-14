@@ -1,5 +1,19 @@
 package com.carellice.iptvision.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.pointerInput
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -104,7 +118,8 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
         val wide = maxWidth >= 720.dp
         val short = maxHeight < 500.dp
         androidx.compose.runtime.CompositionLocalProvider(LocalWide provides wide) {
-            if (wide) {
+            if (Skin.metro) Pivot(vm, wide, onVoiceSearch)
+            else if (wide) {
                 Row(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                     // Telefono in orizzontale: largo ma basso, il menu scorre e l'orologio sparisce.
                     SideNav(vm, compact = short)
@@ -135,10 +150,81 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
     }
 }
 
+private fun Section.pivotLabel() = when (this) {
+    Section.Live -> "tv"
+    Section.Series -> "serie"
+    else -> title.lowercase(Locale.ITALY)
+}
+
+/**
+ * Modern UI (pivot di Windows Phone): nome dell'app in maiuscoletto, le sezioni come grandi voci minuscole
+ * con quella aperta per prima e in bianco, la pagina che entra da destra. Si cambia sezione toccando una
+ * voce, scorrendo di lato sulle voci o col telecomando (◀ ▶ sulle voci, OK per aprire).
+ */
 @Composable
-private fun Content(vm: AppViewModel, onVoiceSearch: () -> Unit) {
+private fun Pivot(vm: AppViewModel, wide: Boolean, onVoiceSearch: () -> Unit) {
+    val sections = vm.sections
+    val i = sections.indexOf(vm.section).coerceAtLeast(0)
+    val ordered = sections.drop(i) + sections.take(i)
+    val pad = if (wide) 24.dp else 12.dp
+    var drag by remember { mutableFloatStateOf(0f) }
+    val step = { d: Int -> vm.section = sections[(i + d + sections.size) % sections.size] }
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(start = pad, end = pad, top = if (wide) 14.dp else 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("IPTVISION", color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
+            if (wide) {
+                val now by produceState(System.currentTimeMillis()) { while (true) { value = System.currentTimeMillis(); delay(15_000) } }
+                Text(SimpleDateFormat("HH:mm", Locale.ITALY).format(Date(now)), color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.Light)
+                HSpace(16.dp)
+            }
+            ServerNetworkLine(vm)
+        }
+        Row(
+            Modifier.fillMaxWidth().clipToBounds().padding(horizontal = pad)
+                .pointerInput(i) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { drag = 0f },
+                        onDragEnd = { if (kotlin.math.abs(drag) > 120) step(if (drag < 0) 1 else -1) },
+                    ) { _, d -> drag += d }
+                },
+        ) {
+            ordered.forEach { s ->
+                val selected = s == vm.section
+                val color by animateColorAsState(if (selected) C.Text else C.Text3, label = "pivot")
+                Text(
+                    s.pivotLabel(),
+                    color = color,
+                    fontSize = if (wide) 56.sp else 42.sp,
+                    lineHeight = if (wide) 72.sp else 54.sp,
+                    fontWeight = FontWeight.Light,
+                    letterSpacing = (-1).sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(end = if (wide) 28.dp else 20.dp)
+                        .tvClickable(background = Color.Transparent, focusedBackground = Color.Transparent, focusScale = 1f) { vm.section = s },
+                )
+            }
+        }
+        AnimatedContent(
+            targetState = vm.section,
+            transitionSpec = {
+                val d = if (sections.indexOf(targetState) >= sections.indexOf(initialState)) 1 else -1
+                val ease = CubicBezierEasing(0.1f, 0.9f, 0.2f, 1f)
+                (slideInHorizontally(tween(320, easing = ease)) { it / 5 * d } + fadeIn(tween(220))) togetherWith
+                    (slideOutHorizontally(tween(160)) { -it / 8 * d } + fadeOut(tween(120)))
+            },
+            label = "pivot",
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = pad).padding(top = 8.dp),
+        ) { target ->
+            Column(Modifier.fillMaxSize()) { Content(vm, onVoiceSearch, target) }
+        }
+    }
+}
+
+@Composable
+private fun Content(vm: AppViewModel, onVoiceSearch: () -> Unit, section: Section = vm.section) {
     vm.status?.let { Text(it, color = C.Text2, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp)) }
-    when (vm.section) {
+    when (section) {
         Section.Live -> LiveSection(vm)
         Section.Movies -> MoviesSection(vm)
         Section.Series -> SeriesSection(vm)
@@ -163,7 +249,7 @@ private fun SideNav(vm: AppViewModel, compact: Boolean) {
     ) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 6.dp, top = if (compact) 0.dp else 8.dp, bottom = if (compact) 6.dp else 18.dp)) {
-                Image(painterResource(R.drawable.logo), null, Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)))
+                Image(painterResource(R.drawable.logo), null, Modifier.size(34.dp).clip(skinCorners(8.dp)))
                 HSpace(10.dp)
                 Text("IPTVISION", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 19.sp)
             }

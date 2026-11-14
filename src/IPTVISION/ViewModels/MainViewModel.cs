@@ -822,18 +822,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Stile skeuomorfico al posto di quello moderno: si salva e il programma si riapre con il nuovo stile.</summary>
-    public bool IsSkeuo
+    /// <summary>Stile grafico (moderno, skeuomorfico o Modern UI): si salva e il programma si riapre con il nuovo stile.</summary>
+    public bool IsClassicSkin { get => _settings.Skin is not ("skeuo" or "metro"); set { if (value) SetSkin("classic"); } }
+    public bool IsSkeuo { get => _settings.Skin == "skeuo"; set { if (value) SetSkin("skeuo"); } }
+    public bool IsMetro { get => _settings.Skin == "metro"; set { if (value) SetSkin("metro"); } }
+
+    private void SetSkin(string skin)
     {
-        get => _settings.Skin == "skeuo";
-        set
-        {
-            if (IsSkeuo == value) return;
-            _settings.Skin = value ? "skeuo" : "classic";
-            OnPropertyChanged();
-            SaveNow();
-            App.Restart();
-        }
+        if (_settings.Skin == skin) return;
+        _settings.Skin = skin;
+        OnPropertyChanged(nameof(IsClassicSkin));
+        OnPropertyChanged(nameof(IsSkeuo));
+        OnPropertyChanged(nameof(IsMetro));
+        SaveNow();
+        App.Restart();
     }
 
     private static bool IsHiddenCategory(Category c) => c.Name.Contains("xxx", StringComparison.OrdinalIgnoreCase);

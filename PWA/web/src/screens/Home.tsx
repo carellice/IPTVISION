@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Clickable, Icon, type IconName, useWide } from '../components/ui.tsx'
 import { tween } from '../components/motion.ts'
 import { app, sections, setSection, useApp } from '../lib/app.ts'
 import { type Section, sectionTitle } from '../lib/library.ts'
 import { NetworkStatus } from '../components/network.tsx'
+import { useSkin } from '../lib/skin.ts'
 import { LiveSection, MoviesSection, SeriesSection } from './Browse.tsx'
 import { SearchSection } from './Search.tsx'
 import { SettingsSection } from './Settings.tsx'
@@ -15,6 +16,7 @@ const icons: Record<Section, IconName> = { Live: 'tv', Movies: 'movie', Series: 
 export function Home() {
   useApp()
   const wide = useWide()
+  if (useSkin() === 'metro') return <Pivot wide={wide} />
   if (wide) {
     return (
       <div className="safe" style={{ display: 'flex', height: '100%' }}>
@@ -48,6 +50,72 @@ function Content() {
       </div>
     </>
   )
+}
+
+const pivotLabel: Record<Section, string> = { Live: 'tv', Movies: 'film', Series: 'serie', Search: 'cerca', Settings: 'impostazioni' }
+
+/**
+ * Modern UI (Windows Phone pivot): app name in small caps, the sections as big lowercase headers
+ * with the current one first and in white, the page sliding in from the right. A horizontal swipe on
+ * the headers moves to the next or previous section.
+ */
+function Pivot({ wide }: { wide: boolean }) {
+  const i = sections.indexOf(app.section)
+  const ordered = [...sections.slice(i), ...sections.slice(0, i)]
+  const [dir, setDir] = useState(1)
+  const go = (s: Section) => { setDir(sections.indexOf(s) >= i ? 1 : -1); setSection(s) }
+  const step = (d: number) => { setDir(d); setSection(sections[(i + d + sections.length) % sections.length]) }
+  const x0 = useRef<number | null>(null)
+  const pad = wide ? 24 : 12
+  return (
+    <div className="safe" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: `${wide ? 14 : 10}px ${pad}px 0` }}>
+        <div style={{ flex: 1, color: 'var(--text)', fontSize: 14, lineHeight: '20px', fontWeight: 600, letterSpacing: 1 }}>IPTVISION</div>
+        {wide && <MetroClock />}
+        <NetworkStatus />
+      </div>
+      <div role="tablist" style={{ display: 'flex', overflow: 'hidden', padding: `0 ${pad}px`, flexShrink: 0, touchAction: 'pan-y' }}
+        onPointerDown={(e) => { x0.current = e.clientX }}
+        onPointerUp={(e) => {
+          const dx = x0.current == null ? 0 : e.clientX - x0.current
+          x0.current = null
+          if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1)
+        }}
+        onKeyDown={(e) => { if (e.key === 'ArrowRight') step(1); if (e.key === 'ArrowLeft') step(-1) }}>
+        {ordered.map((s) => {
+          const selected = s === app.section
+          return (
+            <motion.div key={s} layout="position" transition={tween(300)} role="tab" aria-selected={selected} tabIndex={0}
+              onClick={() => go(s)} onKeyDown={(e) => { if (e.key === 'Enter') go(s) }}
+              style={{ flexShrink: 0, marginRight: wide ? 28 : 20, cursor: 'pointer', outline: 'none', whiteSpace: 'nowrap',
+                fontSize: wide ? 56 : 42, lineHeight: wide ? '76px' : '58px', fontWeight: 300, letterSpacing: -1,
+                color: selected ? 'var(--text)' : 'var(--text3)', transition: 'color 200ms' }}>
+              {pivotLabel[s]}
+            </motion.div>
+          )
+        })}
+      </div>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column', padding: `8px ${pad}px 0` }}>
+        <AnimatePresence initial={false} mode="popLayout" custom={dir}>
+          <motion.div key={app.section} custom={dir}
+            variants={{ in: (d: number) => ({ x: 80 * d, opacity: 0 }), on: { x: 0, opacity: 1 }, out: (d: number) => ({ x: -80 * d, opacity: 0 }) }}
+            initial="in" animate="on" exit="out" transition={{ type: 'tween', duration: 0.28, ease: [0.1, 0.9, 0.2, 1] }}
+            style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <Content />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
+function MetroClock() {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 15_000)
+    return () => clearInterval(t)
+  }, [])
+  return <div style={{ color: 'var(--text)', fontSize: 14, lineHeight: '20px', fontWeight: 300 }}>{timeFmt.format(now)}</div>
 }
 
 /** M3 NavigationBar: 80 dp, pill indicator 64×32 in Accent, labels 11 sp. */

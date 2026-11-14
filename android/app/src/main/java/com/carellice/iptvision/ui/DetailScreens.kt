@@ -104,13 +104,13 @@ fun MovieDetailScreen(vm: AppViewModel, m: Movie) {
         }
         if (wide) {
             Row(Modifier.fillMaxSize().padding(top = 20.dp)) {
-                Artwork(m.poster, m.initials, Modifier.width(260.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(14.dp)), fontSize = 30)
+                Artwork(m.poster, m.initials, Modifier.width(260.dp).aspectRatio(2f / 3f).clip(skinCorners(14.dp)), fontSize = 30)
                 HSpace(32.dp)
                 Box(Modifier.weight(1f).verticalScroll(rememberScrollState())) { body() }
             }
         } else {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                Artwork(m.poster, m.initials, Modifier.width(180.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).align(Alignment.CenterHorizontally), fontSize = 26)
+                Artwork(m.poster, m.initials, Modifier.width(180.dp).aspectRatio(2f / 3f).clip(skinCorners(12.dp)).align(Alignment.CenterHorizontally), fontSize = 26)
                 VSpace(16.dp)
                 body()
             }
@@ -136,7 +136,7 @@ fun SeriesDetailScreen(vm: AppViewModel, s: Series) {
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)) {
             item {
                 Row {
-                    Artwork(s.cover, s.initials, Modifier.width(if (wide) 180.dp else 110.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)), fontSize = 24)
+                    Artwork(s.cover, s.initials, Modifier.width(if (wide) 180.dp else 110.dp).aspectRatio(2f / 3f).clip(skinCorners(12.dp)), fontSize = 24)
                     HSpace(20.dp)
                     Column(Modifier.weight(1f)) {
                         Text(s.name, color = C.Text, fontSize = if (wide) 30.sp else 22.sp, fontWeight = FontWeight.Bold)
@@ -206,7 +206,7 @@ private fun EpisodeRow(vm: AppViewModel, s: Series, ep: Episode, all: List<Episo
         // La larghezza sta sul riquadro: con la barra a tutta larghezza il riquadro si allargava a tutta la riga
         // e il titolo dell'episodio, a fianco, restava senza spazio.
         Box(Modifier.width(150.dp)) {
-            Artwork(ep.image ?: s.cover, ep.label, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)), fontSize = 14)
+            Artwork(ep.image ?: s.cover, ep.label, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(skinCorners(8.dp)), fontSize = 14)
             if (progress > 0f && progress < 1f) ProgressLine(progress, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(5.dp))
         }
         HSpace(14.dp)
