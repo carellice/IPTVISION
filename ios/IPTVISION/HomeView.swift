@@ -209,7 +209,7 @@ struct ContentUnavailable: View {
     var body: some View {
         VStack(spacing: 12) {
             Text(text).foregroundStyle(.secondary)
-            Button("Riprova", action: retry).buttonStyle(.borderedProminent)
+            Button("Riprova", action: retry).prominentStyle()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

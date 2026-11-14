@@ -33,6 +33,8 @@
   <ItemGroup>
     <Resource Include="Assets\logo.png" />
     <Resource Include="Assets\skeuo\*.png" />
+    <Resource Include="Assets\fonts\*.ttf" />
+    <None Include="Assets\fonts\FONTS-OFL.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

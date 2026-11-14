@@ -13,7 +13,7 @@ function serviceWorker(): Plugin {
     closeBundle() {
       const assets = readdirSync(join(outDir, 'assets')).map((f) => `/assets/${f}`)
       const files = ['/', '/manifest.webmanifest', '/roboto.woff2', '/icon-192.png', '/badge.png', '/icon-512.png',
-        '/skeuo/linen.png', '/skeuo/leather.png', '/skeuo/metal-dark.png', ...assets]
+        '/skeuo/linen.png', '/skeuo/leather.png', '/skeuo/metal-dark.png', '/dueffe/bricolage.woff2', '/dueffe/inter.woff2', ...assets]
       const file = join(outDir, 'sw.js')
       const source = readFileSync(file, 'utf8')
         .replace('__BUILD__', String(Date.now()))

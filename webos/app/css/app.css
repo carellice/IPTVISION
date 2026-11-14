@@ -419,3 +419,98 @@ body.playing #player-ui { display: block; }
 .metro .p-panel, .metro .p-next-card { background: rgba(0, 0, 0, 0.94); }
 .metro .p-controls .btn { background: transparent; }
 .metro #toast { background: var(--accent); }
+
+/* ---------- Stile Dueffe (Impostazioni > Aspetto) ----------
+   Il design system Dueffe: fondo quasi nero con un alone oro, superfici calde con un filo di bordo oro al posto
+   delle ombre, testo avorio, un solo accento oro (gradiente, testo scuro sopra), Bricolage Grotesque per i titoli
+   e Inter per il testo, angoli morbidi. Font statici: i TV del 2018 non conoscono i font variabili. */
+@font-face { font-family: "Inter"; src: url("../fonts/Inter-400.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Inter"; src: url("../fonts/Inter-600.woff2") format("woff2"); font-weight: 600; }
+@font-face { font-family: "Inter"; src: url("../fonts/Inter-700.woff2") format("woff2"); font-weight: 700; }
+@font-face { font-family: "Bricolage Grotesque"; src: url("../fonts/Bricolage-700.woff2") format("woff2"); font-weight: 700; }
+@font-face { font-family: "Bricolage Grotesque"; src: url("../fonts/Bricolage-800.woff2") format("woff2"); font-weight: 800; }
+
+.dueffe {
+  --accent: #FFD84D;
+  --accent2: #FFB800;
+  --bg: #050505;
+  --panel: rgba(11, 10, 8, 0.82);
+  --surface: #1A1711;
+  --surface-hover: #242016;
+  --surface-pressed: #2E281A;
+  --stroke: rgba(255, 216, 77, 0.34);
+  --text: #FFFAF0;
+  --text2: #B8AA8D;
+  --text3: #7E7461;
+  --accent-soft: rgba(255, 216, 77, 0.14);
+  --star: #FFD84D;
+  --live: #FF7A5C;
+}
+.dueffe body {
+  font-family: "Inter", "LG Smart UI", "Segoe UI", Roboto, Arial, sans-serif;
+  background: #050505 -webkit-radial-gradient(8% 0%, circle, rgba(255, 216, 77, 0.16), rgba(255, 216, 77, 0) 45%) no-repeat;
+  background: radial-gradient(circle at 8% 0%, rgba(255, 216, 77, 0.16), rgba(255, 216, 77, 0) 45%),
+              radial-gradient(circle at 95% 40%, rgba(255, 184, 0, 0.12), rgba(255, 184, 0, 0) 40%),
+              radial-gradient(circle at 40% 105%, rgba(255, 240, 173, 0.08), rgba(255, 240, 173, 0) 45%), #050505;
+}
+.dueffe h1, .dueffe .page-title, .dueffe .header .title b, .dueffe .p-title, .dueffe .clock b { font-family: "Bricolage Grotesque", "Inter", sans-serif; font-weight: 800; letter-spacing: -0.03em; }
+.dueffe .login { background: transparent; }
+
+/* Focus: bordo oro e un leggero ingrandimento; al rilascio la molla del design system */
+.dueffe .f {
+  border-width: 0.1rem;
+  -webkit-transition: -webkit-transform 0.42s cubic-bezier(.34, 1.56, .64, 1), background-color 0.26s ease, border-color 0.26s ease;
+  transition: transform 0.42s cubic-bezier(.34, 1.56, .64, 1), background-color 0.26s ease, border-color 0.26s ease;
+}
+.dueffe .f.focused { border-color: var(--accent); background-color: var(--surface-hover); }
+
+/* Card calde col filo d'oro */
+.dueffe .cat, .dueffe .setting, .dueffe .list .item {
+  background: -webkit-linear-gradient(top, #1A1711, #11100D);
+  background: linear-gradient(#1A1711, #11100D);
+  border-color: rgba(255, 220, 128, 0.16);
+}
+.dueffe .cat { border-radius: 1.3rem; }
+.dueffe .setting, .dueffe .list .item { border-radius: 1rem; }
+.dueffe .cat.focused, .dueffe .setting.focused, .dueffe .list .item.focused { background: #242016; border-color: var(--accent); }
+.dueffe .cat .icon { color: var(--accent); }
+.dueffe .card { border-radius: 1.3rem; }
+.dueffe .thumb { border-radius: 0.8rem; }
+.dueffe .item.current .t, .dueffe .card.current .name { color: var(--accent); }
+
+/* Menu laterale: pannello scuro con filo d'oro, voce aperta in oro tenue */
+.dueffe .rail { border-right: 1px solid rgba(255, 220, 128, 0.16); }
+.dueffe .nav-item { border-radius: 1.1rem; }
+.dueffe .nav-item.active { background: rgba(255, 216, 77, 0.14); color: var(--text); }
+.dueffe .nav-item.active .ni { color: var(--accent); }
+.dueffe .nav-item.focused { background: #242016; border-color: var(--accent); color: var(--text); }
+
+/* Tasti: oro pieno a gradiente con testo scuro, secondari superficie con linea forte */
+.dueffe .btn, .dueffe .toggle { border-radius: 0.9rem; background: #11100D; border-color: rgba(255, 216, 77, 0.34); color: var(--text); }
+.dueffe .btn.primary, .dueffe .chip.on, .dueffe .toggle.on {
+  background: -webkit-linear-gradient(-45deg, #FFD84D, #FFC21A);
+  background: linear-gradient(135deg, #FFD84D, #FFC21A);
+  color: #161006; border-color: transparent;
+}
+.dueffe .btn.focused, .dueffe .toggle.focused { background: #242016; border-color: var(--accent); }
+.dueffe .btn.primary.focused, .dueffe .chip.on.focused, .dueffe .toggle.on.focused { border-color: var(--text); }
+.dueffe .chip { background: #11100D; border-color: rgba(255, 220, 128, 0.16); color: var(--text); }
+.dueffe .chip.focused { border-color: var(--accent); }
+
+/* Campi */
+.dueffe .field input, .dueffe .search-row input { border-radius: 0.8rem; background: #050505; border-color: rgba(255, 216, 77, 0.34); }
+.dueffe .field input.focused, .dueffe .search-row input.focused { border-color: var(--accent); }
+
+/* Interruttori oro con pomello scuro */
+.dueffe .switch { background: #242016; border: 1px solid rgba(255, 216, 77, 0.34); }
+.dueffe .switch.on { background: -webkit-linear-gradient(-45deg, #FFD84D, #FFC21A); background: linear-gradient(135deg, #FFD84D, #FFC21A); border-color: transparent; }
+.dueffe .switch.on i { background: #161006; }
+
+.dueffe .group-title { color: var(--accent); font-family: "Bricolage Grotesque", "Inter", sans-serif; letter-spacing: 0.02em; }
+.dueffe .badge.q { background: var(--accent); color: #161006; }
+.dueffe .progress { background: #242016; border-radius: 1rem; }
+.dueffe .progress i { background: var(--accent); border-radius: 1rem; }
+.dueffe .dialog { background: rgba(18, 16, 12, 0.97); border: 1px solid rgba(255, 216, 77, 0.34); border-radius: 1.3rem; }
+.dueffe .p-panel { background: rgba(11, 10, 8, 0.96); border-right: 1px solid rgba(255, 220, 128, 0.16); }
+.dueffe .p-next-card { background: rgba(18, 16, 12, 0.96); border: 1px solid rgba(255, 216, 77, 0.34); border-radius: 1.3rem; }
+.dueffe #toast { background: #242016; border: 1px solid rgba(255, 216, 77, 0.34); border-radius: 0.9rem; color: var(--text); }

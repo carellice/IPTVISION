@@ -218,7 +218,7 @@ struct MovieDetail: View {
                     } label: {
                         Label(resume > 0 ? "Riprendi da \(TextHelpers.formatTime(resume))" : "Guarda", systemImage: "play.fill").frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .prominentStyle()
                     if resume > 0 {
                         Button { model.positions.forget(movie.key); model.play(.film(movie)) } label: { Image(systemName: "backward.end.fill") }
                             .buttonStyle(.bordered).accessibilityLabel("Dall'inizio")
@@ -279,7 +279,7 @@ struct SeriesDetail: View {
                         Button { model.playEpisode(show, next, eps) } label: {
                             Label(model.positions.lastEpisode(show.seriesId) == nil ? "Guarda \(next.label)" : "Continua \(next.label)", systemImage: "play.fill").frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .prominentStyle()
                     }
                     Button { model.toggleMyList(show) } label: { Image(systemName: model.inMyList(show) ? "bookmark.fill" : "bookmark") }
                         .buttonStyle(.bordered).accessibilityLabel("La mia lista")

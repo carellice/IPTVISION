@@ -21,6 +21,7 @@
   --text2: #9099a8;
   --text3: #5c6473;
   --accentSoft: #3d7bff22;
+  --onAccent: #fff;
   --danger: #ff5d6c;
   --star: #ffc94d;
   --live: #ff4d5e;
@@ -320,3 +321,124 @@ html[data-skin='metro'] .app > div:not(:has(video)) { animation: metro-turnstile
 
 html[data-skin='metro'] .scroll::-webkit-scrollbar { width: 4px; }
 html[data-skin='metro'] .scroll::-webkit-scrollbar-thumb { background: #555; }
+
+/* ===================================================================================================
+   Dueffe (Impostazioni > Aspetto): the Dueffe design system. Near black with a still gold aurora, warm
+   surfaces with a thin gold line instead of shadows, ivory text, one gold accent as a gradient with
+   dark text on it, Bricolage Grotesque titles and Inter text, soft corners (buttons 18, cards 20-26)
+   and a spring on release instead of the ripple. Same layout as the current style.
+   =================================================================================================== */
+@font-face { font-family: 'Bricolage Grotesque'; src: url('/dueffe/bricolage.woff2') format('woff2'); font-weight: 200 800; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('/dueffe/inter.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+
+html[data-skin='dueffe'] {
+  --accent: #ffd84d;
+  --accent2: #ffb800;
+  --onAccent: #161006;
+  --btnText: #fffaf0;
+  --bg: #050505;
+  --panel: #0b0a08;
+  --surface: #1a1711;
+  --surfaceHover: #242016;
+  --surfacePressed: #2e281a;
+  --stroke: #ffdc8029;
+  --strokeStrong: #ffd84d57;
+  --text: #fffaf0;
+  --text2: #b8aa8d;
+  --text3: #7e7461;
+  --accentSoft: #ffd84d24;
+  --danger: #ff9b85;
+  --star: #ffd84d;
+  --live: #ff7a5c;
+  --df-line: #ffdc8029;
+  --df-gold: linear-gradient(135deg, #ffd84d, #ffc21a);
+  --df-card: linear-gradient(#1a1711, #11100d);
+}
+
+html[data-skin='dueffe'] body { font-family: Inter, 'Roboto', system-ui, sans-serif; letter-spacing: 0; }
+
+/* Aurora: three gold and amber nebulae drifting slowly on the background */
+@keyframes df-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(3%, 2%, 0) scale(1.06); }
+}
+html[data-skin='dueffe'] body::before {
+  content: '';
+  position: fixed;
+  inset: -10%;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(40% 35% at 10% 2%, #ffd84d2e, transparent 70%),
+    radial-gradient(35% 40% at 95% 35%, #ffb80024, transparent 70%),
+    radial-gradient(45% 35% at 40% 105%, #fff0ad1a, transparent 70%);
+  animation: df-drift 32s ease-in-out infinite;
+}
+html[data-skin='dueffe'] .app, html[data-skin='dueffe'] .app [style*='background: var(--bg)'] { background: transparent !important; }
+
+/* Spring press instead of the ripple */
+html[data-skin='dueffe'] .click { transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 260ms; }
+html[data-skin='dueffe'] .click::after { display: none; }
+html[data-skin='dueffe'] .click:active { transform: scale(0.95); transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1); }
+html[data-skin='dueffe'] .click:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* Cards and rows on --surface: warm gradient and a thin gold line */
+html[data-skin='dueffe'] .click[style*='background: var(--surface)'] { background: var(--df-card) !important; box-shadow: inset 0 0 0 1px var(--df-line); }
+html[data-skin='dueffe'] .click[style*='background: var(--surface)']:hover { background: var(--surfaceHover) !important; }
+html[data-skin='dueffe'] .click[style*='background: var(--accentSoft)'] { box-shadow: inset 0 0 0 1px #ffd84d52; }
+html[data-skin='dueffe'] .click[style*='border-radius: 12px'] { border-radius: 20px !important; }
+html[data-skin='dueffe'] .click[style*='height: 96px'] { border-radius: 26px !important; }
+
+/* Gold: gradient, dark text */
+html[data-skin='dueffe'] .click[style*='background: var(--accent)'] { background: var(--df-gold) !important; }
+html[data-skin='dueffe'] .click[style*='background: var(--accent)']:focus-visible { box-shadow: inset 0 0 0 2px var(--text); }
+
+/* Buttons: radius 18 */
+html[data-skin='dueffe'] .click[style*='border-radius: 10px'] { border-radius: 18px !important; }
+
+/* Titles: Bricolage Grotesque */
+html[data-skin='dueffe'] [style*='font-size: 26px'][style*='font-weight: 700'] {
+  font-family: 'Bricolage Grotesque', Inter, system-ui, sans-serif;
+  font-size: 30px !important;
+  line-height: 34px;
+  letter-spacing: -0.02em;
+}
+html[data-skin='dueffe'] [style*='font-weight: 700'] { font-family: 'Bricolage Grotesque', Inter, system-ui, sans-serif; }
+
+/* Login: aurora instead of the blue gradient */
+html[data-skin='dueffe'] [style*='linear-gradient(to bottom'] { background: transparent !important; }
+
+/* Side menu and bars: elevated, a gold line on the edge */
+html[data-skin='dueffe'] [style*='width: 220px'][style*='var(--panel)'] { background: #0b0a08cc !important; box-shadow: inset -1px 0 0 var(--df-line); backdrop-filter: blur(18px); }
+html[data-skin='dueffe'] .nav-pad[style*='var(--panel)'] {
+  background: #080705e6 !important;
+  margin: 0 14px 10px;
+  border-radius: 28px;
+  box-shadow: inset 0 0 0 1px var(--df-line);
+  backdrop-filter: blur(18px);
+}
+
+/* Text fields: radius 16, strong line, gold when focused */
+html[data-skin='dueffe'] div:has(> div > input):not(:has(div div input)) { border-radius: 16px !important; }
+html[data-skin='dueffe'] div:has(> div > input):focus-within { border-color: var(--accent) !important; }
+html[data-skin='dueffe'] div:has(> div > input) label { background: transparent !important; }
+
+/* Progress: track Surface Higher, round ends */
+html[data-skin='dueffe'] [style*='background: var(--strokeStrong)'][style*='overflow: hidden'] { background: #242016 !important; border-radius: 99px !important; }
+
+/* Dialogs and menus: elevated sheet, thin line */
+html[data-skin='dueffe'] [style*='border-radius: 28px'][style*='var(--panel)'],
+html[data-skin='dueffe'] [style*='min-width: 200px'][style*='var(--panel)'] { background: #12100cf0 !important; box-shadow: inset 0 0 0 1px #ffd84d57 !important; border-radius: 26px !important; }
+
+/* Pages enter rising and zooming in, like the Dueffe reveal */
+@keyframes df-reveal {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+html[data-skin='dueffe'] .app > div:not(:has(video)) { animation: df-reveal 520ms cubic-bezier(0.22, 0.78, 0.16, 1) both; }
+
+html[data-skin='dueffe'] .scroll::-webkit-scrollbar-thumb { background: #ffd84d40; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin='dueffe'] *, html[data-skin='dueffe'] body::before { animation: none !important; transition: none !important; }
+}

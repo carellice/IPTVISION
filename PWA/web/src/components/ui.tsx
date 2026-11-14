@@ -125,8 +125,8 @@ export function Pill({ text, selected, icon, onClick, style }: { text: string; s
   return (
     <Clickable onClick={onClick} radius={999} background={selected ? 'var(--accent)' : 'var(--surface)'}
       style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 16px', flexShrink: 0, ...style }}>
-      {icon && <Icon name={icon} size={18} color={selected ? '#fff' : 'var(--text2)'} />}
-      <span style={{ color: selected ? '#fff' : 'var(--text)', fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap' }}>{text}</span>
+      {icon && <Icon name={icon} size={18} color={selected ? 'var(--onAccent)' : 'var(--text2)'} />}
+      <span style={{ color: selected ? 'var(--onAccent)' : 'var(--text)', fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap' }}>{text}</span>
     </Clickable>
   )
 }
@@ -137,8 +137,8 @@ export function ActionButton({ text, icon, primary, onClick, style, disabled }: 
   return (
     <Clickable onClick={onClick} radius={10} background={primary ? 'var(--accent)' : 'var(--surface)'} disabled={disabled}
       style={{ display: 'inline-flex', alignItems: 'center', justifyContent: style?.width ? 'center' : undefined, gap: 8, padding: '12px 18px', ...style }}>
-      {icon && <Icon name={icon} size={20} color="#fff" />}
-      <span style={{ color: '#fff', fontWeight: 600, fontSize: 15 }}>{text}</span>
+      {icon && <Icon name={icon} size={20} color={primary ? 'var(--onAccent)' : 'var(--btnText, #fff)'} />}
+      <span style={{ color: primary ? 'var(--onAccent)' : 'var(--btnText, #fff)', fontWeight: 600, fontSize: 15 }}>{text}</span>
     </Clickable>
   )
 }

@@ -82,42 +82,83 @@ import androidx.compose.ui.res.imageResource
 import com.carellice.iptvision.R
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.unit.TextUnit
 
 /** Stile grafico scelto nelle impostazioni: cambia al volo colori e materiali di tutta l'app. */
 object Skin {
     var skeuo by mutableStateOf(false)
     /** Modern UI (Windows Phone): nero, piatto, angoli vivi, sezioni come voci del pivot (HomeScreen). */
     var metro by mutableStateOf(false)
+    /** Dueffe: fondo quasi nero, superfici calde, avorio e oro, Bricolage e Inter, pressione a molla. */
+    var dueffe by mutableStateOf(false)
 
     fun set(skin: String) {
         skeuo = skin == "skeuo"
         metro = skin == "metro"
+        dueffe = skin == "dueffe"
     }
 }
 
 /** Colori dell'app: quelli dello stile moderno o, con lo stile skeuomorfico, toni caldi di pelle e metallo. */
 object C {
-    private fun pick(classic: Long, skeuo: Long, metro: Long) = Color(if (Skin.metro) metro else if (Skin.skeuo) skeuo else classic)
-    val Accent get() = pick(0xFF3D7BFF, 0xFF3D82F5, 0xFF1BA1E2)
-    val Accent2 get() = pick(0xFF00C2FF, 0xFF6FB2FF, 0xFF1BA1E2)
-    val Bg get() = pick(0xFF0A0B0F, 0xFF232529, 0xFF000000)
-    val Panel get() = pick(0xFF111318, 0xFF2A2729, 0xFF1F1F1F)
-    val Surface get() = pick(0xFF191C23, 0xFF34373E, 0xFF1F1F1F)
-    val SurfaceHover get() = pick(0xFF21252E, 0xFF3E4149, 0xFF2B2B2B)
-    val SurfacePressed get() = pick(0xFF2A2F3A, 0xFF464A54, 0xFF1BA1E2)
-    val Stroke get() = pick(0xFF20242D, 0xFF0E0F11, 0xFF262626)
-    val StrokeStrong get() = pick(0xFF2E3340, 0xFF0A0B0C, 0xFF3D3D3D)
-    val Text get() = pick(0xFFF1F3F7, 0xFFF3F0E8, 0xFFFFFFFF)
-    val Text2 get() = pick(0xFF9099A8, 0xFFABA69C, 0xFFA6A6A6)
-    val Text3 get() = pick(0xFF5C6473, 0xFF7F7B72, 0xFF6B6B6B)
-    val AccentSoft get() = pick(0x223D7BFF, 0x403D82F5, 0xFF1BA1E2)
-    val Danger get() = pick(0xFFFF5D6C, 0xFFFF6B6B, 0xFFE51400)
-    val Star get() = pick(0xFFFFC94D, 0xFFFFCB45, 0xFFF0A30A)
-    val Live get() = pick(0xFFFF4D5E, 0xFFFF3B30, 0xFFE51400)
+    private fun pick(classic: Long, skeuo: Long, metro: Long, dueffe: Long) =
+        Color(if (Skin.dueffe) dueffe else if (Skin.metro) metro else if (Skin.skeuo) skeuo else classic)
+    val Accent get() = pick(0xFF3D7BFF, 0xFF3D82F5, 0xFF1BA1E2, 0xFFFFD84D)
+    val Accent2 get() = pick(0xFF00C2FF, 0xFF6FB2FF, 0xFF1BA1E2, 0xFFFFB800)
+    val Bg get() = pick(0xFF0A0B0F, 0xFF232529, 0xFF000000, 0xFF050505)
+    val Panel get() = pick(0xFF111318, 0xFF2A2729, 0xFF1F1F1F, 0xFF0B0A08)
+    val Surface get() = pick(0xFF191C23, 0xFF34373E, 0xFF1F1F1F, 0xFF1A1711)
+    val SurfaceHover get() = pick(0xFF21252E, 0xFF3E4149, 0xFF2B2B2B, 0xFF242016)
+    val SurfacePressed get() = pick(0xFF2A2F3A, 0xFF464A54, 0xFF1BA1E2, 0xFF2E281A)
+    val Stroke get() = pick(0xFF20242D, 0xFF0E0F11, 0xFF262626, 0x29FFDC80)
+    val StrokeStrong get() = pick(0xFF2E3340, 0xFF0A0B0C, 0xFF3D3D3D, 0x57FFD84D)
+    val Text get() = pick(0xFFF1F3F7, 0xFFF3F0E8, 0xFFFFFFFF, 0xFFFFFAF0)
+    val Text2 get() = pick(0xFF9099A8, 0xFFABA69C, 0xFFA6A6A6, 0xFFB8AA8D)
+    val Text3 get() = pick(0xFF5C6473, 0xFF7F7B72, 0xFF6B6B6B, 0xFF7E7461)
+    val AccentSoft get() = pick(0x223D7BFF, 0x403D82F5, 0xFF1BA1E2, 0x24FFD84D)
+    val Danger get() = pick(0xFFFF5D6C, 0xFFFF6B6B, 0xFFE51400, 0xFFFF9B85)
+    val Star get() = pick(0xFFFFC94D, 0xFFFFCB45, 0xFFF0A30A, 0xFFFFD84D)
+    val Live get() = pick(0xFFFF4D5E, 0xFFFF3B30, 0xFFE51400, 0xFFFF7A5C)
+    /** Testo e icone sopra l'accento: scuri sull'oro di Dueffe, bianchi altrove. */
+    val OnAccent get() = pick(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFF161006)
+}
+
+/** Design system Dueffe: font, gradienti oro, card calde con bordo sottile, aurora sul fondo. */
+object Dueffe {
+    val Line = Color(0x29FFDC80)
+    val Nav = Color(0xF0080705)
+    val Gold = Brush.linearGradient(listOf(Color(0xFFFFD84D), Color(0xFFFFC21A)))
+    val Card = Brush.verticalGradient(listOf(Color(0xFF1A1711), Color(0xFF11100D)))
+
+    @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+    private fun font(id: Int, w: Int) = androidx.compose.ui.text.font.Font(
+        id, FontWeight(w),
+        variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(w)),
+    )
+    val Display = androidx.compose.ui.text.font.FontFamily(listOf(400, 500, 600, 700, 800).map { font(R.font.bricolage, it) })
+    val Body = androidx.compose.ui.text.font.FontFamily(listOf(400, 500, 600, 700).map { font(R.font.inter, it) })
+
+    /** Raggi del design system: tasti 18, card 20, pillole tonde. */
+    fun corners(shape: Shape): Shape = when (shape) {
+        RoundedCornerShape(10.dp), RoundedCornerShape(14.dp) -> RoundedCornerShape(18.dp)
+        RoundedCornerShape(12.dp) -> RoundedCornerShape(20.dp)
+        else -> shape
+    }
+
+    /** Aurora ferma: tre nebulose oro e ambra sul fondo quasi nero. */
+    fun Modifier.aurora(): Modifier = drawBehind {
+        val w = size.width; val h = size.height; val r = maxOf(w, h)
+        drawRect(Brush.radialGradient(listOf(Color(0x2EFFD84D), Color.Transparent), Offset(w * 0.1f, h * 0.02f), r * 0.55f))
+        drawRect(Brush.radialGradient(listOf(Color(0x24FFB800), Color.Transparent), Offset(w * 0.95f, h * 0.35f), r * 0.5f))
+        drawRect(Brush.radialGradient(listOf(Color(0x1AFFF0AD), Color.Transparent), Offset(w * 0.4f, h * 1.05f), r * 0.6f))
+    }
 }
 
 /** Angoli arrotondati, o vivi nello stile Modern UI. */
-fun skinCorners(r: Dp): Shape = if (Skin.metro) RectangleShape else RoundedCornerShape(r)
+fun skinCorners(r: Dp): Shape = if (Skin.metro) RectangleShape else if (Skin.dueffe) RoundedCornerShape(r * 1.5f) else RoundedCornerShape(r)
 
 /** Materiali dello stile skeuomorfico: lino, pelle, metallo spazzolato, plastica blu lucida, bordi in rilievo. */
 object Skeuo {
@@ -147,6 +188,7 @@ object Skeuo {
  */
 @Composable
 fun Modifier.material(color: Color): Modifier = when {
+    Skin.dueffe && color == C.Bg -> with(Dueffe) { background(color).aurora() }
     !Skin.skeuo -> background(color)
     color == C.Bg -> background(color).background(Skeuo.texture(R.drawable.skeuo_linen))
     color == C.Panel -> background(color).background(Skeuo.texture(R.drawable.skeuo_leather))
@@ -162,7 +204,7 @@ fun Modifier.metalBar(): Modifier = if (!Skin.skeuo) background(C.Panel) else th
 
 private fun appColors(): ColorScheme = darkColorScheme(
     primary = C.Accent,
-    onPrimary = Color.White,
+    onPrimary = C.OnAccent,
     secondary = C.Accent2,
     background = C.Bg,
     onBackground = C.Text,
@@ -179,7 +221,8 @@ private fun appColors(): ColorScheme = darkColorScheme(
 
 @Composable
 fun IptvTheme(content: @Composable () -> Unit) = MaterialTheme(colorScheme = appColors()) {
-    if (!Skin.skeuo) content()
+    if (Skin.dueffe) ProvideTextStyle(LocalTextStyle.current.copy(fontFamily = Dueffe.Body, letterSpacing = 0.sp), content)
+    else if (!Skin.skeuo) content()
     // Testo inciso nel materiale: un'ombra scura sopra le lettere.
     else ProvideTextStyle(LocalTextStyle.current.copy(shadow = Shadow(Color(0xB3000000), Offset(0f, -2f), 0f)), content)
 }
@@ -201,14 +244,24 @@ fun Modifier.tvClickable(
     onClick: () -> Unit,
 ): Modifier {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) focusScale else 1f, label = "focus")
+    // Dueffe: premuto si comprime, al rilascio rimbalza a molla (al posto del ripple).
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        if (Skin.dueffe && pressed) 0.95f else if (focused) focusScale else 1f,
+        if (Skin.dueffe) spring(if (pressed) 1f else 0.42f, if (pressed) 900f else 380f) else spring(),
+        label = "focus",
+    )
     // Modern UI: angoli vivi (i cerchi restano); pulsanti e pillole sul fondo scuro col bordo bianco, righe e schede piatte.
     val metroButton = Skin.metro && background == C.Surface && (shape == RoundedCornerShape(10.dp) || shape == RoundedCornerShape(50))
     // === e non ==: CircleShape è uguale a RoundedCornerShape(50), e le pillole devono diventare rettangoli.
     val keepRound = shape === CircleShape || (shape == RoundedCornerShape(50) && background != C.Surface && background != C.Accent)
-    val shape = if (Skin.metro && !keepRound) RectangleShape else shape
+    val shape = if (Skin.metro && !keepRound) RectangleShape else if (Skin.dueffe) Dueffe.corners(shape) else shape
     val background = if (Skin.metro && background == C.Surface) Color.Transparent else background
     val fill = if (focused) focusedBackground else background
+    // Dueffe: l'oro è un gradiente, le superfici sono card calde con un filo di bordo; il focus è oro.
+    val dfGold = Skin.dueffe && fill == C.Accent
+    val dfCard = Skin.dueffe && fill.alpha > 0.5f && !dfGold
     val skeuo = Skin.skeuo && fill.alpha > 0.3f
     val gloss = skeuo && fill == C.Accent
     return this
@@ -224,14 +277,20 @@ fun Modifier.tvClickable(
         .clip(shape)
         .then(
             when {
+                dfGold -> Modifier.background(Dueffe.Gold)
+                dfCard && fill == C.Surface -> Modifier.background(Dueffe.Card).border(1.dp, Dueffe.Line, shape)
+                dfCard -> Modifier.background(fill).border(1.dp, Dueffe.Line, shape)
                 gloss -> Modifier.background(Skeuo.Gloss).border(1.dp, Skeuo.GlossEdge, shape)
                 skeuo -> Modifier.background(Skeuo.plate(fill)).then(if (focused) Modifier else Modifier.border(1.dp, Skeuo.Bevel, shape))
                 else -> Modifier.background(fill)
             },
         )
         .then(if (metroButton && !focused) Modifier.border(2.dp, Color.White, shape) else Modifier)
-        .border(if (focused) 2.dp else 0.dp, if (focused) Color.White else Color.Transparent, shape)
-        .combinedClickable(onLongClick = onLongClick, onClick = onClick)
+        .border(if (focused) 2.dp else 0.dp, if (!focused) Color.Transparent else if (dfGold) C.Text else if (Skin.dueffe) C.Accent else Color.White, shape)
+        .then(
+            if (Skin.dueffe) Modifier.combinedClickable(interactionSource = source, indication = null, onLongClick = onLongClick, onClick = onClick)
+            else Modifier.combinedClickable(onLongClick = onLongClick, onClick = onClick),
+        )
 }
 
 /**
@@ -386,7 +445,7 @@ private fun Initials(text: String, fontSize: Int) {
 
 @Composable
 fun ProgressLine(progress: Float, modifier: Modifier = Modifier, color: Color = C.Accent, height: Dp = 3.dp) {
-    Box(modifier.height(height).clip(if (Skin.metro) RectangleShape else RoundedCornerShape(2.dp)).background(C.StrokeStrong)) {
+    Box(modifier.height(height).clip(if (Skin.metro) RectangleShape else RoundedCornerShape(50)).background(if (Skin.dueffe) C.SurfaceHover else C.StrokeStrong)) {
         Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(height).background(color))
     }
 }
@@ -406,8 +465,8 @@ fun Pill(text: String, selected: Boolean, icon: ImageVector? = null, modifier: M
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (icon != null) Icon(icon, null, tint = if (selected) Color.White else C.Text2, modifier = Modifier.size(18.dp))
-        Text(text, color = if (selected) Color.White else C.Text, fontSize = 14.sp, maxLines = 1, fontWeight = FontWeight.Medium)
+        if (icon != null) Icon(icon, null, tint = if (selected) C.OnAccent else C.Text2, modifier = Modifier.size(18.dp))
+        Text(text, color = if (selected) C.OnAccent else C.Text, fontSize = 14.sp, maxLines = 1, fontWeight = if (Skin.dueffe) FontWeight.SemiBold else FontWeight.Medium)
     }
 }
 
@@ -418,15 +477,16 @@ fun ActionButton(text: String, icon: ImageVector?, primary: Boolean = false, mod
             .tvClickable(
                 shape = RoundedCornerShape(10.dp),
                 background = if (primary) C.Accent else C.Surface,
-                focusedBackground = if (primary) Color(0xFF5A90FF) else C.SurfacePressed,
+                focusedBackground = if (primary) (if (Skin.dueffe) C.Accent else Color(0xFF5A90FF)) else C.SurfacePressed,
                 onClick = onClick,
             )
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
-        Text(text, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        val on = if (primary) C.OnAccent else if (Skin.dueffe) C.Text else Color.White
+        if (icon != null) Icon(icon, null, tint = on, modifier = Modifier.size(20.dp))
+        Text(text, color = on, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
     }
 }
 
@@ -484,7 +544,10 @@ fun Empty(text: String, modifier: Modifier = Modifier.fillMaxSize()) {
 fun SectionTitle(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
     Column(modifier) {
         // Modern UI: il pivot in alto nomina già la sezione, resta il sottotitolo.
-        if (!(Skin.metro && com.carellice.iptvision.Section.entries.any { it.title == title })) Text(title, color = C.Text, fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (!(Skin.metro && com.carellice.iptvision.Section.entries.any { it.title == title })) Text(
+            title, color = C.Text, fontSize = if (Skin.dueffe) 30.sp else 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            fontFamily = if (Skin.dueffe) Dueffe.Display else null, letterSpacing = if (Skin.dueffe) (-0.3).sp else TextUnit.Unspecified,
+        )
         if (subtitle != null) Text(subtitle, color = C.Text2, fontSize = 13.sp)
     }
 }

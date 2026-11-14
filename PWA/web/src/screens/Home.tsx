@@ -133,7 +133,7 @@ function NavBar() {
               <div style={{ position: 'relative', width: 64, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <motion.div initial={false} animate={{ opacity: selected ? 1 : 0, scaleX: selected ? 1 : 0.5 }} transition={tween(100)}
                   style={{ position: 'absolute', inset: 0, borderRadius: 16, background: 'var(--accent)' }} />
-                <Icon name={icons[s]} color={selected ? '#fff' : 'var(--text2)'} style={{ position: 'relative' }} />
+                <Icon name={icons[s]} color={selected ? 'var(--onAccent)' : 'var(--text2)'} style={{ position: 'relative' }} />
               </div>
               <div style={{ fontSize: 11, lineHeight: '16px', fontWeight: 500, color: selected ? 'var(--text)' : 'var(--text2)' }}>{label}</div>
             </div>

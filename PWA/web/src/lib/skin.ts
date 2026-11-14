@@ -3,12 +3,12 @@ import { useSyncExternalStore } from 'react'
 
 const KEY = 'iptvision.skin'
 
-export type Skin = 'classic' | 'skeuo' | 'metro'
+export type Skin = 'classic' | 'skeuo' | 'metro' | 'dueffe'
 
 export function applySkin() {
   try {
     const s = localStorage.getItem(KEY)
-    if (s === 'skeuo' || s === 'metro') document.documentElement.dataset.skin = s
+    if (s === 'skeuo' || s === 'metro' || s === 'dueffe') document.documentElement.dataset.skin = s
   } catch { /* private mode */ }
 }
 

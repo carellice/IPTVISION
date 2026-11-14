@@ -44,6 +44,8 @@ public partial class App : Application
             var settings = SettingsService.Load();
             if (settings.Skin == "skeuo")
                 Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Themes/Skeuo.xaml") });
+            if (settings.Skin == "dueffe")
+                Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Themes/Dueffe.xaml") });
             if (settings.Skin == "metro")
             {
                 Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Themes/Metro.xaml") });

@@ -774,7 +774,7 @@
                 <ControlTemplate TargetType="ContentControl">
                     <Grid>
                         <Ellipse Stroke="#26FFFFFF" StrokeThickness="3.5" />
-                        <Path Stroke="{StaticResource BrandBrush}" StrokeThickness="3.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                        <Path Stroke="{DynamicResource BrandBrush}" StrokeThickness="3.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                               Stretch="None" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center"
                               Data="M 22,1.75 A 20.25,20.25 0 0 1 42.25,22" Width="44" Height="44">
                             <Path.RenderTransform>

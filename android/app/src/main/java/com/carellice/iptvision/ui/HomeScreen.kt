@@ -16,6 +16,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
@@ -130,7 +131,15 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
             } else {
                 Column(Modifier.fillMaxSize().statusBarsPadding()) {
                     Column(Modifier.weight(1f).padding(horizontal = 14.dp).padding(top = 12.dp)) { Content(vm, onVoiceSearch) }
-                    NavigationBar(Modifier.metalBar(), containerColor = Color.Transparent) {
+                    // Dueffe: barra flottante alta 68, raggio 28, colore Nav con un filo di bordo oro.
+                    val df = Skin.dueffe
+                    NavigationBar(
+                        if (!df) Modifier.metalBar() else Modifier.navigationBarsPadding().padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
+                            .height(68.dp).clip(RoundedCornerShape(28.dp)).background(Dueffe.Nav)
+                            .border(1.dp, Dueffe.Line, RoundedCornerShape(28.dp)).padding(horizontal = 6.dp),
+                        containerColor = Color.Transparent,
+                        windowInsets = if (df) androidx.compose.foundation.layout.WindowInsets(0) else androidx.compose.material3.NavigationBarDefaults.windowInsets,
+                    ) {
                         vm.sections.forEach { s ->
                             NavigationBarItem(
                                 selected = vm.section == s,
@@ -138,7 +147,7 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                                 icon = { Icon(s.icon(), null) },
                                 label = { Text(if (s == Section.Live) "TV" else if (s == Section.Settings) "Altro" else s.title, fontSize = 11.sp) },
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Color.White, indicatorColor = C.Accent,
+                                    selectedIconColor = C.OnAccent, indicatorColor = C.Accent,
                                     unselectedIconColor = C.Text2, unselectedTextColor = C.Text2, selectedTextColor = C.Text,
                                 ),
                             )

@@ -25,7 +25,7 @@ struct PlayerView: View {
                 if let f = player.failed {
                     VStack(spacing: 12) {
                         Text(f).foregroundStyle(.white)
-                        Button("Riprova") { start() }.buttonStyle(.borderedProminent)
+                        Button("Riprova") { start() }.prominentStyle()
                     }
                 }
                 Color.clear.contentShape(Rectangle())
@@ -155,7 +155,7 @@ struct PlayerView: View {
             HStack {
                 Text("Episodio successivo tra \(c) s").foregroundStyle(.white)
                 Button("Annulla") { countdown = nil; close() }.buttonStyle(.bordered)
-                Button("Guarda ora") { countdown = nil; model.playNextEpisode() }.buttonStyle(.borderedProminent)
+                Button("Guarda ora") { countdown = nil; model.playNextEpisode() }.prominentStyle()
             }
             .padding()
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Theme.corner(14)))

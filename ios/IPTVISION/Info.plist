@@ -41,6 +41,14 @@
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Inter-400.ttf</string>
+		<string>Inter-600.ttf</string>
+		<string>Inter-700.ttf</string>
+		<string>Bricolage-700.ttf</string>
+		<string>Bricolage-800.ttf</string>
+	</array>
 	<key>UIRequiresFullScreen</key>
 	<false/>
 	<key>UIStatusBarStyle</key>

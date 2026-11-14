@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -189,18 +190,19 @@ fun SettingsSection(vm: AppViewModel) {
 
         Group("Aspetto")
         val skin = vm.settings.skin
-        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("classic" to "Moderno", "skeuo" to "Skeuomorfico", "metro" to "Modern UI").forEach { (key, label) ->
-                Pill(label, selected = skin == key || (key == "classic" && skin !in listOf("skeuo", "metro"))) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("classic" to "Moderno", "skeuo" to "Skeuomorfico", "metro" to "Modern UI", "dueffe" to "Dueffe").forEach { (key, label) ->
+                Pill(label, selected = skin == key || (key == "classic" && skin !in listOf("skeuo", "metro", "dueffe"))) {
                     vm.settings.skin = key
                     Skin.set(key)
                 }
             }
         }
         Text(
-            when (Skin.metro to Skin.skeuo) {
-                (true to false) -> "Lo stile di Windows Phone: nero, piatto, angoli vivi, titoli grandi e sezioni da scorrere in alto."
-                (false to true) -> "Pelle, lino, metallo spazzolato e pulsanti lucidi."
+            when {
+                Skin.dueffe -> "Fondo quasi nero, superfici calde, avorio e oro, angoli morbidi e pulsanti che rimbalzano."
+                Skin.metro -> "Lo stile di Windows Phone: nero, piatto, angoli vivi, titoli grandi e sezioni da scorrere in alto."
+                Skin.skeuo -> "Pelle, lino, metallo spazzolato e pulsanti lucidi."
                 else -> "Lo stile di sempre: scuro, arrotondato, menu in basso o di lato."
             },
             color = C.Text3, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp),
