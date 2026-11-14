@@ -1,6 +1,6 @@
 {
   "name": "iptvision-server",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "private": true,
   "type": "module",
   "description": "Server di IPTVISION PWA: account, preferiti e posizioni in SQLite, liste e guida dal provider IPTV, flussi per il browser e per le app IPTVISION in modalità server.",
