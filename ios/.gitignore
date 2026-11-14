@@ -1,0 +1,9 @@
+# Generati dalla GitHub Action (xcodegen, pod install, xcodebuild)
+*.xcodeproj/
+*.xcworkspace/
+Pods/
+Podfile.lock
+build/
+build.log
+Payload/
+*.ipa

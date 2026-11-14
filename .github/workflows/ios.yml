@@ -1,0 +1,85 @@
+# Compila l'app iOS (iPhone e iPad) su un Mac di GitHub e pubblica IPTVISION.ipa non firmato.
+# La firma la fa chi installa, con il proprio Apple ID: vedi ios/README.md.
+#
+# Si avvia da solo a ogni modifica in ios/ su main, oppure a mano:
+#   - GitHub → Actions → "App iOS (.ipa)" → Run workflow
+#   - gh workflow run ios.yml
+name: App iOS (.ipa)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-ipa
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Strumenti
+        run: |
+          brew install xcodegen
+          command -v pod || sudo gem install cocoapods
+
+      - name: Progetto Xcode e libVLC
+        working-directory: ios
+        run: |
+          xcodegen generate
+          pod install --repo-update
+
+      - name: Compila (senza firma)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -workspace IPTVISION.xcworkspace \
+            -scheme IPTVISION \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tee build.log | grep -E "error:|warning: .*IPTVISION/|BUILD (SUCCEEDED|FAILED)" || true
+          test -d build/Build/Products/Release-iphoneos/IPTVISION.app
+
+      - name: Crea IPTVISION.ipa
+        working-directory: ios
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/IPTVISION.app Payload/
+          zip -qry IPTVISION.ipa Payload
+          ls -lh IPTVISION.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IPTVISION-ipa
+          path: ios/IPTVISION.ipa
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-log
+          path: ios/build.log
+
+      # Release fissa "ios": il file .bat scarica sempre da qui l'ultima versione.
+      - name: Pubblica nella release "ios"
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view ios >/dev/null 2>&1 || gh release create ios --prerelease \
+            --title "IPTVISION per iPhone e iPad" \
+            --notes "Ultima build dell'app iOS per iPhone e iPad. Su Windows scarica installa-iphone.bat qui sotto e aprilo: ti guida passo passo. Istruzioni: https://github.com/carellice/IPTVISION/blob/main/ios/README.md"
+          gh release upload ios ios/IPTVISION.ipa ios/installa-iphone.bat --clobber
