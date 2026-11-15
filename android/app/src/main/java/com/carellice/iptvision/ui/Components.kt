@@ -86,6 +86,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.draw.alpha
 
 /** Stile grafico scelto nelle impostazioni: cambia al volo colori e materiali di tutta l'app. */
 object Skin {
@@ -94,36 +95,39 @@ object Skin {
     var metro by mutableStateOf(false)
     /** Dueffe: fondo quasi nero, superfici calde, avorio e oro, Bricolage e Inter, pressione a molla. */
     var dueffe by mutableStateOf(false)
+    /** Nothing: nero OLED a punti, superfici piatte con linee sottili, bianco e un solo rosso, Space Grotesk, Space Mono e Doto. */
+    var nothing by mutableStateOf(false)
 
     fun set(skin: String) {
         skeuo = skin == "skeuo"
         metro = skin == "metro"
         dueffe = skin == "dueffe"
+        nothing = skin == "nothing"
     }
 }
 
 /** Colori dell'app: quelli dello stile moderno o, con lo stile skeuomorfico, toni caldi di pelle e metallo. */
 object C {
-    private fun pick(classic: Long, skeuo: Long, metro: Long, dueffe: Long) =
-        Color(if (Skin.dueffe) dueffe else if (Skin.metro) metro else if (Skin.skeuo) skeuo else classic)
-    val Accent get() = pick(0xFF3D7BFF, 0xFF3D82F5, 0xFF1BA1E2, 0xFFFFD84D)
-    val Accent2 get() = pick(0xFF00C2FF, 0xFF6FB2FF, 0xFF1BA1E2, 0xFFFFB800)
-    val Bg get() = pick(0xFF0A0B0F, 0xFF232529, 0xFF000000, 0xFF050505)
-    val Panel get() = pick(0xFF111318, 0xFF2A2729, 0xFF1F1F1F, 0xFF0B0A08)
-    val Surface get() = pick(0xFF191C23, 0xFF34373E, 0xFF1F1F1F, 0xFF1A1711)
-    val SurfaceHover get() = pick(0xFF21252E, 0xFF3E4149, 0xFF2B2B2B, 0xFF242016)
-    val SurfacePressed get() = pick(0xFF2A2F3A, 0xFF464A54, 0xFF1BA1E2, 0xFF2E281A)
-    val Stroke get() = pick(0xFF20242D, 0xFF0E0F11, 0xFF262626, 0x29FFDC80)
-    val StrokeStrong get() = pick(0xFF2E3340, 0xFF0A0B0C, 0xFF3D3D3D, 0x57FFD84D)
-    val Text get() = pick(0xFFF1F3F7, 0xFFF3F0E8, 0xFFFFFFFF, 0xFFFFFAF0)
-    val Text2 get() = pick(0xFF9099A8, 0xFFABA69C, 0xFFA6A6A6, 0xFFB8AA8D)
-    val Text3 get() = pick(0xFF5C6473, 0xFF7F7B72, 0xFF6B6B6B, 0xFF7E7461)
-    val AccentSoft get() = pick(0x223D7BFF, 0x403D82F5, 0xFF1BA1E2, 0x24FFD84D)
-    val Danger get() = pick(0xFFFF5D6C, 0xFFFF6B6B, 0xFFE51400, 0xFFFF9B85)
-    val Star get() = pick(0xFFFFC94D, 0xFFFFCB45, 0xFFF0A30A, 0xFFFFD84D)
-    val Live get() = pick(0xFFFF4D5E, 0xFFFF3B30, 0xFFE51400, 0xFFFF7A5C)
-    /** Testo e icone sopra l'accento: scuri sull'oro di Dueffe, bianchi altrove. */
-    val OnAccent get() = pick(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFF161006)
+    private fun pick(classic: Long, skeuo: Long, metro: Long, dueffe: Long, nothing: Long) =
+        Color(if (Skin.nothing) nothing else if (Skin.dueffe) dueffe else if (Skin.metro) metro else if (Skin.skeuo) skeuo else classic)
+    val Accent get() = pick(0xFF3D7BFF, 0xFF3D82F5, 0xFF1BA1E2, 0xFFFFD84D, 0xFFFFFFFF)
+    val Accent2 get() = pick(0xFF00C2FF, 0xFF6FB2FF, 0xFF1BA1E2, 0xFFFFB800, 0xFFE8E8E8)
+    val Bg get() = pick(0xFF0A0B0F, 0xFF232529, 0xFF000000, 0xFF050505, 0xFF000000)
+    val Panel get() = pick(0xFF111318, 0xFF2A2729, 0xFF1F1F1F, 0xFF0B0A08, 0xFF000000)
+    val Surface get() = pick(0xFF191C23, 0xFF34373E, 0xFF1F1F1F, 0xFF1A1711, 0xFF111111)
+    val SurfaceHover get() = pick(0xFF21252E, 0xFF3E4149, 0xFF2B2B2B, 0xFF242016, 0xFF1A1A1A)
+    val SurfacePressed get() = pick(0xFF2A2F3A, 0xFF464A54, 0xFF1BA1E2, 0xFF2E281A, 0xFF222222)
+    val Stroke get() = pick(0xFF20242D, 0xFF0E0F11, 0xFF262626, 0x29FFDC80, 0xFF222222)
+    val StrokeStrong get() = pick(0xFF2E3340, 0xFF0A0B0C, 0xFF3D3D3D, 0x57FFD84D, 0xFF333333)
+    val Text get() = pick(0xFFF1F3F7, 0xFFF3F0E8, 0xFFFFFFFF, 0xFFFFFAF0, 0xFFE8E8E8)
+    val Text2 get() = pick(0xFF9099A8, 0xFFABA69C, 0xFFA6A6A6, 0xFFB8AA8D, 0xFF999999)
+    val Text3 get() = pick(0xFF5C6473, 0xFF7F7B72, 0xFF6B6B6B, 0xFF7E7461, 0xFF666666)
+    val AccentSoft get() = pick(0x223D7BFF, 0x403D82F5, 0xFF1BA1E2, 0x24FFD84D, 0x14FFFFFF)
+    val Danger get() = pick(0xFFFF5D6C, 0xFFFF6B6B, 0xFFE51400, 0xFFFF9B85, 0xFFD71921)
+    val Star get() = pick(0xFFFFC94D, 0xFFFFCB45, 0xFFF0A30A, 0xFFFFD84D, 0xFFFFFFFF)
+    val Live get() = pick(0xFFFF4D5E, 0xFFFF3B30, 0xFFE51400, 0xFFFF7A5C, 0xFFD71921)
+    /** Testo e icone sopra l'accento: scuri sull'oro di Dueffe e sul bianco di Nothing, bianchi altrove. */
+    val OnAccent get() = pick(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFF161006, 0xFF000000)
 }
 
 /** Design system Dueffe: font, gradienti oro, card calde con bordo sottile, aurora sul fondo. */
@@ -154,6 +158,35 @@ object Dueffe {
         drawRect(Brush.radialGradient(listOf(Color(0x2EFFD84D), Color.Transparent), Offset(w * 0.1f, h * 0.02f), r * 0.55f))
         drawRect(Brush.radialGradient(listOf(Color(0x24FFB800), Color.Transparent), Offset(w * 0.95f, h * 0.35f), r * 0.5f))
         drawRect(Brush.radialGradient(listOf(Color(0x1AFFF0AD), Color.Transparent), Offset(w * 0.4f, h * 1.05f), r * 0.6f))
+    }
+}
+
+/** Design system Nothing: font, griglia di punti sul fondo, raggi (pillole per i tasti, 12-16 per le card). */
+object Nothing {
+    @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+    private fun font(id: Int, w: Int) = androidx.compose.ui.text.font.Font(
+        id, FontWeight(w),
+        variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(w)),
+    )
+    val Body = androidx.compose.ui.text.font.FontFamily(listOf(300, 400, 500, 600, 700).map { font(R.font.nd_grotesk, it) })
+    val Mono = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(R.font.nd_mono))
+    val Dots = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(R.font.nd_doto, FontWeight.Bold))
+
+    /** Tasti e pillole tondi, card al massimo 16. */
+    fun corners(shape: Shape): Shape = when (shape) {
+        RoundedCornerShape(10.dp), RoundedCornerShape(14.dp) -> RoundedCornerShape(50)
+        else -> shape
+    }
+
+    /** Griglia di punti da 16 dp appena visibile, il motivo a matrice di punti di Nothing. */
+    fun Modifier.dots(): Modifier = drawBehind {
+        val step = 16.dp.toPx(); val r = 0.75.dp.toPx(); val c = Color(0x1FFFFFFF)
+        var y = step / 2
+        while (y < size.height) {
+            var x = step / 2
+            while (x < size.width) { drawCircle(c, r, Offset(x, y)); x += step }
+            y += step
+        }
     }
 }
 
@@ -189,6 +222,7 @@ object Skeuo {
 @Composable
 fun Modifier.material(color: Color): Modifier = when {
     Skin.dueffe && color == C.Bg -> with(Dueffe) { background(color).aurora() }
+    Skin.nothing && color == C.Bg -> with(Nothing) { background(color).dots() }
     !Skin.skeuo -> background(color)
     color == C.Bg -> background(color).background(Skeuo.texture(R.drawable.skeuo_linen))
     color == C.Panel -> background(color).background(Skeuo.texture(R.drawable.skeuo_leather))
@@ -222,6 +256,7 @@ private fun appColors(): ColorScheme = darkColorScheme(
 @Composable
 fun IptvTheme(content: @Composable () -> Unit) = MaterialTheme(colorScheme = appColors()) {
     if (Skin.dueffe) ProvideTextStyle(LocalTextStyle.current.copy(fontFamily = Dueffe.Body, letterSpacing = 0.sp), content)
+    else if (Skin.nothing) ProvideTextStyle(LocalTextStyle.current.copy(fontFamily = Nothing.Body, letterSpacing = 0.sp), content)
     else if (!Skin.skeuo) content()
     // Testo inciso nel materiale: un'ombra scura sopra le lettere.
     else ProvideTextStyle(LocalTextStyle.current.copy(shadow = Shadow(Color(0xB3000000), Offset(0f, -2f), 0f)), content)
@@ -248,7 +283,7 @@ fun Modifier.tvClickable(
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        if (Skin.dueffe && pressed) 0.95f else if (focused) focusScale else 1f,
+        if (Skin.dueffe && pressed) 0.95f else if (focused && !Skin.nothing) focusScale else 1f,
         if (Skin.dueffe) spring(if (pressed) 1f else 0.42f, if (pressed) 900f else 380f) else spring(),
         label = "focus",
     )
@@ -256,8 +291,11 @@ fun Modifier.tvClickable(
     val metroButton = Skin.metro && background == C.Surface && (shape == RoundedCornerShape(10.dp) || shape == RoundedCornerShape(50))
     // === e non ==: CircleShape è uguale a RoundedCornerShape(50), e le pillole devono diventare rettangoli.
     val keepRound = shape === CircleShape || (shape == RoundedCornerShape(50) && background != C.Surface && background != C.Accent)
-    val shape = if (Skin.metro && !keepRound) RectangleShape else if (Skin.dueffe) Dueffe.corners(shape) else shape
-    val background = if (Skin.metro && background == C.Surface) Color.Transparent else background
+    val shape = if (Skin.metro && !keepRound) RectangleShape else if (Skin.dueffe) Dueffe.corners(shape) else if (Skin.nothing) Nothing.corners(shape) else shape
+    // Nothing: tasti e pillole secondari sono solo un contorno, le card #111 con un filo #222; niente molla, premuto sbiadisce.
+    val ndOutline = Skin.nothing && background == C.Surface && shape == RoundedCornerShape(50)
+    val background = if ((Skin.metro || ndOutline) && background == C.Surface) Color.Transparent else background
+    val ndAlpha by animateFloatAsState(if (Skin.nothing && pressed) 0.6f else 1f, androidx.compose.animation.core.tween(180), label = "press")
     val fill = if (focused) focusedBackground else background
     // Dueffe: l'oro è un gradiente, le superfici sono card calde con un filo di bordo; il focus è oro.
     val dfGold = Skin.dueffe && fill == C.Accent
@@ -266,6 +304,7 @@ fun Modifier.tvClickable(
     val gloss = skeuo && fill == C.Accent
     return this
         .scale(scale)
+        .alpha(ndAlpha)
         .onFocusChanged {
             focused = it.isFocused
             if (it.isFocused) onFocus?.invoke()
@@ -282,13 +321,19 @@ fun Modifier.tvClickable(
                 dfCard -> Modifier.background(fill).border(1.dp, Dueffe.Line, shape)
                 gloss -> Modifier.background(Skeuo.Gloss).border(1.dp, Skeuo.GlossEdge, shape)
                 skeuo -> Modifier.background(Skeuo.plate(fill)).then(if (focused) Modifier else Modifier.border(1.dp, Skeuo.Bevel, shape))
+                Skin.nothing && ndOutline && !focused -> Modifier.border(1.dp, C.StrokeStrong, shape)
+                Skin.nothing && fill.alpha > 0.5f && fill != C.Accent && !focused -> Modifier.background(fill).border(1.dp, C.Stroke, shape)
                 else -> Modifier.background(fill)
             },
         )
         .then(if (metroButton && !focused) Modifier.border(2.dp, Color.White, shape) else Modifier)
-        .border(if (focused) 2.dp else 0.dp, if (!focused) Color.Transparent else if (dfGold) C.Text else if (Skin.dueffe) C.Accent else Color.White, shape)
+        .border(
+            if (focused) (if (Skin.nothing) 1.5.dp else 2.dp) else 0.dp,
+            if (!focused) Color.Transparent else if (dfGold) C.Text else if (Skin.dueffe) C.Accent else if (Skin.nothing && fill == C.Accent) C.Live else Color.White,
+            shape,
+        )
         .then(
-            if (Skin.dueffe) Modifier.combinedClickable(interactionSource = source, indication = null, onLongClick = onLongClick, onClick = onClick)
+            if (Skin.dueffe || Skin.nothing) Modifier.combinedClickable(interactionSource = source, indication = null, onLongClick = onLongClick, onClick = onClick)
             else Modifier.combinedClickable(onLongClick = onLongClick, onClick = onClick),
         )
 }
@@ -445,10 +490,29 @@ private fun Initials(text: String, fontSize: Int) {
 
 @Composable
 fun ProgressLine(progress: Float, modifier: Modifier = Modifier, color: Color = C.Accent, height: Dp = 3.dp) {
+    if (Skin.nothing) {
+        // Nothing: barra a segmenti quadrati, blocchi da 6 dp con 2 dp di stacco.
+        val h = maxOf(height, 4.dp)
+        Box(modifier.height(h).drawBehind {
+            val seg = 6.dp.toPx(); val gap = 2.dp.toPx(); val filled = size.width * progress.coerceIn(0f, 1f)
+            var x = 0f
+            while (x < size.width) {
+                val w = minOf(seg, size.width - x)
+                drawRect(if (x < filled) color else Color(0xFF222222), Offset(x, 0f), androidx.compose.ui.geometry.Size(w, size.height))
+                x += seg + gap
+            }
+        })
+        return
+    }
     Box(modifier.height(height).clip(if (Skin.metro) RectangleShape else RoundedCornerShape(50)).background(if (Skin.dueffe) C.SurfaceHover else C.StrokeStrong)) {
         Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(height).background(color))
     }
 }
+
+/** Etichetta Nothing di tasti e pillole: Space Mono maiuscolo, 13 sp, spaziatura larga. */
+@Composable
+fun NdLabel(text: String, color: Color) =
+    Text(text.uppercase(), color = color, fontSize = 13.sp, maxLines = 1, fontFamily = Nothing.Mono, letterSpacing = 0.8.sp)
 
 @Composable
 fun Pill(text: String, selected: Boolean, icon: ImageVector? = null, modifier: Modifier = Modifier, onFocus: (() -> Unit)? = null, onClick: () -> Unit) {
@@ -466,7 +530,8 @@ fun Pill(text: String, selected: Boolean, icon: ImageVector? = null, modifier: M
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (icon != null) Icon(icon, null, tint = if (selected) C.OnAccent else C.Text2, modifier = Modifier.size(18.dp))
-        Text(text, color = if (selected) C.OnAccent else C.Text, fontSize = 14.sp, maxLines = 1, fontWeight = if (Skin.dueffe) FontWeight.SemiBold else FontWeight.Medium)
+        if (Skin.nothing) NdLabel(text, if (selected) C.OnAccent else C.Text)
+        else Text(text, color = if (selected) C.OnAccent else C.Text, fontSize = 14.sp, maxLines = 1, fontWeight = if (Skin.dueffe) FontWeight.SemiBold else FontWeight.Medium)
     }
 }
 
@@ -484,9 +549,9 @@ fun ActionButton(text: String, icon: ImageVector?, primary: Boolean = false, mod
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val on = if (primary) C.OnAccent else if (Skin.dueffe) C.Text else Color.White
+        val on = if (primary) C.OnAccent else if (Skin.dueffe || Skin.nothing) C.Text else Color.White
         if (icon != null) Icon(icon, null, tint = on, modifier = Modifier.size(20.dp))
-        Text(text, color = on, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        if (Skin.nothing) NdLabel(text, on) else Text(text, color = on, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
     }
 }
 
@@ -544,6 +609,14 @@ fun Empty(text: String, modifier: Modifier = Modifier.fillMaxSize()) {
 fun SectionTitle(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
     Column(modifier) {
         // Modern UI: il pivot in alto nomina già la sezione, resta il sottotitolo.
+        // Nothing: titolo a matrice di punti (Doto) e sottotitolo come etichetta Space Mono.
+        if (Skin.nothing) {
+            Text(title, color = Color.White, fontSize = 36.sp, lineHeight = 40.sp, fontFamily = Nothing.Dots, fontWeight = FontWeight.Bold, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, letterSpacing = (-0.5).sp)
+            if (subtitle != null) Text(subtitle.uppercase(), color = C.Text2, fontSize = 11.sp, fontFamily = Nothing.Mono, letterSpacing = 0.9.sp,
+                modifier = Modifier.padding(top = 4.dp))
+            return@Column
+        }
         if (!(Skin.metro && com.carellice.iptvision.Section.entries.any { it.title == title })) Text(
             title, color = C.Text, fontSize = if (Skin.dueffe) 30.sp else 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
             fontFamily = if (Skin.dueffe) Dueffe.Display else null, letterSpacing = if (Skin.dueffe) (-0.3).sp else TextUnit.Unspecified,

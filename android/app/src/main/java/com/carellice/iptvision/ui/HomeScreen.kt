@@ -81,6 +81,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.unit.sp
 import com.carellice.iptvision.ALL_ID
 import com.carellice.iptvision.AppViewModel
@@ -134,7 +135,8 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                     // Dueffe: barra flottante alta 68, raggio 28, colore Nav con un filo di bordo oro.
                     val df = Skin.dueffe
                     NavigationBar(
-                        if (!df) Modifier.metalBar() else Modifier.navigationBarsPadding().padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
+                        if (Skin.nothing) Modifier.background(C.Bg).drawBehind { drawLine(Color(0xFF222222), androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx()) }
+                        else if (!df) Modifier.metalBar() else Modifier.navigationBarsPadding().padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
                             .height(68.dp).clip(RoundedCornerShape(28.dp)).background(Dueffe.Nav)
                             .border(1.dp, Dueffe.Line, RoundedCornerShape(28.dp)).padding(horizontal = 6.dp),
                         containerColor = Color.Transparent,
@@ -145,7 +147,12 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                                 selected = vm.section == s,
                                 onClick = { vm.section = s },
                                 icon = { Icon(s.icon(), null) },
-                                label = { Text(if (s == Section.Live) "TV" else if (s == Section.Settings) "Altro" else s.title, fontSize = 11.sp) },
+                                label = {
+                                    val l = if (s == Section.Live) "TV" else if (s == Section.Settings) "Altro" else s.title
+                                    // Nothing: voci in Space Mono maiuscolo.
+                                    if (Skin.nothing) Text(l.uppercase(), fontSize = 10.sp, fontFamily = Nothing.Mono, letterSpacing = 0.8.sp)
+                                    else Text(l, fontSize = 11.sp)
+                                },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = C.OnAccent, indicatorColor = C.Accent,
                                     unselectedIconColor = C.Text2, unselectedTextColor = C.Text2, selectedTextColor = C.Text,

@@ -442,3 +442,156 @@ html[data-skin='dueffe'] .scroll::-webkit-scrollbar-thumb { background: #ffd84d4
 @media (prefers-reduced-motion: reduce) {
   html[data-skin='dueffe'] *, html[data-skin='dueffe'] body::before { animation: none !important; transition: none !important; }
 }
+
+/* ===================================================================================================
+   Nothing (Impostazioni > Aspetto): the Nothing design system. OLED black with a faint dot grid,
+   flat #111 surfaces separated by thin #222 lines (no shadows, no gradients, no blur), grey text
+   levels, white as the only "accent" (inverted: white fill, black text) and red #D71921 only for
+   what is live or destructive. Space Grotesk for text, Space Mono ALL CAPS for labels and buttons,
+   Doto dot-matrix for page titles. Short ease-out fades instead of the ripple. Same layout.
+   =================================================================================================== */
+@font-face { font-family: 'Space Grotesk'; src: url('/nothing/space-grotesk.woff2') format('woff2'); font-weight: 300 700; font-display: swap; }
+@font-face { font-family: 'Space Mono'; src: url('/nothing/space-mono.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Space Mono'; src: url('/nothing/space-mono-bold.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Doto'; src: url('/nothing/doto.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+
+html[data-skin='nothing'] {
+  --accent: #ffffff;
+  --accent2: #e8e8e8;
+  --onAccent: #000000;
+  --btnText: #e8e8e8;
+  --bg: #000000;
+  --panel: #000000;
+  --surface: #111111;
+  --surfaceHover: #1a1a1a;
+  --surfacePressed: #222222;
+  --stroke: #222222;
+  --strokeStrong: #333333;
+  --text: #e8e8e8;
+  --text2: #999999;
+  --text3: #666666;
+  --accentSoft: #ffffff14;
+  --danger: #d71921;
+  --star: #ffffff;
+  --live: #d71921;
+  --nd-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --nd-mono: 'Space Mono', 'JetBrains Mono', ui-monospace, monospace;
+}
+
+html[data-skin='nothing'] body {
+  font-family: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
+  letter-spacing: 0;
+  background: #000 radial-gradient(circle, #ffffff1f 1px, transparent 1.2px) 0 0 / 16px 16px fixed;
+}
+html[data-skin='nothing'] .app, html[data-skin='nothing'] .app [style*='background: var(--bg)'] { background: transparent !important; }
+
+/* No shadows, no blur, no text shadow anywhere */
+html[data-skin='nothing'] *:not(.click):not(video) { box-shadow: none !important; text-shadow: none !important; backdrop-filter: none !important; }
+
+/* Press: a short ease-out fade instead of the ripple. Focus: a white line. */
+html[data-skin='nothing'] .click { transition: background-color 180ms var(--nd-ease), opacity 180ms var(--nd-ease), box-shadow 180ms var(--nd-ease); }
+html[data-skin='nothing'] .click::after { display: none; }
+html[data-skin='nothing'] .click:active { opacity: 0.6; }
+html[data-skin='nothing'] .click:focus-visible { box-shadow: inset 0 0 0 1px #fff; }
+
+/* Cards and rows: flat #111 with a thin #222 line, radius at most 16 */
+html[data-skin='nothing'] .click[style*='background: var(--surface)'] { box-shadow: inset 0 0 0 1px var(--stroke); }
+html[data-skin='nothing'] .click[style*='background: var(--surface)']:hover { box-shadow: inset 0 0 0 1px var(--strokeStrong); }
+html[data-skin='nothing'] .click[style*='background: var(--surface)']:focus-visible { box-shadow: inset 0 0 0 1px #fff; }
+html[data-skin='nothing'] .click[style*='height: 96px'] { border-radius: 16px !important; }
+html[data-skin='nothing'] .click[style*='background: var(--accentSoft)'] { box-shadow: inset 2px 0 0 #fff, inset 0 0 0 1px var(--strokeStrong); }
+
+/* Buttons and pills: pill shape, Space Mono ALL CAPS. White = primary (inverted), outline = secondary. */
+html[data-skin='nothing'] .click[style*='border-radius: 10px'],
+html[data-skin='nothing'] .click[style*='border-radius: 999px'] { border-radius: 999px !important; }
+html[data-skin='nothing'] .click[style*='border-radius: 10px'] span,
+html[data-skin='nothing'] .click[style*='border-radius: 999px'] span {
+  font-family: var(--nd-mono);
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+html[data-skin='nothing'] .click[style*='border-radius: 10px'][style*='var(--surface)'],
+html[data-skin='nothing'] .click[style*='border-radius: 999px'][style*='var(--surface)'] { background: transparent !important; box-shadow: inset 0 0 0 1px var(--strokeStrong); }
+html[data-skin='nothing'] .click[style*='border-radius: 10px'][style*='var(--surface)']:hover,
+html[data-skin='nothing'] .click[style*='border-radius: 999px'][style*='var(--surface)']:hover { box-shadow: inset 0 0 0 1px var(--text2); }
+html[data-skin='nothing'] .click[style*='background: var(--accent)']:focus-visible { box-shadow: inset 0 0 0 2px #000, 0 0 0 1px #fff; }
+
+/* Page titles: Doto dot-matrix, the one expressive moment of the screen */
+html[data-skin='nothing'] [style*='font-size: 26px'][style*='font-weight: 700'] {
+  font-family: 'Doto', var(--nd-mono);
+  font-size: 36px !important;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff !important;
+}
+html[data-skin='nothing'] [style*='font-weight: 700']:not([style*='font-size: 26px']),
+html[data-skin='nothing'] [style*='font-weight: 600'] { font-weight: 500 !important; }
+/* The subtitle under a page title is metadata: a Space Mono label */
+html[data-skin='nothing'] [style*='font-size: 26px'][style*='font-weight: 700'] + div {
+  font-family: var(--nd-mono);
+  font-size: 11px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+/* The app logo goes monochrome */
+html[data-skin='nothing'] img[src='/logo.png'] { filter: grayscale(1) contrast(1.15); }
+
+/* Labels: Space Mono ALL CAPS, the instrument panel (group titles, badges, small captions) */
+html[data-skin='nothing'] [style*='letter-spacing: 1px'],
+html[data-skin='nothing'] [style*='font-size: 11px'] {
+  font-family: var(--nd-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em !important;
+  font-weight: 400 !important;
+}
+html[data-skin='nothing'] [style*='font-size: 11px'][style*='border-radius: 4px'] { background: transparent !important; box-shadow: inset 0 0 0 1px currentColor !important; }
+html[data-skin='nothing'] [style*='font-size: 11px'][style*='border-radius: 4px'][style*='var(--live)'] { background: var(--live) !important; color: #fff !important; box-shadow: none !important; }
+
+/* Login: plain black instead of the blue gradient */
+html[data-skin='nothing'] [style*='linear-gradient(to bottom'] { background: transparent !important; }
+
+/* Side menu and bottom bar: black with a thin line on the edge */
+html[data-skin='nothing'] [style*='width: 220px'][style*='var(--panel)'] { border-right: 1px solid var(--stroke); }
+html[data-skin='nothing'] .nav-pad[style*='var(--panel)'] { border-top: 1px solid var(--stroke); }
+html[data-skin='nothing'] .nav-pad [style*='font-size: 11px'] { font-size: 10px !important; }
+
+/* Text fields: full border radius 8, white when focused, Space Mono for what you type */
+html[data-skin='nothing'] div:has(> div > input):not(:has(div div input)) { border-radius: 8px !important; background: transparent !important; }
+html[data-skin='nothing'] div:has(> div > input):focus-within { border-color: var(--text) !important; }
+html[data-skin='nothing'] div:has(> div > input) label { background: #000 !important; font-family: var(--nd-mono); text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px !important; }
+html[data-skin='nothing'] input { font-family: var(--nd-mono); }
+
+/* Switch: pill track, white when on with a black thumb */
+html[data-skin='nothing'] [style*='width: 52px; height: 32px'] { background: var(--strokeStrong) !important; border-color: var(--strokeStrong) !important; }
+html[data-skin='nothing'] [style*='width: 52px; height: 32px'] > div { background: var(--text3) !important; }
+html[data-skin='nothing'] [style*='width: 52px; height: 32px'][style*='var(--accent)'] { background: #fff !important; border-color: #fff !important; }
+html[data-skin='nothing'] [style*='width: 52px; height: 32px'][style*='var(--accent)'] > div { background: #000 !important; }
+
+/* Progress: the segmented bar, square blocks with 2px gaps */
+html[data-skin='nothing'] [style*='background: var(--strokeStrong)'][style*='overflow: hidden'] {
+  background: var(--stroke) !important;
+  border-radius: 0 !important;
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 8px);
+  mask: repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 8px);
+  min-height: 4px;
+}
+html[data-skin='nothing'] [style*='background: var(--strokeStrong)'][style*='overflow: hidden'] > div { border-radius: 0 !important; min-height: 4px; }
+
+/* Dialogs and menus: #111 sheet, thin visible line, radius 16 */
+html[data-skin='nothing'] [style*='border-radius: 28px'][style*='var(--panel)'],
+html[data-skin='nothing'] [style*='min-width: 200px'][style*='var(--panel)'] { background: var(--surface) !important; outline: 1px solid var(--strokeStrong); border-radius: 16px !important; }
+
+/* Pages fade in, percussive and short */
+@keyframes nd-fade { from { opacity: 0; } to { opacity: 1; } }
+html[data-skin='nothing'] .app > div:not(:has(video)) { animation: nd-fade 260ms var(--nd-ease) both; }
+
+html[data-skin='nothing'] .scroll::-webkit-scrollbar { width: 4px; }
+html[data-skin='nothing'] .scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin='nothing'] * { animation: none !important; transition: none !important; }
+}

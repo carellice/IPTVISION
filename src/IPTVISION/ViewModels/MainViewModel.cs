@@ -822,11 +822,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Stile grafico (moderno, skeuomorfico, Modern UI o Dueffe): si salva e il programma si riapre con il nuovo stile.</summary>
-    public bool IsClassicSkin { get => _settings.Skin is not ("skeuo" or "metro" or "dueffe"); set { if (value) SetSkin("classic"); } }
+    /// <summary>Stile grafico (moderno, skeuomorfico, Modern UI, Dueffe o Nothing): si salva e il programma si riapre con il nuovo stile.</summary>
+    public bool IsClassicSkin { get => _settings.Skin is not ("skeuo" or "metro" or "dueffe" or "nothing"); set { if (value) SetSkin("classic"); } }
     public bool IsSkeuo { get => _settings.Skin == "skeuo"; set { if (value) SetSkin("skeuo"); } }
     public bool IsMetro { get => _settings.Skin == "metro"; set { if (value) SetSkin("metro"); } }
     public bool IsDueffe { get => _settings.Skin == "dueffe"; set { if (value) SetSkin("dueffe"); } }
+    public bool IsNothing { get => _settings.Skin == "nothing"; set { if (value) SetSkin("nothing"); } }
 
     private void SetSkin(string skin)
     {
@@ -836,6 +837,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsSkeuo));
         OnPropertyChanged(nameof(IsMetro));
         OnPropertyChanged(nameof(IsDueffe));
+        OnPropertyChanged(nameof(IsNothing));
         SaveNow();
         App.Restart();
     }

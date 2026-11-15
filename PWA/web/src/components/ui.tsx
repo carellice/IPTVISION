@@ -262,7 +262,7 @@ export function Switch({ checked }: { checked: boolean }) {
       <motion.div
         animate={{ x: checked ? 20 : 0, width: checked ? 24 : 16, height: checked ? 24 : 16, top: checked ? 2 : 6, left: checked ? 2 : 6 }}
         transition={spring(1, 1500)}
-        style={{ position: 'absolute', borderRadius: '50%', background: checked ? '#fff' : 'var(--text2)' }}
+        style={{ position: 'absolute', borderRadius: '50%', background: checked ? 'var(--onAccent)' : 'var(--text2)' }}
       />
     </div>
   )

@@ -158,12 +158,13 @@ export function SettingsSection() {
   )
 }
 
-const skins: [Skin, string][] = [['classic', 'Moderno'], ['skeuo', 'Skeuomorfico'], ['metro', 'Modern UI'], ['dueffe', 'Dueffe']]
+const skins: [Skin, string][] = [['classic', 'Moderno'], ['skeuo', 'Skeuomorfico'], ['metro', 'Modern UI'], ['dueffe', 'Dueffe'], ['nothing', 'Nothing']]
 const skinNotes: Record<Skin, string> = {
   classic: 'Lo stile di sempre: scuro, arrotondato, menu in basso o di lato.',
   skeuo: 'Pelle, lino, metallo spazzolato e pulsanti lucidi.',
   metro: 'Lo stile di Windows Phone: nero, piatto, angoli vivi, titoli grandi e sezioni da scorrere in alto.',
   dueffe: 'Fondo quasi nero, superfici calde, avorio e oro, angoli morbidi e pulsanti che rimbalzano.',
+  nothing: 'Nero OLED, bianco e un solo rosso, caratteri a matrice di punti e monospazio, linee sottili al posto delle ombre.',
 }
 
 function Group({ title }: { title: string }) {

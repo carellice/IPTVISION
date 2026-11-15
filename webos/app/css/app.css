@@ -514,3 +514,103 @@ body.playing #player-ui { display: block; }
 .dueffe .p-panel { background: rgba(11, 10, 8, 0.96); border-right: 1px solid rgba(255, 220, 128, 0.16); }
 .dueffe .p-next-card { background: rgba(18, 16, 12, 0.96); border: 1px solid rgba(255, 216, 77, 0.34); border-radius: 1.3rem; }
 .dueffe #toast { background: #242016; border: 1px solid rgba(255, 216, 77, 0.34); border-radius: 0.9rem; color: var(--text); }
+
+/* ---------- Stile Nothing (Impostazioni > Aspetto) ----------
+   Il design system Nothing: nero OLED con una griglia di punti appena visibile, superfici piatte #111 separate da
+   linee sottili (niente ombre, gradienti o sfocature), grigi per la gerarchia, il bianco come unico accento (pieno,
+   testo nero sopra) e il rosso #D71921 solo per la diretta. Space Grotesk per il testo, Space Mono maiuscolo per
+   etichette e tasti, Doto a matrice di punti per i titoli. Dissolvenze brevi, niente rimbalzi. Font statici. */
+@font-face { font-family: "Space Grotesk"; src: url("../fonts/SpaceGrotesk-400.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Space Grotesk"; src: url("../fonts/SpaceGrotesk-500.woff2") format("woff2"); font-weight: 500 700; }
+@font-face { font-family: "Space Mono"; src: url("../fonts/SpaceMono-Regular.woff2") format("woff2"); font-weight: 400 700; }
+@font-face { font-family: "Doto"; src: url("../fonts/Doto-700.woff2") format("woff2"); font-weight: 400 800; }
+
+.nothing {
+  --accent: #FFFFFF;
+  --accent2: #E8E8E8;
+  --bg: #000000;
+  --panel: #000000;
+  --surface: #111111;
+  --surface-hover: #1A1A1A;
+  --surface-pressed: #222222;
+  --stroke: #333333;
+  --text: #E8E8E8;
+  --text2: #999999;
+  --text3: #666666;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --star: #FFFFFF;
+  --live: #D71921;
+}
+.nothing body {
+  font-family: "Space Grotesk", "LG Smart UI", "Segoe UI", Roboto, Arial, sans-serif;
+  background: #000 -webkit-radial-gradient(center, circle, rgba(255, 255, 255, 0.12) 1px, rgba(255, 255, 255, 0) 1.5px);
+  background: #000 radial-gradient(circle, rgba(255, 255, 255, 0.12) 1px, rgba(255, 255, 255, 0) 1.5px);
+  background-size: 1rem 1rem;
+}
+.nothing * { box-shadow: none !important; text-shadow: none !important; }
+.nothing h1, .nothing .page-title, .nothing .header .title b, .nothing .p-title, .nothing .clock b { font-family: "Doto", "Space Mono", monospace; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+.nothing .login { background: transparent; }
+.nothing .cat .name, .nothing .nav-item.active { font-weight: 500; }
+
+/* Focus: linea bianca e dissolvenza breve, niente molla */
+.nothing .f {
+  border-width: 0.08rem;
+  -webkit-transition: background-color 0.2s cubic-bezier(.25, .1, .25, 1), border-color 0.2s cubic-bezier(.25, .1, .25, 1);
+  transition: background-color 0.2s cubic-bezier(.25, .1, .25, 1), border-color 0.2s cubic-bezier(.25, .1, .25, 1);
+}
+.nothing .f.focused { border-color: #fff; background-color: var(--surface-hover); }
+
+/* Card piatte con un filo #222 */
+.nothing .cat, .nothing .setting, .nothing .list .item { background: #111; border-color: #222; border-radius: 0.75rem; }
+.nothing .cat.focused, .nothing .setting.focused, .nothing .list .item.focused { background: #1A1A1A; border-color: #fff; }
+.nothing .cat .icon, .nothing .cat .icon.cont { color: var(--text2); }
+.nothing .cat .count { font-family: "Space Mono", monospace; }
+.nothing .card { border-radius: 0.75rem; }
+.nothing .thumb { border-radius: 0.5rem; }
+.nothing .item.current .t, .nothing .card.current .name { color: #fff; }
+
+/* Menu laterale: voci in Space Mono maiuscolo, quella aperta in bianco con un punto rosso */
+.nothing .rail { border-right: 1px solid #222; }
+.nothing .nav-item { border-radius: 999px; font-family: "Space Mono", monospace; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.85rem; color: var(--text3); }
+.nothing .nav-item.active { background: transparent; color: #fff; }
+.nothing .nav-item.active .ni { color: #fff; }
+.nothing .nav-item.active:after { content: ""; display: inline-block; width: 0.35rem; height: 0.35rem; border-radius: 50%; background: #D71921; margin-left: 0.5rem; vertical-align: middle; }
+.nothing .nav-item.focused { background: #1A1A1A; border-color: #fff; color: #fff; }
+
+/* Tasti a pillola in Space Mono maiuscolo: bianco pieno il principale, contorno gli altri */
+.nothing .btn, .nothing .toggle, .nothing .chip {
+  border-radius: 999px; background: transparent; border-color: #333; color: var(--text);
+  font-family: "Space Mono", monospace; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 400;
+}
+.nothing .btn.primary, .nothing .chip.on, .nothing .toggle.on { background: #fff; color: #000; border-color: #fff; }
+.nothing .btn.focused, .nothing .toggle.focused, .nothing .chip.focused { background: #1A1A1A; border-color: #fff; color: #fff; }
+.nothing .btn.primary.focused, .nothing .chip.on.focused, .nothing .toggle.on.focused { background: #fff; color: #000; border-color: #D71921; }
+
+/* Campi: bordo pieno raggio 8, testo in Space Mono */
+.nothing .field input, .nothing .search-row input { border-radius: 0.5rem; background: #000; border-color: #333; font-family: "Space Mono", monospace; }
+.nothing .field input.focused, .nothing .search-row input.focused { border-color: #fff; }
+
+/* Interruttori: binario grigio, bianco quando acceso con pomello nero */
+.nothing .switch { background: #333; border: 1px solid #333; }
+.nothing .switch i { background: #666; }
+.nothing .switch.on { background: #fff; border-color: #fff; }
+.nothing .switch.on i { background: #000; }
+
+/* Etichette da strumento: Space Mono maiuscolo */
+.nothing .group-title, .nothing .badge { font-family: "Space Mono", monospace; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 400; color: var(--text2); }
+.nothing .badge { background: transparent; border: 1px solid #333; }
+.nothing .badge.q { background: transparent; color: #fff; border-color: #fff; }
+
+/* Barra di avanzamento a segmenti quadrati */
+.nothing .progress { position: relative; height: 0.3rem; background: #222; border-radius: 0; }
+.nothing .progress i { background: #fff; border-radius: 0; }
+.nothing .progress:after {
+  content: ""; position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+  background: -webkit-repeating-linear-gradient(left, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 0.3rem, #000 0.3rem, #000 0.4rem);
+  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 0.3rem, #000 0.3rem, #000 0.4rem);
+}
+
+.nothing .dialog { background: #111; border: 1px solid #333; border-radius: 1rem; }
+.nothing .p-panel { background: rgba(0, 0, 0, 0.94); border-right: 1px solid #222; }
+.nothing .p-next-card { background: #111; border: 1px solid #333; border-radius: 1rem; }
+.nothing #toast { background: #111; border: 1px solid #333; border-radius: 999px; color: var(--text); font-family: "Space Mono", monospace; text-transform: uppercase; letter-spacing: 0.06em; }

@@ -191,8 +191,8 @@ fun SettingsSection(vm: AppViewModel) {
         Group("Aspetto")
         val skin = vm.settings.skin
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("classic" to "Moderno", "skeuo" to "Skeuomorfico", "metro" to "Modern UI", "dueffe" to "Dueffe").forEach { (key, label) ->
-                Pill(label, selected = skin == key || (key == "classic" && skin !in listOf("skeuo", "metro", "dueffe"))) {
+            listOf("classic" to "Moderno", "skeuo" to "Skeuomorfico", "metro" to "Modern UI", "dueffe" to "Dueffe", "nothing" to "Nothing").forEach { (key, label) ->
+                Pill(label, selected = skin == key || (key == "classic" && skin !in listOf("skeuo", "metro", "dueffe", "nothing"))) {
                     vm.settings.skin = key
                     Skin.set(key)
                 }
@@ -200,6 +200,7 @@ fun SettingsSection(vm: AppViewModel) {
         }
         Text(
             when {
+                Skin.nothing -> "Nero OLED, bianco e un solo rosso, titoli a matrice di punti e monospazio, linee sottili al posto delle ombre."
                 Skin.dueffe -> "Fondo quasi nero, superfici calde, avorio e oro, angoli morbidi e pulsanti che rimbalzano."
                 Skin.metro -> "Lo stile di Windows Phone: nero, piatto, angoli vivi, titoli grandi e sezioni da scorrere in alto."
                 Skin.skeuo -> "Pelle, lino, metallo spazzolato e pulsanti lucidi."
@@ -326,7 +327,10 @@ private fun ListsGroup(vm: AppViewModel) {
 @Composable
 private fun Group(title: String) {
     VSpace(18.dp)
-    if (title.isNotEmpty()) Text(title.uppercase(), color = C.Text3, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+    if (title.isNotEmpty()) {
+        if (Skin.nothing) Text(title.uppercase(), color = C.Text2, fontSize = 11.sp, fontFamily = Nothing.Mono, letterSpacing = 0.9.sp)
+        else Text(title.uppercase(), color = C.Text3, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+    }
     VSpace(6.dp)
 }
 

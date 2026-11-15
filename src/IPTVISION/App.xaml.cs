@@ -46,6 +46,13 @@ public partial class App : Application
                 Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Themes/Skeuo.xaml") });
             if (settings.Skin == "dueffe")
                 Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Themes/Dueffe.xaml") });
+            if (settings.Skin == "nothing")
+            {
+                Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Themes/Nothing.xaml") });
+                // Nothing: niente ombre, nemmeno dove MainWindow le scrive a mano (gli angoli restano).
+                EventManager.RegisterClassHandler(typeof(System.Windows.Controls.Border), FrameworkElement.SizeChangedEvent,
+                    new SizeChangedEventHandler((s, _) => ((System.Windows.Controls.Border)s).Effect = null));
+            }
             if (settings.Skin == "metro")
             {
                 Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Themes/Metro.xaml") });

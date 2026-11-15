@@ -796,13 +796,14 @@
     box.appendChild(h('div', { class: 'group-title', text: 'Aspetto' }));
     var skin = S.get('skin');
     var skins = h('div', { class: 'seasons' });
-    [['classic', 'Moderno'], ['skeuo', 'Skeuomorfico'], ['metro', 'Modern UI'], ['dueffe', 'Dueffe']].forEach(function (o) {
-      var on = skin === o[0] || (o[0] === 'classic' && skin !== 'skeuo' && skin !== 'metro' && skin !== 'dueffe');
+    [['classic', 'Moderno'], ['skeuo', 'Skeuomorfico'], ['metro', 'Modern UI'], ['dueffe', 'Dueffe'], ['nothing', 'Nothing']].forEach(function (o) {
+      var on = skin === o[0] || (o[0] === 'classic' && skin !== 'skeuo' && skin !== 'metro' && skin !== 'dueffe' && skin !== 'nothing');
       skins.appendChild(V.focusable(h('div', { class: 'chip' + (on ? ' on' : ''), data: { key: 'skin-' + o[0] }, text: o[1] }), function () {
         S.set('skin', o[0]);
         document.documentElement.classList.toggle('skeuo', o[0] === 'skeuo');
         document.documentElement.classList.toggle('metro', o[0] === 'metro');
         document.documentElement.classList.toggle('dueffe', o[0] === 'dueffe');
+        document.documentElement.classList.toggle('nothing', o[0] === 'nothing');
         render(false, root.querySelector('[data-key="skin-' + o[0] + '"]'));
       }));
     });
@@ -811,6 +812,7 @@
       skeuo: 'Pelle, lino, metallo spazzolato e pulsanti lucidi.',
       metro: 'Lo stile di Windows Phone: nero, piatto, angoli vivi, titoli grandi e sezioni in alto.',
       dueffe: 'Fondo quasi nero, superfici calde, avorio e oro, angoli morbidi.',
+      nothing: 'Nero OLED, bianco e un solo rosso, titoli a matrice di punti, linee sottili al posto delle ombre.',
     }[skin] || 'Lo stile di sempre: scuro, arrotondato, menu di lato.' }));
     box.appendChild(h('div', { class: 'group-title', text: 'Riproduzione' }));
     box.appendChild(settingRow('Formato HLS (m3u8) per la TV in diretta', 'Di solito MPEG-TS è più stabile; prova HLS se un canale non parte.',

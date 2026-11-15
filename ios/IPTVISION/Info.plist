@@ -48,6 +48,11 @@
 		<string>Inter-700.ttf</string>
 		<string>Bricolage-700.ttf</string>
 		<string>Bricolage-800.ttf</string>
+		<string>SpaceGrotesk-400.ttf</string>
+		<string>SpaceGrotesk-500.ttf</string>
+		<string>SpaceMono-Regular.ttf</string>
+		<string>SpaceGrotesk-700.ttf</string>
+		<string>Doto-700.ttf</string>
 	</array>
 	<key>UIRequiresFullScreen</key>
 	<false/>

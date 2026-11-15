@@ -35,6 +35,7 @@
     <Resource Include="Assets\skeuo\*.png" />
     <Resource Include="Assets\fonts\*.ttf" />
     <None Include="Assets\fonts\FONTS-OFL.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Assets\fonts\FONTS-OFL-NOTHING.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

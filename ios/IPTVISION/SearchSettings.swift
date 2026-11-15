@@ -97,12 +97,14 @@ struct SettingsView: View {
                     Text("Moderno").tag("classic")
                     Text("Modern UI").tag("metro")
                     Text("Dueffe").tag("dueffe")
+                    Text("Nothing").tag("nothing")
                 }
                 .pickerStyle(.segmented)
             } header: {
                 Text("Aspetto")
             } footer: {
                 Text(skin == "metro" ? "Lo stile di Windows Phone: nero, piatto, angoli vivi, titoli grandi e sezioni da scorrere in alto."
+                     : skin == "nothing" ? "Nero OLED, bianco e un solo rosso, titoli a matrice di punti e etichette in monospazio."
                      : skin == "dueffe" ? "Fondo quasi nero, superfici calde, avorio e oro, titoli in Bricolage Grotesque."
                      : "Lo stile di sempre, con le schede in basso.")
             }

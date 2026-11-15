@@ -1,14 +1,14 @@
-// Graphic style of this browser: the current one, skeuomorphic or Modern UI (styles.css, html[data-skin]).
+// Graphic style of this browser: the current one, skeuomorphic, Modern UI, Dueffe or Nothing (styles.css, html[data-skin]).
 import { useSyncExternalStore } from 'react'
 
 const KEY = 'iptvision.skin'
 
-export type Skin = 'classic' | 'skeuo' | 'metro' | 'dueffe'
+export type Skin = 'classic' | 'skeuo' | 'metro' | 'dueffe' | 'nothing'
 
 export function applySkin() {
   try {
     const s = localStorage.getItem(KEY)
-    if (s === 'skeuo' || s === 'metro' || s === 'dueffe') document.documentElement.dataset.skin = s
+    if (s === 'skeuo' || s === 'metro' || s === 'dueffe' || s === 'nothing') document.documentElement.dataset.skin = s
   } catch { /* private mode */ }
 }
 

@@ -1172,7 +1172,7 @@
                                     <TextBlock Text="ASPETTO" Style="{StaticResource SectionTitle}" />
                                     <TextBlock Text="Stile grafico" Style="{StaticResource FieldLabel}" />
                                     <Border Background="{StaticResource SegmentTrackBrush}" CornerRadius="9" Padding="2">
-                                        <UniformGrid Columns="4">
+                                        <UniformGrid Columns="5">
                                             <RadioButton Style="{StaticResource SegmentButton}" GroupName="skin" Content="Moderno"
                                                          IsChecked="{Binding IsClassicSkin}" />
                                             <RadioButton Style="{StaticResource SegmentButton}" GroupName="skin" Content="Skeuomorfico"
@@ -1181,6 +1181,8 @@
                                                          IsChecked="{Binding IsMetro}" />
                                             <RadioButton Style="{StaticResource SegmentButton}" GroupName="skin" Content="Dueffe"
                                                          IsChecked="{Binding IsDueffe}" />
+                                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="skin" Content="Nothing"
+                                                         IsChecked="{Binding IsNothing}" />
                                         </UniformGrid>
                                     </Border>
                                     <TextBlock Text="Cambiando stile IPTVISION si riapre da solo e riprende il canale." Foreground="{StaticResource TextTertiaryBrush}"

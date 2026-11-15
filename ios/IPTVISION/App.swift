@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct IPTVISIONApp: App {
     @StateObject private var model = AppModel()
-    /// Stile grafico: "classic" (moderno), "metro" (Modern UI, Windows Phone) o "dueffe" (Dueffe). Si sceglie nelle impostazioni.
+    /// Stile grafico: "classic" (moderno), "metro" (Modern UI, Windows Phone), "dueffe" (Dueffe) o "nothing" (Nothing). Si sceglie nelle impostazioni.
     @AppStorage("skin") private var skin = "classic"
 
     init() {
@@ -23,7 +23,7 @@ struct IPTVISIONApp: App {
             .environmentObject(model)
             .preferredColorScheme(.dark)
             .tint(Theme.accent)
-            .font(Theme.dueffe ? .custom("Inter", size: 17, relativeTo: .body) : .body)
+            .font(Theme.dueffe ? .custom("Inter", size: 17, relativeTo: .body) : Theme.nothing ? .custom("SpaceGrotesk-Regular", size: 17, relativeTo: .body) : .body)
             .fullScreenCover(isPresented: Binding(get: { model.playing != nil }, set: { if !$0 { model.playing = nil } })) {
                 PlayerView().environmentObject(model)
             }
@@ -41,21 +41,27 @@ enum Theme {
     static var metro: Bool { UserDefaults.standard.string(forKey: "skin") == "metro" }
     /// Dueffe: fondo quasi nero, superfici calde, avorio e oro, Bricolage Grotesque e Inter (cartella Fonts).
     static var dueffe: Bool { UserDefaults.standard.string(forKey: "skin") == "dueffe" }
+    /// Nothing: nero OLED, superfici piatte con linee sottili, bianco come accento e rosso solo per la diretta;
+    /// Space Grotesk per il testo, Space Mono maiuscolo per le etichette, Doto a punti per i titoli (cartella Fonts).
+    static var nothing: Bool { UserDefaults.standard.string(forKey: "skin") == "nothing" }
     private static let wpBlue = Color(red: 0x1B / 255, green: 0xA1 / 255, blue: 0xE2 / 255)
     private static let gold = Color(red: 1, green: 0xD8 / 255, blue: 0x4D / 255)
-    static var accent: Color { dueffe ? gold : metro ? wpBlue : Color(red: 0x3D / 255, green: 0x7B / 255, blue: 1) }
-    static var accent2: Color { dueffe ? Color(red: 1, green: 0xB8 / 255, blue: 0) : metro ? wpBlue : Color(red: 0, green: 0xC2 / 255, blue: 1) }
-    static var bg: Color { dueffe ? Color(red: 5 / 255, green: 5 / 255, blue: 5 / 255) : metro ? .black : Color(red: 0x0A / 255, green: 0x0B / 255, blue: 0x0F / 255) }
-    static var card: Color { dueffe ? Color(red: 0x1A / 255, green: 0x17 / 255, blue: 0x11 / 255) : Color.white.opacity(metro ? 0.12 : 0.06) }
-    /// Testo sopra l'accento: scuro sull'oro di Dueffe.
-    static var onAccent: Color { dueffe ? Color(red: 0x16 / 255, green: 0x10 / 255, blue: 6 / 255) : .white }
+    static var accent: Color { nothing ? .white : dueffe ? gold : metro ? wpBlue : Color(red: 0x3D / 255, green: 0x7B / 255, blue: 1) }
+    static var accent2: Color { nothing ? Color(white: 0xE8 / 255) : dueffe ? Color(red: 1, green: 0xB8 / 255, blue: 0) : metro ? wpBlue : Color(red: 0, green: 0xC2 / 255, blue: 1) }
+    static var bg: Color { nothing ? .black : dueffe ? Color(red: 5 / 255, green: 5 / 255, blue: 5 / 255) : metro ? .black : Color(red: 0x0A / 255, green: 0x0B / 255, blue: 0x0F / 255) }
+    static var card: Color { nothing ? Color(white: 0x11 / 255) : dueffe ? Color(red: 0x1A / 255, green: 0x17 / 255, blue: 0x11 / 255) : Color.white.opacity(metro ? 0.12 : 0.06) }
+    /// Testo sopra l'accento: scuro sull'oro di Dueffe e sul bianco di Nothing.
+    static var onAccent: Color { nothing ? .black : dueffe ? Color(red: 0x16 / 255, green: 0x10 / 255, blue: 6 / 255) : .white }
     /// Raggio degli angoli: zero nello stile Modern UI.
-    static func corner(_ r: CGFloat) -> CGFloat { metro ? 0 : dueffe ? r * 1.5 : r }
+    static func corner(_ r: CGFloat) -> CGFloat { metro ? 0 : dueffe ? r * 1.5 : nothing ? min(r, 16) : r }
 
     /// Titoli delle barre leggeri come quelli di Windows Phone; nello stile moderno quelli di sistema.
     static func applyAppearance() {
         let bar = UINavigationBar.appearance()
-        if dueffe {
+        if nothing {
+            bar.largeTitleTextAttributes = [.font: UIFont(name: "Doto-Bold", size: 36) ?? .monospacedSystemFont(ofSize: 34, weight: .bold), .foregroundColor: UIColor.white]
+            bar.titleTextAttributes = [.font: UIFont(name: "SpaceMono-Regular", size: 15) ?? .monospacedSystemFont(ofSize: 15, weight: .regular), .kern: 1.2]
+        } else if dueffe {
             bar.largeTitleTextAttributes = [.font: UIFont(name: "BricolageGrotesque-24ptExtraBold", size: 34) ?? .systemFont(ofSize: 34, weight: .heavy)]
             bar.titleTextAttributes = [.font: UIFont(name: "BricolageGrotesque-24ptBold", size: 17) ?? .systemFont(ofSize: 17, weight: .bold)]
         } else if metro {
@@ -71,7 +77,7 @@ enum Theme {
 extension View {
     /// Pulsante principale: quello di sistema, o nello stile Dueffe l'oro a gradiente con testo scuro e la molla.
     @ViewBuilder func prominentStyle() -> some View {
-        if Theme.dueffe { buttonStyle(GoldButtonStyle()) } else { buttonStyle(.borderedProminent) }
+        if Theme.dueffe { buttonStyle(GoldButtonStyle()) } else if Theme.nothing { buttonStyle(NothingButtonStyle()) } else { buttonStyle(.borderedProminent) }
     }
 }
 
@@ -87,6 +93,22 @@ struct GoldButtonStyle: ButtonStyle {
             )
             .scaleEffect(configuration.isPressed ? 0.95 : 1)
             .animation(.spring(response: 0.35, dampingFraction: 0.42), value: configuration.isPressed)
+    }
+}
+
+/// Tasto principale Nothing: pillola bianca piena, testo nero in Space Mono maiuscolo, premuto sbiadisce (niente molla).
+struct NothingButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.custom("SpaceMono-Regular", size: 13))
+            .textCase(.uppercase)
+            .kerning(0.8)
+            .foregroundStyle(Color.black)
+            .padding(.horizontal, 24).padding(.vertical, 12)
+            .frame(minHeight: 44)
+            .background(Color.white, in: Capsule())
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .animation(.easeOut(duration: 0.18), value: configuration.isPressed)
     }
 }
 
