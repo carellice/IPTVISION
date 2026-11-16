@@ -110,6 +110,8 @@ function DiscoverHome() {
   useEffect(() => { if (ready && scroller.current) scroller.current.scrollTop = saved.scroll }, [ready])
 
   if (!movies || !series) return <Loading text="Caricamento film e serie…" />
+  // TMDB lists still loading or being matched to the catalog: a loading screen, not a half-empty page.
+  if (matched == null && !error) return <Loading text="Caricamento film e serie…" />
 
   const providerRows = [
     ...(filter !== 'tv' ? movies.categories.map((c) => ({ kind: 'movie' as Kind, id: c.id, name: c.name })) : []),
@@ -127,7 +129,6 @@ function DiscoverHome() {
       </div>
 
       {error && <div style={{ color: 'var(--danger)', fontSize: 14, padding: '0 2px 12px' }}>{error} Controlla la chiave in Impostazioni → TMDB.</div>}
-      {matched == null && !error && <div style={{ height: wide ? 'clamp(340px, 42vw, 560px)' : 460, borderRadius: 16, background: 'var(--surface)' }} />}
       {hero.length > 0 && <Hero items={hero} wide={wide} />}
 
       {continueRow.filter(pass).length > 0 && (

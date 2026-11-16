@@ -192,6 +192,11 @@ private fun DiscoverHome(vm: AppViewModel) {
         if (filter != Filter.Movie) series.categories.forEach { add(Triple(false, it.id, it.name)) }
     }
 
+    // Liste di TMDB ancora in arrivo o da confrontare col catalogo: schermata di caricamento, non una pagina mezza vuota.
+    if (matched == null && vm.tmdbError == null) {
+        Loading("Caricamento film e serie…")
+        return
+    }
     val state = rememberLazyListState(Saved.index, Saved.offset)
     DisposableEffect(Unit) { onDispose { Saved.index = state.firstVisibleItemIndex; Saved.offset = state.firstVisibleItemScrollOffset } }
     val gap = if (wide) 26.dp else 20.dp
@@ -207,9 +212,6 @@ private fun DiscoverHome(vm: AppViewModel) {
         }
         vm.tmdbError?.let { e ->
             item("error") { Text("$e Controlla la chiave in Impostazioni → TMDB.", color = C.Danger, fontSize = 14.sp, modifier = Modifier.padding(start = 2.dp, bottom = 12.dp)) }
-        }
-        if (matched == null && vm.tmdbError == null) item("placeholder") {
-            Box(Modifier.fillMaxWidth().height(if (wide) 420.dp else 460.dp).clip(RoundedCornerShape(16.dp)).background(C.Surface))
         }
         if (hero.isNotEmpty()) item("hero") { Hero(vm, hero, wide) }
 
