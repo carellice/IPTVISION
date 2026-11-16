@@ -128,7 +128,8 @@ function NavBar() {
       <div style={{ display: 'flex', height: 80 }}>
         {sectionList().map((s) => {
           const selected = app.section === s
-          const label = s === 'Live' ? 'TV' : s === 'Settings' ? 'Altro' : sectionTitle[s]
+          // Short labels: "Film e serie" would wrap on two lines.
+          const label = s === 'Live' ? 'TV' : s === 'Settings' ? 'Altro' : s === 'Discover' ? 'Film/serie' : sectionTitle[s]
           return (
             <div key={s} role="tab" aria-selected={selected} tabIndex={0} onClick={() => setSection(s)}
               onKeyDown={(e) => { if (e.key === 'Enter') setSection(s) }}
@@ -138,7 +139,7 @@ function NavBar() {
                   style={{ position: 'absolute', inset: 0, borderRadius: 16, background: 'var(--accent)' }} />
                 <Icon name={icons[s]} color={selected ? 'var(--onAccent)' : 'var(--text2)'} style={{ position: 'relative' }} />
               </div>
-              <div style={{ fontSize: 11, lineHeight: '16px', fontWeight: 500, color: selected ? 'var(--text)' : 'var(--text2)' }}>{label}</div>
+              <div style={{ fontSize: 11, lineHeight: '16px', fontWeight: 500, whiteSpace: 'nowrap', color: selected ? 'var(--text)' : 'var(--text2)' }}>{label}</div>
             </div>
           )
         })}

@@ -150,10 +150,10 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                                 onClick = { vm.section = s },
                                 icon = { Icon(s.icon(), null) },
                                 label = {
-                                    val l = if (s == Section.Live) "TV" else if (s == Section.Settings) "Altro" else s.title
-                                    // Nothing: voci in Space Mono maiuscolo.
-                                    if (Skin.nothing) Text(l.uppercase(), fontSize = 10.sp, fontFamily = Nothing.Mono, letterSpacing = 0.8.sp)
-                                    else Text(l, fontSize = 11.sp)
+                                    val l = navLabel(s)
+                                    // Nothing: voci in Space Mono maiuscolo. Sempre su una riga sola.
+                                    if (Skin.nothing) Text(l.uppercase(), fontSize = 10.sp, fontFamily = Nothing.Mono, letterSpacing = 0.8.sp, maxLines = 1, softWrap = false)
+                                    else Text(l, fontSize = 11.sp, maxLines = 1, softWrap = false)
                                 },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = C.OnAccent, indicatorColor = C.Accent,
@@ -166,6 +166,14 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
             }
         }
     }
+}
+
+/** Voci corte per la barra in basso: "Film e serie" andrebbe su due righe. */
+private fun navLabel(s: Section) = when (s) {
+    Section.Live -> "TV"
+    Section.Discover -> "Film/serie"
+    Section.Settings -> "Altro"
+    else -> s.title
 }
 
 private fun Section.pivotLabel() = when (this) {
