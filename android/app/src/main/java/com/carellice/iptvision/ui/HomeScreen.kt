@@ -122,7 +122,8 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
         val wide = maxWidth >= 720.dp
         val short = maxHeight < 500.dp
         androidx.compose.runtime.CompositionLocalProvider(LocalWide provides wide) {
-            if (Skin.metro) Pivot(vm, wide, onVoiceSearch)
+            // Modern UI: pivot sugli schermi larghi, sul telefono la barra in basso come gli altri stili.
+            if (Skin.metro && wide) Pivot(vm, wide, onVoiceSearch)
             else if (wide) {
                 Row(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                     // Telefono in orizzontale: largo ma basso, il menu scorre e l'orologio sparisce.
@@ -153,10 +154,14 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                                     val l = navLabel(s)
                                     // Nothing: voci in Space Mono maiuscolo. Sempre su una riga sola.
                                     if (Skin.nothing) Text(l.uppercase(), fontSize = 10.sp, fontFamily = Nothing.Mono, letterSpacing = 0.8.sp, maxLines = 1, softWrap = false)
+                                    // Modern UI: voci minuscole, come la app bar di Windows Phone.
+                                    else if (Skin.metro) Text(l.lowercase(Locale.ITALY), fontSize = 11.sp, maxLines = 1, softWrap = false)
                                     else Text(l, fontSize = 11.sp, maxLines = 1, softWrap = false)
                                 },
+                                // Modern UI: niente pillola, l'icona scelta nel colore d'accento.
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = C.OnAccent, indicatorColor = C.Accent,
+                                    selectedIconColor = if (Skin.metro) C.Accent else C.OnAccent,
+                                    indicatorColor = if (Skin.metro) Color.Transparent else C.Accent,
                                     unselectedIconColor = C.Text2, unselectedTextColor = C.Text2, selectedTextColor = C.Text,
                                 ),
                             )

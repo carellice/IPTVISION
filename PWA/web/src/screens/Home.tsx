@@ -17,7 +17,9 @@ const icons: Record<Section, IconName> = { Live: 'tv', Movies: 'movie', Series: 
 export function Home() {
   useApp()
   const wide = useWide()
-  if (useSkin() === 'metro') return <Pivot wide={wide} />
+  const metro = useSkin() === 'metro'
+  // Modern UI: pivot on wide screens, bottom bar on the phone like the other skins.
+  if (metro && wide) return <Pivot wide={wide} />
   if (wide) {
     return (
       <div className="safe" style={{ display: 'flex', height: '100%' }}>
@@ -33,7 +35,7 @@ export function Home() {
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '12px 14px 0' }}>
         <Content />
       </div>
-      <NavBar />
+      <NavBar metro={metro} />
     </div>
   )
 }
@@ -121,8 +123,8 @@ function MetroClock() {
   return <div style={{ color: 'var(--text)', fontSize: 14, lineHeight: '20px', fontWeight: 300 }}>{timeFmt.format(now)}</div>
 }
 
-/** M3 NavigationBar: 80 dp, pill indicator 64×32 in Accent, labels 11 sp. */
-function NavBar() {
+/** M3 NavigationBar: 80 dp, pill indicator 64×32 in Accent, labels 11 sp. Modern UI: no pill, accent icon, lowercase labels. */
+function NavBar({ metro }: { metro: boolean }) {
   return (
     <div className="nav-pad" style={{ background: 'var(--panel)', flexShrink: 0 }}>
       <div style={{ display: 'flex', height: 80 }}>
@@ -135,11 +137,11 @@ function NavBar() {
               onKeyDown={(e) => { if (e.key === 'Enter') setSection(s) }}
               style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer' }}>
               <div style={{ position: 'relative', width: 64, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <motion.div initial={false} animate={{ opacity: selected ? 1 : 0, scaleX: selected ? 1 : 0.5 }} transition={tween(100)}
+                <motion.div initial={false} animate={{ opacity: selected && !metro ? 1 : 0, scaleX: selected ? 1 : 0.5 }} transition={tween(100)}
                   style={{ position: 'absolute', inset: 0, borderRadius: 16, background: 'var(--accent)' }} />
-                <Icon name={icons[s]} color={selected ? 'var(--onAccent)' : 'var(--text2)'} style={{ position: 'relative' }} />
+                <Icon name={icons[s]} color={selected ? (metro ? 'var(--accent)' : 'var(--onAccent)') : 'var(--text2)'} style={{ position: 'relative' }} />
               </div>
-              <div style={{ fontSize: 11, lineHeight: '16px', fontWeight: 500, whiteSpace: 'nowrap', color: selected ? 'var(--text)' : 'var(--text2)' }}>{label}</div>
+              <div style={{ fontSize: 11, lineHeight: '16px', fontWeight: 500, whiteSpace: 'nowrap', color: selected ? 'var(--text)' : 'var(--text2)' }}>{metro ? label.toLowerCase() : label}</div>
             </div>
           )
         })}
