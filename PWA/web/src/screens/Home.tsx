@@ -2,15 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Clickable, Icon, type IconName, useWide } from '../components/ui.tsx'
 import { tween } from '../components/motion.ts'
-import { app, sections, setSection, useApp } from '../lib/app.ts'
+import { app, sectionList, setSection, useApp } from '../lib/app.ts'
 import { type Section, sectionTitle } from '../lib/library.ts'
 import { NetworkStatus } from '../components/network.tsx'
 import { useSkin } from '../lib/skin.ts'
 import { LiveSection, MoviesSection, SeriesSection } from './Browse.tsx'
 import { SearchSection } from './Search.tsx'
+import { DiscoverSection } from './Discover.tsx'
 import { SettingsSection } from './Settings.tsx'
 
-const icons: Record<Section, IconName> = { Live: 'tv', Movies: 'movie', Series: 'view_module', Search: 'search', Settings: 'settings' }
+const icons: Record<Section, IconName> = { Live: 'tv', Movies: 'movie', Series: 'view_module', Discover: 'theaters', Search: 'search', Settings: 'settings' }
 
 /** HomeScreen.kt: bottom bar on the phone, side menu with the clock from 720 px. */
 export function Home() {
@@ -45,6 +46,7 @@ function Content() {
         {app.section === 'Live' && <LiveSection />}
         {app.section === 'Movies' && <MoviesSection />}
         {app.section === 'Series' && <SeriesSection />}
+        {app.section === 'Discover' && <DiscoverSection />}
         {app.section === 'Search' && <SearchSection />}
         {app.section === 'Settings' && <SettingsSection />}
       </div>
@@ -52,7 +54,7 @@ function Content() {
   )
 }
 
-const pivotLabel: Record<Section, string> = { Live: 'tv', Movies: 'film', Series: 'serie', Search: 'cerca', Settings: 'impostazioni' }
+const pivotLabel: Record<Section, string> = { Live: 'tv', Movies: 'film', Series: 'serie', Discover: 'film e serie', Search: 'cerca', Settings: 'impostazioni' }
 
 /**
  * Modern UI (Windows Phone pivot): app name in small caps, the sections as big lowercase headers
@@ -60,6 +62,7 @@ const pivotLabel: Record<Section, string> = { Live: 'tv', Movies: 'film', Series
  * the headers moves to the next or previous section.
  */
 function Pivot({ wide }: { wide: boolean }) {
+  const sections = sectionList()
   const i = sections.indexOf(app.section)
   const ordered = [...sections.slice(i), ...sections.slice(0, i)]
   const [dir, setDir] = useState(1)
@@ -123,7 +126,7 @@ function NavBar() {
   return (
     <div className="nav-pad" style={{ background: 'var(--panel)', flexShrink: 0 }}>
       <div style={{ display: 'flex', height: 80 }}>
-        {sections.map((s) => {
+        {sectionList().map((s) => {
           const selected = app.section === s
           const label = s === 'Live' ? 'TV' : s === 'Settings' ? 'Altro' : sectionTitle[s]
           return (
@@ -151,7 +154,7 @@ function SideNav() {
         <img src="/logo.png" alt="" style={{ width: 34, height: 34, borderRadius: 8 }} />
         <div style={{ marginLeft: 10, color: 'var(--text)', fontWeight: 700, fontSize: 19, lineHeight: '24px' }}>IPTVISION</div>
       </div>
-      {sections.map((s) => {
+      {sectionList().map((s) => {
         const selected = app.section === s
         return (
           <Clickable key={s} onClick={() => setSection(s)} background={selected ? 'var(--accentSoft)' : 'transparent'}

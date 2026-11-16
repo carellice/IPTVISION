@@ -7,6 +7,7 @@
         xmlns:m="clr-namespace:IPTVISION.Models"
         xmlns:vm="clr-namespace:IPTVISION.ViewModels"
         xmlns:svc="clr-namespace:IPTVISION.Services"
+        xmlns:conv="clr-namespace:IPTVISION.Converters"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         Title="IPTVISION"
@@ -295,20 +296,30 @@
                     <!-- Sezioni: TV / Film / Serie -->
                     <Border Grid.Row="1" Margin="14,0,14,10" Background="{StaticResource SegmentTrackBrush}" CornerRadius="10" Padding="3"
                             Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
-                        <UniformGrid Columns="3">
+                        <UniformGrid Columns="{Binding ModeTabColumns}">
                             <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsLiveMode}" ToolTip="TV in diretta (Ctrl+1)">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
                                     <TextBlock Text="TV" VerticalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
-                            <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsMoviesMode}" ToolTip="Film (Ctrl+2)">
+                            <!-- Con la chiave TMDB film e serie sono una scheda sola, che apre "Film e serie". -->
+                            <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsDiscoverMode}" Command="{Binding OpenDiscoverCommand}"
+                                         ToolTip="Film e serie (Ctrl+2)" Visibility="{Binding HasTmdb, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8B2;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
+                                    <TextBlock Text="Film e serie" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsMoviesMode}" ToolTip="Film (Ctrl+2)"
+                                         Visibility="{Binding HasTmdb, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE8B2;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
                                     <TextBlock Text="Film" VerticalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
-                            <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsSeriesMode}" ToolTip="Serie TV (Ctrl+3)">
+                            <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsSeriesMode}" ToolTip="Serie TV (Ctrl+3)"
+                                         Visibility="{Binding HasTmdb, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE8A9;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
                                     <TextBlock Text="Serie TV" VerticalAlignment="Center" />
@@ -1188,6 +1199,22 @@
                                     <TextBlock Text="Cambiando stile IPTVISION si riapre da solo e riprende il canale." Foreground="{StaticResource TextTertiaryBrush}"
                                                FontSize="11.5" Margin="2,7,0,6" TextWrapping="Wrap" />
 
+                                    <TextBlock Text="TMDB" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,10"
+                                               Text="Con una chiave di themoviedb.org (la &#x22;Chiave API&#x22; o il &#x22;Token di accesso in lettura&#x22; che trovi nel tuo profilo TMDB, alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi." />
+                                    <StackPanel Visibility="{Binding HasTmdb, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="Chiave inserita." FontSize="13" Margin="2,0,0,10" />
+                                        <Button Style="{StaticResource SecondaryButton}" Content="Rimuovi chiave" Command="{Binding RemoveTmdbKeyCommand}" HorizontalAlignment="Left" />
+                                    </StackPanel>
+                                    <StackPanel Visibility="{Binding HasTmdb, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                                        <TextBlock Text="CHIAVE API O TOKEN" Style="{StaticResource FieldLabel}" />
+                                        <PasswordBox x:Name="TmdbKeyBox" Style="{StaticResource PasswordInput}" Margin="0,0,0,10" />
+                                        <TextBlock Text="{Binding TmdbKeyError}" Foreground="#FFB3BA" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"
+                                                   Visibility="{Binding TmdbKeyError, Converter={StaticResource NullToVis}}" />
+                                        <Button Style="{StaticResource PrimaryButton}" Content="Salva chiave" Click="SaveTmdbKey_Click" HorizontalAlignment="Left"
+                                                IsEnabled="{Binding IsTmdbChecking, Converter={StaticResource InvertBool}}" />
+                                    </StackPanel>
+
                                     <TextBlock Text="RIPRODUZIONE" Style="{StaticResource SectionTitle}" />
                                     <TextBlock Text="Formato del flusso" Style="{StaticResource FieldLabel}" />
                                     <Border Background="{StaticResource SegmentTrackBrush}" CornerRadius="9" Padding="2">
@@ -1413,6 +1440,461 @@
                     </Border>
                 </Grid>
             </Border>
+
+            <!-- ==== Film e serie (con la chiave TMDB): come le app di streaming, sopra pannello e video ==== -->
+            <Grid x:Name="DiscoverLayer" Grid.ColumnSpan="2" Panel.ZIndex="20" Background="{StaticResource BgBrush}"
+                  Visibility="{Binding ShowDiscover, Converter={StaticResource BoolToVis}}">
+                <Grid.Resources>
+                    <conv:RankGeometryConverter x:Key="RankGeometry" />
+                    <!-- Riquadro senza cornice che si ingrandisce sotto il mouse; col focus prende il bordo bianco. -->
+                    <Style x:Key="DiscoverTile" TargetType="Button">
+                        <Setter Property="Cursor" Value="Hand" />
+                        <Setter Property="Margin" Value="0,0,10,0" />
+                        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+                        <Setter Property="RenderTransform"><Setter.Value><ScaleTransform /></Setter.Value></Setter>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Frame" BorderBrush="Transparent" BorderThickness="2" CornerRadius="10">
+                                        <ContentPresenter />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsKeyboardFocused" Value="True">
+                                            <Setter TargetName="Frame" Property="BorderBrush" Value="White" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Panel.ZIndex" Value="2" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.06" Duration="0:0:0.22" DecelerationRatio="1" />
+                                            <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.06" Duration="0:0:0.22" DecelerationRatio="1" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.2" />
+                                            <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.2" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                    <!-- Pulsanti sopra l'immagine grande: bianco pieno o grigio trasparente. -->
+                    <Style x:Key="HeroButton" TargetType="Button">
+                        <Setter Property="Cursor" Value="Hand" />
+                        <Setter Property="Foreground" Value="White" />
+                        <Setter Property="Background" Value="#8C6E6E73" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Setter Property="FontSize" Value="15" />
+                        <Setter Property="FontWeight" Value="Bold" />
+                        <Setter Property="Height" Value="42" />
+                        <Setter Property="Padding" Value="16,0,20,0" />
+                        <Setter Property="Margin" Value="0,0,10,0" />
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="B" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}"
+                                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                                        <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="B" Property="Opacity" Value="0.85" /></Trigger>
+                                        <Trigger Property="IsKeyboardFocused" Value="True">
+                                            <Setter TargetName="B" Property="BorderBrush" Value="White" />
+                                            <Setter TargetName="B" Property="BorderThickness" Value="2" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                    <!-- Frecce ai lati delle righe: compaiono passando col mouse sulla riga. -->
+                    <Style x:Key="RowArrow" TargetType="Button">
+                        <Setter Property="Cursor" Value="Hand" />
+                        <Setter Property="Width" Value="48" />
+                        <Setter Property="Opacity" Value="0" />
+                        <Setter Property="Focusable" Value="False" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}">
+                                        <TextBlock Text="{TemplateBinding Content}" FontFamily="{StaticResource IconFont}" FontSize="22" Foreground="White"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
+                                <Setter Property="Opacity" Value="1" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                    <Style x:Key="SeeAll" TargetType="Button">
+                        <Setter Property="Cursor" Value="Hand" />
+                        <Setter Property="Foreground" Value="{StaticResource BrandBrush}" />
+                        <Setter Property="FontSize" Value="13" />
+                        <Setter Property="FontWeight" Value="SemiBold" />
+                        <Setter Property="Margin" Value="14,0,0,0" />
+                        <Setter Property="VerticalAlignment" Value="Bottom" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <TextBlock x:Name="T" Text="Vedi tutto ›" Padding="0,0,0,3" Background="Transparent" />
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="T" Property="TextDecorations" Value="Underline" /></Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <!-- Locandina 2:3 con l'avanzamento e, per le serie, l'etichetta SERIE. -->
+                    <DataTemplate x:Key="PosterTileTemplate" DataType="{x:Type vm:DiscoverTile}">
+                        <Button Style="{StaticResource DiscoverTile}" ToolTip="{Binding Name}"
+                                Command="{Binding DataContext.OpenDiscoverTileCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                            <StackPanel Width="154">
+                                <Grid Height="231">
+                                    <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource SurfaceHoverBrush}" />
+                                    <TextBlock Text="{Binding Initials}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding HasPoster, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                                    <Rectangle RadiusX="8" RadiusY="8">
+                                        <Rectangle.Fill><ImageBrush ImageSource="{Binding Poster}" Stretch="UniformToFill" /></Rectangle.Fill>
+                                    </Rectangle>
+                                    <Border Background="#B3000000" CornerRadius="4" Padding="5,1" Margin="6" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                            Visibility="{Binding ShowSeriesBadge, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="SERIE" FontSize="9" FontWeight="Black" Foreground="White" />
+                                    </Border>
+                                    <Grid x:Name="Track" Height="3" VerticalAlignment="Bottom" Margin="6,0,6,6" Background="#80262A34"
+                                          Visibility="{Binding HasProgress, Converter={StaticResource BoolToVis}}">
+                                        <Border HorizontalAlignment="Left" Background="{StaticResource BrandBrush}">
+                                            <Border.Width>
+                                                <MultiBinding Converter="{StaticResource ProgressWidth}">
+                                                    <Binding Path="Progress" />
+                                                    <Binding ElementName="Track" Path="ActualWidth" />
+                                                </MultiBinding>
+                                            </Border.Width>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                                <TextBlock Text="{Binding Name}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="1,6,1,0"
+                                           TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="32"
+                                           Visibility="{Binding ShowCaption, Converter={StaticResource BoolToVis}}" />
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+
+                    <!-- Top 10: il numero grande col solo contorno, mezzo nascosto dietro la locandina. -->
+                    <DataTemplate x:Key="TopTileTemplate" DataType="{x:Type vm:DiscoverTile}">
+                        <Button Style="{StaticResource DiscoverTile}" ToolTip="{Binding Name}"
+                                Command="{Binding DataContext.OpenDiscoverTileCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                            <Grid Height="210">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="140" />
+                                </Grid.ColumnDefinitions>
+                                <Path Stroke="{StaticResource TextTertiaryBrush}" StrokeThickness="2.5" Fill="{StaticResource BgBrush}" VerticalAlignment="Bottom"
+                                      Height="150" Stretch="Uniform" Margin="0,0,-22,0" Data="{Binding Rank, Converter={StaticResource RankGeometry}}" />
+                                <Grid Grid.Column="1">
+                                    <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource SurfaceHoverBrush}" />
+                                    <TextBlock Text="{Binding Initials}" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding HasPoster, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                                    <Rectangle RadiusX="8" RadiusY="8">
+                                        <Rectangle.Fill><ImageBrush ImageSource="{Binding Poster}" Stretch="UniformToFill" /></Rectangle.Fill>
+                                    </Rectangle>
+                                </Grid>
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+
+                    <!-- Continua a guardare: la scena del titolo con l'avanzamento. -->
+                    <DataTemplate x:Key="WideTileTemplate" DataType="{x:Type vm:DiscoverTile}">
+                        <Button Style="{StaticResource DiscoverTile}" ToolTip="{Binding Name}"
+                                Command="{Binding DataContext.OpenDiscoverTileCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                            <StackPanel Width="290">
+                                <Grid Height="163">
+                                    <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource SurfaceHoverBrush}" />
+                                    <TextBlock Text="{Binding Initials}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding HasScene, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                                    <Rectangle RadiusX="8" RadiusY="8">
+                                        <Rectangle.Fill><ImageBrush ImageSource="{Binding Scene}" Stretch="UniformToFill" /></Rectangle.Fill>
+                                    </Rectangle>
+                                    <Rectangle RadiusX="8" RadiusY="8">
+                                        <Rectangle.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Offset="0.45" Color="#00000000" />
+                                                <GradientStop Offset="1" Color="#B3000000" />
+                                            </LinearGradientBrush>
+                                        </Rectangle.Fill>
+                                    </Rectangle>
+                                    <Border Width="34" Height="34" CornerRadius="17" BorderBrush="White" BorderThickness="2" Background="#73000000"
+                                            HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,12">
+                                        <TextBlock Text="&#xE768;" FontFamily="{StaticResource IconFont}" FontSize="14" Foreground="White"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2,0,0,0" />
+                                    </Border>
+                                    <Grid x:Name="Track" Height="4" VerticalAlignment="Bottom" Background="#80262A34"
+                                          Visibility="{Binding HasProgress, Converter={StaticResource BoolToVis}}">
+                                        <Border HorizontalAlignment="Left" Background="{StaticResource BrandBrush}">
+                                            <Border.Width>
+                                                <MultiBinding Converter="{StaticResource ProgressWidth}">
+                                                    <Binding Path="Progress" />
+                                                    <Binding ElementName="Track" Path="ActualWidth" />
+                                                </MultiBinding>
+                                            </Border.Width>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                                <TextBlock Text="{Binding DisplayTitle}" FontSize="13" FontWeight="SemiBold" Margin="1,6,1,0" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Subtitle}" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" Margin="1,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </Grid.Resources>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Barra: TV, filtri, categorie, elenco classico -->
+                <Grid Margin="28,12,28,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource SecondaryButton}" Command="{Binding DiscoverToLiveCommand}" ToolTip="TV in diretta (Ctrl+1)" Margin="0,0,14,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
+                                <TextBlock Text="TV" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Border Background="{DynamicResource SegmentTrackBrush}" CornerRadius="10" Padding="2" Width="300">
+                            <UniformGrid Columns="3">
+                                <RadioButton Style="{StaticResource SegmentButton}" GroupName="discover" Content="Tutto"
+                                             IsChecked="{Binding IsDiscoverAll, Mode=OneWay}" Command="{Binding SetDiscoverFilterCommand}" CommandParameter="all" />
+                                <RadioButton Style="{StaticResource SegmentButton}" GroupName="discover" Content="Film"
+                                             IsChecked="{Binding IsDiscoverMovies, Mode=OneWay}" Command="{Binding SetDiscoverFilterCommand}" CommandParameter="movie" />
+                                <RadioButton Style="{StaticResource SegmentButton}" GroupName="discover" Content="Serie TV"
+                                             IsChecked="{Binding IsDiscoverSeries, Mode=OneWay}" Command="{Binding SetDiscoverFilterCommand}" CommandParameter="tv" />
+                            </UniformGrid>
+                        </Border>
+                        <Button x:Name="DiscoverCategoriesButton" Style="{StaticResource SecondaryButton}" Margin="14,0,0,0" Click="DiscoverCategories_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Categorie" VerticalAlignment="Center" />
+                                <TextBlock Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="10" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Popup IsOpen="{Binding IsDiscoverCategoriesOpen}" PlacementTarget="{Binding ElementName=DiscoverCategoriesButton}"
+                               Placement="Bottom" StaysOpen="False" AllowsTransparency="True" VerticalOffset="6">
+                            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource StrokeStrongBrush}" BorderThickness="1" CornerRadius="12"
+                                    Width="560" Height="480" Padding="8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition />
+                                        <ColumnDefinition />
+                                    </Grid.ColumnDefinitions>
+                                    <DockPanel Visibility="{Binding IsDiscoverSeries, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                                        <TextBlock DockPanel.Dock="Top" Text="FILM" Style="{StaticResource SectionTitle}" Margin="10,6,0,6" />
+                                        <ListBox ItemsSource="{Binding DiscoverMovieCategories}" Style="{StaticResource LibraryList}" DisplayMemberPath="Name"
+                                                 SelectionChanged="DiscoverCategory_SelectionChanged" Tag="m" />
+                                    </DockPanel>
+                                    <DockPanel Grid.Column="1" Visibility="{Binding IsDiscoverMovies, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                                        <TextBlock DockPanel.Dock="Top" Text="SERIE TV" Style="{StaticResource SectionTitle}" Margin="10,6,0,6" />
+                                        <ListBox ItemsSource="{Binding DiscoverSeriesCategories}" Style="{StaticResource LibraryList}" DisplayMemberPath="Name"
+                                                 SelectionChanged="DiscoverCategory_SelectionChanged" Tag="s" />
+                                    </DockPanel>
+                                </Grid>
+                            </Border>
+                        </Popup>
+                    </StackPanel>
+                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Command="{Binding CloseDiscoverCommand}"
+                            ToolTip="Elenco delle categorie e ricerca (Esc)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE8FD;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
+                            <TextBlock Text="Elenco e ricerca" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- Le righe: virtualizzate, si costruiscono solo quelle in vista. -->
+                <ItemsControl x:Name="DiscoverList" Grid.Row="1" ItemsSource="{Binding DiscoverItems}" Focusable="False"
+                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel" VirtualizingPanel.VirtualizationMode="Recycling"
+                              ScrollViewer.CanContentScroll="True" PreviewMouseWheel="DiscoverList_PreviewMouseWheel">
+                    <ItemsControl.Template>
+                        <ControlTemplate TargetType="ItemsControl">
+                            <ScrollViewer x:Name="DiscoverScroll" Focusable="False" CanContentScroll="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <ItemsPresenter Margin="0,0,0,30" />
+                            </ScrollViewer>
+                        </ControlTemplate>
+                    </ItemsControl.Template>
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.Resources>
+                        <!-- In alto: il titolo di tendenza a tutta larghezza. -->
+                        <DataTemplate DataType="{x:Type vm:DiscoverHero}">
+                            <StackPanel Margin="28,4,28,0">
+                                <TextBlock Text="{Binding Error}" Foreground="{StaticResource DangerBrush}" FontSize="14" TextWrapping="Wrap" Margin="2,0,0,12"
+                                           Visibility="{Binding Error, Converter={StaticResource NullToVis}}" />
+                                <!-- Mentre TMDB risponde: il posto dell'immagine grande. -->
+                                <Border Height="460" CornerRadius="18" Background="{StaticResource SurfaceBrush}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsLoading}" Value="True" />
+                                                        <Condition Binding="{Binding Error}" Value="{x:Null}" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                </Border>
+                                <Grid Height="460" Visibility="{Binding HasTile, Converter={StaticResource BoolToVis}}">
+                                    <Grid>
+                                        <Rectangle RadiusX="18" RadiusY="18" Fill="Black" />
+                                        <Rectangle RadiusX="18" RadiusY="18">
+                                            <Rectangle.Fill><ImageBrush ImageSource="{Binding Picture}" Stretch="UniformToFill" AlignmentY="Top" /></Rectangle.Fill>
+                                        </Rectangle>
+                                        <Rectangle RadiusX="18" RadiusY="18">
+                                            <Rectangle.Fill>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                    <GradientStop Offset="0" Color="#E0000000" />
+                                                    <GradientStop Offset="0.35" Color="#8C000000" />
+                                                    <GradientStop Offset="0.68" Color="#00000000" />
+                                                </LinearGradientBrush>
+                                            </Rectangle.Fill>
+                                        </Rectangle>
+                                        <Rectangle RadiusX="18" RadiusY="18">
+                                            <Rectangle.Fill>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                    <GradientStop Offset="0.6" Color="#00000000" />
+                                                    <GradientStop Offset="1" Color="#BF000000" />
+                                                </LinearGradientBrush>
+                                            </Rectangle.Fill>
+                                        </Rectangle>
+                                        <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="44,0,0,46" MaxWidth="600">
+                                            <TextBlock Text="{Binding Kicker}" Foreground="#00C2FF" FontSize="12" FontWeight="Black" />
+                                            <TextBlock Text="{Binding Tile.DisplayTitle}" Foreground="White" FontSize="44" FontWeight="Black" LineHeight="50"
+                                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="104" Margin="0,6,0,8" />
+                                            <TextBlock Text="{Binding Meta}" Foreground="#CCFFFFFF" FontSize="14" FontWeight="Medium" />
+                                            <TextBlock Text="{Binding Overview}" Foreground="#E0FFFFFF" FontSize="15" LineHeight="22" TextWrapping="Wrap"
+                                                       TextTrimming="CharacterEllipsis" MaxHeight="66" Margin="0,12,0,0"
+                                                       Visibility="{Binding Overview, Converter={StaticResource NullToVis}}" />
+                                            <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                                                <Button Style="{StaticResource HeroButton}" Background="White" Foreground="Black"
+                                                        Command="{Binding DataContext.PlayHeroCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="&#xE768;" FontFamily="{StaticResource IconFont}" FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                        <TextBlock Text="{Binding PlayText}" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Style="{StaticResource HeroButton}" Width="42" Padding="0" BorderBrush="#99FFFFFF" BorderThickness="1.5" ToolTip="La mia lista"
+                                                        Command="{Binding DataContext.ToggleHeroMyListCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                    <TextBlock FontFamily="{StaticResource IconFont}" FontSize="16">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="&#xE710;" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding InMyList}" Value="True"><Setter Property="Text" Value="&#xE73E;" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Button>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <ItemsControl ItemsSource="{Binding Dots}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Focusable="False">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Cursor="Hand" Margin="3,0" Focusable="False"
+                                                            Command="{Binding DataContext.SetHeroCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Index}">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border x:Name="Dot" Width="7" Height="7" CornerRadius="3.5" Background="#66FFFFFF" />
+                                                                <ControlTemplate.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                                        <Setter TargetName="Dot" Property="Width" Value="22" />
+                                                                        <Setter TargetName="Dot" Property="Background" Value="White" />
+                                                                    </DataTrigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
+                                </Grid>
+                            </StackPanel>
+                        </DataTemplate>
+
+                        <DataTemplate DataType="{x:Type vm:DiscoverHeading}">
+                            <TextBlock Text="{Binding Text}" FontSize="24" FontWeight="ExtraBold" Margin="30,44,28,0" TextWrapping="Wrap" />
+                        </DataTemplate>
+
+                        <!-- Una riga: titolo, "Vedi tutto" e i riquadri che scorrono di lato con le frecce. -->
+                        <DataTemplate DataType="{x:Type vm:DiscoverRow}">
+                            <StackPanel Margin="0,22,0,0">
+                                <StackPanel Orientation="Horizontal" Margin="30,0,28,0">
+                                    <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                    <Button Style="{StaticResource SeeAll}" Visibility="{Binding HasAll, Converter={StaticResource BoolToVis}}"
+                                            Command="{Binding DataContext.DiscoverSeeAllCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                </StackPanel>
+                                <Grid Background="Transparent">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                                  CanContentScroll="False" Focusable="False" Padding="26,12,26,14">
+                                        <Grid>
+                                            <ItemsControl ItemsSource="{Binding Tiles}" ItemTemplate="{StaticResource PosterTileTemplate}" Focusable="False"
+                                                          Visibility="{Binding IsPoster, Converter={StaticResource BoolToVis}}">
+                                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                            </ItemsControl>
+                                            <ItemsControl ItemsSource="{Binding Tiles}" ItemTemplate="{StaticResource TopTileTemplate}" Focusable="False"
+                                                          Visibility="{Binding IsTop, Converter={StaticResource BoolToVis}}">
+                                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                            </ItemsControl>
+                                            <ItemsControl ItemsSource="{Binding Tiles}" ItemTemplate="{StaticResource WideTileTemplate}" Focusable="False"
+                                                          Visibility="{Binding IsWide, Converter={StaticResource BoolToVis}}">
+                                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                            </ItemsControl>
+                                        </Grid>
+                                    </ScrollViewer>
+                                    <Button Style="{StaticResource RowArrow}" HorizontalAlignment="Left" Content="&#xE76B;" Click="DiscoverRowArrow_Click" Tag="-1" Margin="0,12,0,14">
+                                        <Button.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><GradientStop Color="#BF000000" /><GradientStop Offset="1" Color="#00000000" /></LinearGradientBrush>
+                                        </Button.Background>
+                                    </Button>
+                                    <Button Style="{StaticResource RowArrow}" HorizontalAlignment="Right" Content="&#xE76C;" Click="DiscoverRowArrow_Click" Tag="1" Margin="0,12,0,14">
+                                        <Button.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><GradientStop Color="#00000000" /><GradientStop Offset="1" Color="#BF000000" /></LinearGradientBrush>
+                                        </Button.Background>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.Resources>
+                </ItemsControl>
+            </Grid>
 
             <!-- ==== Video ==== -->
             <Grid x:Name="VideoHost" Grid.Column="1" Background="Black" Visibility="{Binding ShowVideo, Converter={StaticResource BoolToVis}}">

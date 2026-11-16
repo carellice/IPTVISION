@@ -614,3 +614,41 @@ body.playing #player-ui { display: block; }
 .nothing .p-panel { background: rgba(0, 0, 0, 0.94); border-right: 1px solid #222; }
 .nothing .p-next-card { background: #111; border: 1px solid #333; border-radius: 1rem; }
 .nothing #toast { background: #111; border: 1px solid #333; border-radius: 999px; color: var(--text); font-family: "Space Mono", monospace; text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ---------- Film e serie (con la chiave TMDB) ---------- */
+/* Righe che scorrono di lato col telecomando (nav.js porta in vista il riquadro): inline-block, niente gap. */
+.discover { padding-right: 0.6rem; }
+.hero { position: relative; height: 26rem; border-radius: 1.1rem; overflow: hidden; background: var(--surface); margin: 0.4rem 0 0.6rem; }
+.hero-bg { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-size: cover; background-position: center 25%; -webkit-transition: background-image 0.8s; transition: background-image 0.8s; }
+.hero-shade { position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,.88) 0%, rgba(0,0,0,.55) 35%, rgba(0,0,0,0) 68%), linear-gradient(0deg, rgba(0,0,0,.75) 0%, rgba(0,0,0,0) 40%); }
+.hero-text { position: absolute; left: 2.4rem; bottom: 2rem; width: 52%; }
+.hero .kicker { color: var(--accent2); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12rem; }
+.hero .h-title { font-size: 2.6rem; line-height: 3rem; font-weight: 800; margin: 0.3rem 0 0.4rem; max-height: 6rem; overflow: hidden; }
+.hero .h-meta { color: rgba(255,255,255,.8); font-size: 0.9rem; }
+.hero .h-plot { color: rgba(255,255,255,.88); font-size: 0.9rem; line-height: 1.35rem; margin-top: 0.6rem; max-height: 4.05rem; overflow: hidden; }
+.hero .btn { display: inline-block; margin-right: 0.6rem; }
+.hero .dots { position: absolute; right: 1.6rem; bottom: 1.4rem; }
+.hero .dots i { display: inline-block; width: 0.4rem; height: 0.4rem; border-radius: 0.2rem; margin-left: 0.35rem; background: rgba(255,255,255,.4); }
+.hero .dots i.on { width: 1.2rem; background: #fff; }
+.drow { margin-top: 1.1rem; }
+.drow-title { font-size: 1.15rem; font-weight: 700; padding-left: 0.3rem; }
+.drow-title .see-all { display: inline-block; margin-left: 0.8rem; padding: 0.1rem 0.5rem; font-size: 0.8rem; color: var(--accent2); font-weight: 600; }
+.hscroll { overflow: hidden; white-space: nowrap; padding: 0.5rem 0.3rem 0.4rem; }
+.dtiles { white-space: nowrap; }
+.dtile { display: inline-block; vertical-align: top; white-space: normal; width: 8.6rem; margin-right: 0.5rem; padding: 0.15rem; border-radius: 0.6rem; }
+.dtile .art { position: relative; width: 100%; padding-top: 150%; border-radius: 0.45rem; background: var(--surface-hover); overflow: hidden; }
+.dtile .art img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+.dtile .kind { position: absolute; left: 0.35rem; top: 0.35rem; background: rgba(0,0,0,.7); color: #fff; font-size: 0.5rem; font-weight: 800; letter-spacing: 0.05rem; padding: 0.1rem 0.3rem; border-radius: 0.2rem; }
+.dtile .cap { font-size: 0.75rem; color: var(--text2); margin-top: 0.35rem; height: 1.9rem; overflow: hidden; line-height: 0.95rem; }
+.dtile .name { font-size: 0.8rem; font-weight: 600; margin-top: 0.35rem; }
+.dtile.wide { width: 15rem; }
+.dtile.wide .art { padding-top: 56.25%; }
+.dtile.wide .play { position: absolute; left: 0.5rem; bottom: 0.6rem; width: 1.7rem; height: 1.7rem; line-height: 1.6rem; text-align: center; border: 0.1rem solid #fff; border-radius: 50%; background: rgba(0,0,0,.45); font-size: 0.7rem; }
+.dtile.top { width: 13rem; }
+.dtile.top .rank { display: inline-block; vertical-align: bottom; width: 5.6rem; margin-right: -1.4rem; text-align: right; font-size: 9rem; line-height: 7.6rem; font-weight: 900; color: var(--bg); -webkit-text-stroke: 0.15rem var(--text3); font-family: Arial, sans-serif; }
+.dtile.top .art { display: inline-block; vertical-align: bottom; width: 7.2rem; padding-top: 0; height: 10.8rem; }
+.detail { position: relative; }
+.detail .backdrop { position: absolute; left: 0; top: 0; right: 0; height: 75%; background-size: cover; background-position: center 20%; opacity: 0.4; pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 25%, transparent); mask-image: linear-gradient(180deg, #000 25%, transparent); }
+.detail > .poster, .detail > .grow, .detail > .scroll { position: relative; }

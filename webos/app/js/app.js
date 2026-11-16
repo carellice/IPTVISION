@@ -9,9 +9,15 @@
     { id: 'Live', title: 'TV in diretta', icon: '📺' },
     { id: 'Movies', title: 'Film', icon: '🎬' },
     { id: 'Series', title: 'Serie TV', icon: '🎞' },
+    { id: 'Discover', title: 'Film e serie', icon: '🎬' },
     { id: 'Search', title: 'Cerca', icon: '🔍' },
     { id: 'Settings', title: 'Impostazioni', icon: '⚙' },
   ];
+  /** Le sezioni del menu: con la chiave TMDB film e serie sono una sola, "Film e serie". */
+  function sections() {
+    var tmdb = !!S.get('tmdbKey');
+    return SECTIONS.filter(function (s) { return tmdb ? s.id !== 'Movies' && s.id !== 'Series' : s.id !== 'Discover'; });
+  }
   var SORTS = {
     Default: 'Predefinito', Number: 'Numero', NameAsc: 'Nome (A-Z)', NameDesc: 'Nome (Z-A)',
     Recent: 'Aggiunti di recente', Year: 'Anno (più recenti)', Rating: 'Voto',
@@ -466,7 +472,7 @@
     // data-enter: entrando nel menu dal contenuto si torna sulla sezione aperta (vedi nav.js).
     var rail = h('div', { class: 'rail', 'data-enter': 'active' }, [h('div', { class: 'brand' }, [h('img', { src: 'img/largeIcon.png', alt: '' }), h('h1', { text: 'IPTVISION' })])]);
     var activeItem = null;
-    SECTIONS.forEach(function (s) {
+    sections().forEach(function (s) {
       var el = V.focusable(h('div', { class: 'nav-item' + (A.section === s.id ? ' active' : ''), data: { key: 'nav-' + s.id } }, [h('span', { class: 'ni', text: s.icon }), '  ', h('span', { class: 'nt', text: s.title })]), function () {
         // OK sulla voce di menu: si entra nel contenuto (sotto il pivot nello stile Modern UI).
         Nav.move(metro() ? 'down' : 'right');
@@ -491,7 +497,12 @@
         el.nav = metro() ? { down: toInput } : { right: toInput };
       });
     } else if (A.section === 'Settings') renderSettings(content);
-    else {
+    else if (A.section === 'Discover') {
+      ensure('movies'); ensure('series');
+      var dopen = A.openCat.Discover;
+      if (dopen) renderLibrary(content, dopen.charAt(0) === 'm' ? 'Movies' : 'Series', dopen.slice(2));
+      else renderDiscover(content);
+    } else {
       if (A.section === 'Movies') ensure('movies');
       if (A.section === 'Series') ensure('series');
       renderLibrary(content, A.section);
@@ -501,7 +512,8 @@
     if (!focusAfterRender) focusAfterRender = activeItem;
   }
 
-  function renderLibrary(content, section) {
+  /** openId: la categoria aperta da "Film e serie" (si chiude tornando lì). */
+  function renderLibrary(content, section, openId) {
     var lib = section === 'Live' ? A.live : section === 'Movies' ? A.movies : A.series;
     var title = section === 'Live' ? 'TV in diretta' : section === 'Movies' ? 'Film' : 'Serie TV';
     if (!lib) {
@@ -509,7 +521,7 @@
       return;
     }
     var entries = catEntries(section);
-    var open = A.openCat[section];
+    var open = openId || A.openCat[section];
     var entry = null;
     entries.forEach(function (e) { if (e.id === open) entry = e; });
 
@@ -534,7 +546,7 @@
     var grid = S.isGrid(section);
     var items = section === 'Live' ? channelsFor(open) : section === 'Movies' ? moviesFor(open) : seriesFor(open);
     var unit = section === 'Live' ? (items.length === 1 ? ' canale' : ' canali') : section === 'Movies' ? ' film' : ' serie';
-    var backBtn = V.focusable(h('div', { class: 'back btn small', text: '←' }), function () { A.openCat[section] = null; render(); });
+    var backBtn = V.focusable(h('div', { class: 'back btn small', text: '←' }), function () { if (openId) A.openCat.Discover = null; else A.openCat[section] = null; render(); });
     var sortBtn = V.focusable(h('div', { class: 'btn small', data: { key: 'sort' }, text: '⇅  ' + SORTS[S.sortOf(section)] }), function () { showSort(section); });
     var listBtn = V.focusable(h('div', { class: 'toggle btn small' + (grid ? '' : ' on'), data: { key: 'view-list' }, text: '☰ Elenco' }), function () { S.setGrid(section, false); render(false, root.querySelector('[data-key="view-list"]')); });
     var gridBtn = V.focusable(h('div', { class: 'toggle btn small' + (grid ? ' on' : ''), data: { key: 'view-grid' }, text: '▦ Griglia' }), function () { S.setGrid(section, true); render(false, root.querySelector('[data-key="view-grid"]')); });
@@ -814,6 +826,7 @@
       dueffe: 'Fondo quasi nero, superfici calde, avorio e oro, angoli morbidi.',
       nothing: 'Nero OLED, bianco e un solo rosso, titoli a matrice di punti, linee sottili al posto delle ombre.',
     }[skin] || 'Lo stile di sempre: scuro, arrotondato, menu di lato.' }));
+    tmdbSettings(box);
     box.appendChild(h('div', { class: 'group-title', text: 'Riproduzione' }));
     box.appendChild(settingRow('Formato HLS (m3u8) per la TV in diretta', 'Di solito MPEG-TS è più stabile; prova HLS se un canale non parte.',
       S.get('outputFormat') === 'm3u8', function () { S.set('outputFormat', S.get('outputFormat') === 'm3u8' ? 'ts' : 'm3u8'); }));
@@ -835,6 +848,266 @@
     box.appendChild(h('div', { class: 'group-title', text: '' }));
     box.appendChild(V.focusable(h('div', { class: 'btn', text: 'Esci dall\'account' }), logout));
     box.appendChild(h('div', { class: 'dim', style: 'margin-top:1rem;font-size:0.8rem', text: 'IPTVISION è solo un lettore e non contiene canali. Va usato con un servizio IPTV a cui si ha diritto di accedere.' }));
+  }
+
+  /** La chiave TMDB del TV: con questa film e serie diventano una sola schermata con copertine, tendenze e generi. */
+  function tmdbSettings(box) {
+    box.appendChild(h('div', { class: 'group-title', text: 'TMDB' }));
+    box.appendChild(h('div', { class: 'dim', style: 'margin:0.3rem 0 0.6rem', text: 'Con una chiave di themoviedb.org (la "Chiave API" o il "Token di accesso in lettura" che trovi nel tuo profilo TMDB, alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi.' }));
+    if (S.get('tmdbKey')) {
+      box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Chiave' }), 'Inserita']));
+      box.appendChild(V.focusable(h('div', { class: 'btn', data: { key: 'tmdb-remove' }, text: 'Rimuovi chiave' }), function () { setTmdbKey(''); }));
+      return;
+    }
+    var input = h('input', { type: 'text', placeholder: 'Chiave API o token TMDB' });
+    input.classList.add('f');
+    input.dataset.key = 'tmdb-input';
+    var save = function () {
+      var k = input.value.trim();
+      if (!k) return;
+      u.toast('Controllo la chiave…');
+      IPTV.Tmdb.check(k).then(function () { setTmdbKey(k); u.toast('Chiave TMDB salvata: trovi tutto in "Film e serie"'); }, function (e) { u.toast(e.message); });
+    };
+    input.onSubmit = save;
+    box.appendChild(h('div', { class: 'field', style: 'max-width:34rem' }, input));
+    box.appendChild(V.focusable(h('div', { class: 'btn primary', text: 'Salva chiave' }), save));
+  }
+
+  function setTmdbKey(k) {
+    S.set('tmdbKey', k);
+    IPTV.Tmdb.clear();
+    A.tmdbRows = null; A.tmdbError = null; A.tmdbLoading = false;
+    A.openCat.Discover = null;
+    render(false, root.querySelector('[data-key="nav-Settings"]'));
+  }
+
+  // ---------- Film e serie (TMDB) ----------
+
+  var heroTimer = null;
+  var discoverFilter = 'all';
+
+  function loadTmdb() {
+    var key = S.get('tmdbKey');
+    if (!key || A.tmdbRows || A.tmdbLoading) return;
+    A.tmdbLoading = true;
+    IPTV.Tmdb.check(key).catch(function (e) { A.tmdbError = e.message; });
+    IPTV.Tmdb.loadRows(key).then(function (rows) {
+      A.tmdbLoading = false;
+      if (S.get('tmdbKey') !== key) return;
+      A.tmdbRows = rows;
+      A.tmdbMatched = null;
+      if (A.screen === 'home' && A.section === 'Discover' && !A.openCat.Discover) render(true);
+    });
+  }
+
+  function itemKey(it) { return it.kind === 'movie' ? it.posKey : 's:' + it.seriesId; }
+
+  /** Le liste di TMDB diventano titoli del catalogo ({ entry, tmdb }), ognuno una volta per riga. */
+  function matchedRows() {
+    if (!A.tmdbRows || !A.movies || !A.series) return null;
+    if (A.tmdbMatched && A.tmdbMatched.movies === A.movies && A.tmdbMatched.series === A.series) return A.tmdbMatched.rows;
+    var idx = IPTV.Tmdb.index(A.movies.items, A.series.items);
+    var rows = A.tmdbRows.map(function (r) {
+      var seen = {}, titles = [];
+      r.items.forEach(function (c) {
+        var e = IPTV.Tmdb.find(c, idx);
+        if (!e || seen[itemKey(e.item)]) return;
+        seen[itemKey(e.item)] = true;
+        titles.push({ entry: e, tmdb: c });
+      });
+      return { id: r.id, title: r.title, top: r.top, titles: titles };
+    });
+    A.tmdbMatched = { movies: A.movies, series: A.series, rows: rows };
+    return rows;
+  }
+
+  function openTitle(t) { openEntry(t.entry); }
+
+  /** I film partono subito (da dove si era rimasti), le serie aprono gli episodi. */
+  function playTitle(t) {
+    if (t.entry.item.kind === 'movie' && t.entry.variants.length === 1) playMovie(t.entry.item, false); else openTitle(t);
+  }
+
+  function maxProgress(e) {
+    return e.item.kind === 'movie' ? Math.max.apply(null, e.variants.map(function (v) { return Pos.progress(v.posKey); })) : 0;
+  }
+
+  function renderDiscover(content) {
+    clearInterval(heroTimer);
+    if (!A.movies || !A.series) { content.appendChild(h('div', { class: 'empty', text: 'Caricamento film e serie…' })); return; }
+    loadTmdb();
+    var pass = function (t) { return discoverFilter === 'all' || (discoverFilter === 'movie') === (t.entry.item.kind === 'movie'); };
+    var rows = matchedRows();
+    var known = {};
+    (rows || []).forEach(function (r) { r.titles.forEach(function (t) { known[itemKey(t.entry.item)] = t.tmdb; }); });
+    var wrap = function (e) { return { entry: e, tmdb: known[itemKey(e.item)] || null }; };
+
+    var cont = moviesFor(CONT).map(function (e) { return { t: wrap(e), u: Math.max.apply(null, e.variants.map(function (v) { return Pos.updatedAt(v.posKey); })) }; })
+      .concat(seriesFor(CONT).map(function (e) { var le = Pos.lastEpisode(e.item.seriesId); return { t: wrap(e), u: le ? le.u : 0 }; }))
+      .sort(function (a, b) { return b.u - a.u; }).map(function (x) { return x.t; }).filter(pass);
+    var mine = moviesFor(MINE).concat(seriesFor(MINE)).map(wrap).filter(pass)
+      .sort(function (a, b) { return Pos.myListAddedAt(itemKey(b.entry.item)) - Pos.myListAddedAt(itemKey(a.entry.item)); });
+    var recent = u.groupVariants(A.movies.items.slice().sort(function (a, b) { return (b.added || 0) - (a.added || 0); }).slice(0, 80), function (m) { return m.name; }).slice(0, 30).map(wrap);
+    var tmdbRows = (rows || []).map(function (r) { return { id: r.id, title: r.title, top: r.top, titles: r.titles.filter(pass) }; })
+      .filter(function (r) { return r.titles.length >= (r.top ? 5 : 4); });
+    var trend = (rows || []).filter(function (r) { return r.id === 'trend'; })[0];
+    var hero = trend ? trend.titles.filter(function (t) { return pass(t) && t.tmdb.backdrop; }).slice(0, 6) : [];
+
+    var box = h('div', { class: 'discover' });
+    content.appendChild(h('div', { class: 'scroll' }, box));
+
+    var chips = h('div', { class: 'seasons', style: 'margin-bottom:0.4rem' });
+    [['all', 'Tutto'], ['movie', 'Film'], ['tv', 'Serie TV']].forEach(function (o) {
+      chips.appendChild(V.focusable(h('div', { class: 'chip' + (discoverFilter === o[0] ? ' on' : ''), data: { key: 'df-' + o[0] }, text: o[1] }), function () {
+        discoverFilter = o[0];
+        render(false, root.querySelector('[data-key="df-' + o[0] + '"]'));
+      }));
+    });
+    chips.appendChild(V.focusable(h('div', { class: 'chip', data: { key: 'df-cats' }, text: 'Categorie ▾' }), showDiscoverCategories));
+    box.appendChild(chips);
+    if (A.tmdbError) box.appendChild(h('div', { style: 'color:var(--live);margin:0.4rem 0 0.8rem', text: A.tmdbError + ' Controlla la chiave in Impostazioni → TMDB.' }));
+    if (hero.length) box.appendChild(heroBox(hero));
+    else if (!rows && !A.tmdbError) box.appendChild(h('div', { class: 'hero' }));
+
+    // Le righe si disegnano a blocchi: le successive quando il focus si avvicina alla fine.
+    var all = [];
+    if (cont.length) all.push({ title: 'Continua a guardare', wide: true, titles: cont });
+    if (mine.length) all.push({ title: 'La mia lista', titles: mine, lookup: true });
+    tmdbRows.forEach(function (r, i) {
+      all.push({ title: r.top ? r.title + ' in Italia' : r.title, top: r.top, titles: r.titles.slice(0, r.top ? 10 : 24) });
+      if (i === 1 && discoverFilter !== 'tv' && recent.length) all.push({ title: 'Aggiunti di recente', titles: recent, lookup: true, all: 'm:' + ALL });
+    });
+    if (rows && !tmdbRows.length && !A.tmdbError) all.push({ note: 'Nessun titolo di TMDB trovato nel catalogo: sotto ci sono le categorie della lista.' });
+    all.push({ heading: 'Le categorie della lista' });
+    if (discoverFilter !== 'tv') A.movies.cats.forEach(function (c) { all.push({ title: c.name, cat: 'm:' + c.id }); });
+    if (discoverFilter !== 'movie') A.series.cats.forEach(function (c) { all.push({ title: c.name + ' · Serie', cat: 's:' + c.id }); });
+
+    var shown = 0;
+    function more() {
+      var end = Math.min(all.length, shown + 6);
+      for (var i = shown; i < end; i++) box.appendChild(rowBox(all[i], i));
+      shown = end;
+    }
+    function rowBox(r, i) {
+      if (r.note) return h('div', { class: 'dim', style: 'margin:1rem 0', text: r.note });
+      if (r.heading) return h('div', { class: 'page-title', style: 'margin-top:2rem', text: r.heading });
+      var titles = r.titles;
+      if (r.cat) {
+        var id = r.cat.slice(2);
+        titles = (r.cat.charAt(0) === 'm' ? moviesFor(id) : seriesFor(id)).slice(0, 24).map(function (e) { return { entry: e, tmdb: null }; });
+        if (!titles.length) return h('div');
+      }
+      var tiles = h('div', { class: 'dtiles' });
+      titles.forEach(function (t, n) {
+        var el = r.top ? topTile(t, n + 1) : r.wide ? wideTile(t) : posterTile(t, !!r.cat, !!r.lookup);
+        var prev = el.onFocus;
+        el.onFocus = function () { if (i >= shown - 2) more(); if (prev) prev(); };
+        tiles.appendChild(el);
+      });
+      var head = [h('span', { text: r.title })];
+      var allId = r.all || r.cat;
+      if (allId) head.push(V.focusable(h('span', { class: 'see-all', text: 'Vedi tutto ›' }), function () { A.openCat.Discover = allId; render(); }));
+      return h('div', { class: 'drow' }, [h('div', { class: 'drow-title' }, head), h('div', { class: 'hscroll' }, tiles)]);
+    }
+    more();
+  }
+
+  function posterUrl(t) { return IPTV.Tmdb.img(t.tmdb && t.tmdb.poster) || t.entry.item.poster || t.entry.item.cover; }
+
+  /** La scheda TMDB del titolo quando manca (la mia lista, aggiunti di recente, continua a guardare). */
+  function withTmdb(t, cb) {
+    if (t.tmdb || !S.get('tmdbKey')) return;
+    var it = t.entry.item;
+    IPTV.Tmdb.lookup(S.get('tmdbKey'), it.kind === 'movie' ? 'movie' : 'tv', it.name, it.year).then(function (c) { if (c) { t.tmdb = c; cb(c); } });
+  }
+
+  /** Cambia l'immagine di un riquadro (si carica quando arriva vicino allo schermo, vedi util.js). */
+  function swapArt(art, url) {
+    var img = art.querySelector('img');
+    if (!url || !img) return;
+    if (img.getAttribute('src')) img.src = url; else img.dataset.src = url;
+  }
+
+  function posterTile(t, caption, lookup) {
+    var it = t.entry.item;
+    var p = maxProgress(t.entry);
+    var art = h('div', { class: 'art' }, u.art(posterUrl(t), it.initials)
+      .concat(it.kind !== 'movie' && !caption ? [h('span', { class: 'kind', text: 'SERIE' })] : [])
+      .concat(p > 0 && p < 1 ? [u.progressBar(p)] : []));
+    var el = V.focusable(h('div', { class: 'dtile' }, [art, caption ? h('div', { class: 'cap', text: it.name }) : null]), function () { openTitle(t); });
+    el.dataset.key = 'd-' + itemKey(it);
+    el.listItem = it;
+    if (lookup) withTmdb(t, function (c) { swapArt(art, IPTV.Tmdb.img(c.poster)); });
+    return el;
+  }
+
+  function topTile(t, n) {
+    var it = t.entry.item;
+    var el = V.focusable(h('div', { class: 'dtile top' }, [h('span', { class: 'rank', text: String(n) }), h('div', { class: 'art' }, u.art(posterUrl(t), it.initials))]), function () { openTitle(t); });
+    el.listItem = it;
+    return el;
+  }
+
+  /** Continua a guardare: la scena del titolo con l'avanzamento, come fanno i servizi di streaming. */
+  function wideTile(t) {
+    var it = t.entry.item;
+    var p = maxProgress(t.entry);
+    var scene = IPTV.Tmdb.img(t.tmdb && t.tmdb.backdrop, 'w780');
+    var art = h('div', { class: 'art' }, u.art(scene || it.poster || it.cover, it.initials).concat([h('span', { class: 'play', text: '▶' })]).concat(p > 0 && p < 1 ? [u.progressBar(p)] : []));
+    var name = h('div', { class: 'name ellipsis', text: (t.tmdb && t.tmdb.title) || it.name });
+    var el = V.focusable(h('div', { class: 'dtile wide' }, [art, name, h('div', { class: 'cap ellipsis', text: it.kind === 'movie' ? 'Film' : 'Serie TV · riprendi l\'episodio' })]), function () { playTitle(t); });
+    el.continueEntry = t.entry;
+    el.listItem = it;
+    withTmdb(t, function (c) {
+      name.textContent = c.title || it.name;
+      swapArt(art, IPTV.Tmdb.img(c.backdrop, 'w780'));
+    });
+    return el;
+  }
+
+  /** In alto: un titolo di tendenza a tutta larghezza che cambia da solo ogni 9 secondi. */
+  function heroBox(items) {
+    var i = 0;
+    var bg = h('div', { class: 'hero-bg' });
+    var kicker = h('div', { class: 'kicker' }), title = h('div', { class: 'h-title' }), meta = h('div', { class: 'h-meta' }), plot = h('div', { class: 'h-plot' });
+    var play = V.focusable(h('div', { class: 'btn primary', data: { key: 'hero-play' } }), function () { playTitle(items[i]); });
+    var info = V.focusable(h('div', { class: 'btn', data: { key: 'hero-info' }, text: 'ⓘ  Altre info' }), function () { openTitle(items[i]); });
+    var mine = V.focusable(h('div', { class: 'btn', data: { key: 'hero-mine' } }), function () { toggleMyList(items[i].entry.item); paint(); });
+    var dots = h('div', { class: 'dots' });
+    function paint() {
+      var t = items[i], c = t.tmdb, it = t.entry.item;
+      bg.style.backgroundImage = 'url("' + IPTV.Tmdb.img(c.backdrop, 'w1280') + '")';
+      kicker.textContent = 'N. ' + (i + 1) + ' DI TENDENZA';
+      title.textContent = c.title || it.name;
+      meta.textContent = u.joinMeta(it.kind === 'movie' ? 'Film' : 'Serie TV', c.year, c.vote ? '★ ' + c.vote.toFixed(1) : null);
+      plot.textContent = c.overview || '';
+      play.textContent = it.kind === 'movie' ? '▶  Riproduci' : '▶  Episodi';
+      mine.textContent = inMyList(it) ? '✓  Nella mia lista' : '+  La mia lista';
+      dots.innerHTML = '';
+      items.forEach(function (_, n) { dots.appendChild(h('i', { class: n === i ? 'on' : '' })); });
+    }
+    paint();
+    if (items.length > 1) heroTimer = setInterval(function () {
+      if (!document.body.contains(bg) || A.screen !== 'home') { clearInterval(heroTimer); return; }
+      i = (i + 1) % items.length;
+      paint();
+    }, 9000);
+    return h('div', { class: 'hero' }, [bg, h('div', { class: 'hero-shade' }), h('div', { class: 'hero-text' }, [kicker, title, meta, plot, h('div', { style: 'margin-top:1.2rem' }, [play, info, mine])]), dots]);
+  }
+
+  function showDiscoverCategories() {
+    var box = h('div', { class: 'dialog' }, [h('h3', { text: 'Categorie' })]);
+    var list = h('div', { class: 'scroll', style: 'max-height:30rem' });
+    function add(prefix, title, allName, cats) {
+      list.appendChild(h('div', { class: 'group-title', text: title }));
+      [{ id: ALL, name: allName }].concat(cats).forEach(function (c) {
+        list.appendChild(V.focusable(h('div', { class: 'opt', text: c.name }), function () { closeModal(); A.openCat.Discover = prefix + ':' + c.id; render(); }));
+      });
+    }
+    if (discoverFilter !== 'tv') add('m', 'Film', 'Tutti i film', A.movies.cats);
+    if (discoverFilter !== 'movie') add('s', 'Serie TV', 'Tutte le serie', A.series.cats);
+    box.appendChild(list);
+    openModal(box);
   }
 
   /** Torna alla schermata di accesso; le liste salvate restano lì da scegliere. */
@@ -868,23 +1141,42 @@
       A.client.vodInfo(m.streamId).then(function (info) { d.info = info || {}; if (A.screen === 'movie' && A.data === d) render(true); }).catch(function () { d.info = {}; });
     }
     var info = d.info || {};
+    var tm = detailTmdb(d, 'movie', m.name, m.year, 'movie');
     var play = V.focusable(h('div', { class: 'btn primary', data: { key: 'play' }, text: resume > 0 ? '▶  Riprendi da ' + u.formatTime(resume) : '▶  Guarda' }), function () { playMovie(m, false); });
     var buttons = [play];
     if (resume > 0) buttons.push(V.focusable(h('div', { class: 'btn', text: '↺  Dall\'inizio' }), function () { playMovie(m, true); }));
     buttons.push(myListButton(m));
     root.appendChild(h('div', { class: 'detail' }, [
-      h('div', { class: 'poster' }, u.art(m.poster, m.initials)),
+      backdrop(tm),
+      h('div', { class: 'poster' }, u.art(IPTV.Tmdb.img(tm && tm.poster, 'w500') || m.poster, m.initials)),
       h('div', { class: 'grow' }, [
         h('h2', { text: m.name }),
         h('div', { class: 'muted', text: u.joinMeta(info.year || m.year, info.genre, info.duration, m.rating > 0 ? '★ ' + m.rating.toFixed(1) : null) }),
         info.tech ? h('div', { class: 'dim', text: [u.techResolution(info.tech)].concat(u.techDetails(info.tech)).filter(Boolean).join('  ·  ') }) : null,
         h('div', { style: 'margin-top:1.4rem' }, buttons),
-        info.plot ? h('div', { class: 'plot', text: info.plot }) : null,
+        info.plot || (tm && tm.overview) ? h('div', { class: 'plot', text: info.plot || tm.overview }) : null,
         info.director ? h('div', { class: 'muted', text: 'Regia: ' + info.director }) : null,
         info.cast ? h('div', { class: 'muted', style: 'margin-top:0.3rem', text: 'Cast: ' + info.cast }) : null,
       ]),
     ]));
     if (!focusAfterRender) focusAfterRender = play;
+  }
+
+  /** Con la chiave TMDB: la scheda del titolo, chiesta una volta (poi si ridisegna la schermata). */
+  function detailTmdb(d, kind, name, year, screen) {
+    var key = S.get('tmdbKey');
+    if (!key) return null;
+    if (d.tm === undefined) {
+      d.tm = null;
+      IPTV.Tmdb.lookup(key, kind, name, year).then(function (c) { d.tm = c; if (c && A.screen === screen && A.data === d) render(true); });
+    }
+    return d.tm;
+  }
+
+  /** La scena del titolo che sfuma dietro la scheda. */
+  function backdrop(tm) {
+    var url = IPTV.Tmdb.img(tm && tm.backdrop, 'w1280');
+    return url ? h('div', { class: 'backdrop', style: 'background-image:url("' + url + '")' }) : null;
   }
 
   /** L'episodio da cui riprendere: l'ultimo aperto se non finito, altrimenti il successivo. */
@@ -906,6 +1198,7 @@
         .catch(function (e) { d.info = { episodes: [] }; u.toast(e.message || 'Impossibile caricare gli episodi.'); if (A.data === d) render(); });
     }
     var info = d.info;
+    var tm = detailTmdb(d, 'tv', s.name, s.year, 'series');
     var eps = info ? info.episodes : [];
     var seasons = [];
     eps.forEach(function (e) { if (seasons.indexOf(e.season) < 0) seasons.push(e.season); });
@@ -913,11 +1206,11 @@
     if (d.season === null && resume) d.season = resume.season;
     var box = h('div', { class: 'list' });
     var head = h('div', { class: 'row', style: 'margin-bottom:1rem' }, [
-      h('div', { class: 'poster', style: 'width:10rem;height:15rem;margin-right:1.6rem;border-radius:0.8rem;overflow:hidden;position:relative;background:var(--surface-hover)' }, u.art(s.cover, s.initials)),
+      h('div', { class: 'poster', style: 'width:10rem;height:15rem;margin-right:1.6rem;border-radius:0.8rem;overflow:hidden;position:relative;background:var(--surface-hover)' }, u.art(IPTV.Tmdb.img(tm && tm.poster, 'w500') || s.cover, s.initials)),
       h('div', { class: 'grow' }, [
         h('h2', { text: s.name }),
         h('div', { class: 'muted', text: u.joinMeta((info && info.year) || s.year, (info && info.genre) || s.genre, seasons.length ? seasons.length + ' stagioni' : null) }),
-        h('div', { class: 'plot', text: (info && info.plot) || s.plot || '' }),
+        h('div', { class: 'plot', text: (info && info.plot) || s.plot || (tm && tm.overview) || '' }),
       ]),
     ]);
     var play = null;
@@ -947,9 +1240,9 @@
         ]),
       ]), function () { playEpisode(s, e, eps, false); }));
     });
-    root.appendChild(h('div', { class: 'detail', style: 'display:block' }, h('div', { class: 'scroll', style: 'height:100%' }, [
+    root.appendChild(h('div', { class: 'detail', style: 'display:block' }, [backdrop(tm), h('div', { class: 'scroll', style: 'height:100%' }, [
       head, info ? chips : h('div', { class: 'muted', text: 'Caricamento episodi…' }), box,
-    ])));
+    ])]));
     if (!focusAfterRender) focusAfterRender = play;
   }
 

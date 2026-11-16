@@ -78,3 +78,21 @@ public sealed class VolumeGlyphConverter : IMultiValueConverter
 
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => [];
 }
+
+/// <summary>Numero della classifica → il suo contorno, grande e pieno del colore di fondo (Top 10 di "Film e serie").</summary>
+public sealed class RankGeometryConverter : IValueConverter
+{
+    public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not int n || n <= 0) return null;
+        var text = new System.Windows.Media.FormattedText(n.ToString(culture), CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+            new System.Windows.Media.Typeface(new System.Windows.Media.FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Black, FontStretches.Normal),
+            190, System.Windows.Media.Brushes.Black, 1.0);
+        // La riga di testo ha spazio sopra e sotto le cifre: si tiene solo il disegno.
+        var g = text.BuildGeometry(new Point(0, 0));
+        g.Transform = new System.Windows.Media.TranslateTransform(-g.Bounds.X, -g.Bounds.Y);
+        return g;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
+}

@@ -19,6 +19,12 @@ enum AppSettings {
         set { d.set(Array(newValue), forKey: "favorites") }
     }
 
+    /// Chiave API o token di TMDB, solo su questo dispositivo: con questa film e serie diventano "Film e serie".
+    static var tmdbKey: String {
+        get { d.string(forKey: "tmdbKey") ?? "" }
+        set { d.set(newValue, forKey: "tmdbKey") }
+    }
+
     /// "ts" (MPEG-TS) oppure "m3u8" (HLS).
     static var outputFormat: String {
         get { d.string(forKey: "outputFormat") ?? "ts" }

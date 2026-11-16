@@ -29,6 +29,8 @@ public sealed class AppSettings
     public bool HideAdult { get; set; }
     /// <summary>Stile grafico: "classic" (moderno), "skeuo" (skeuomorfico), "metro" (Modern UI), "dueffe" (Dueffe) o "nothing" (Nothing). Si applica all'avvio.</summary>
     public string Skin { get; set; } = "classic";
+    /// <summary>Chiave API o token di TMDB: con questa film e serie diventano una sola schermata, "Film e serie".</summary>
+    public string? TmdbKey { get; set; }
 
     /// <summary>Ordinamento scelto per ogni sezione ("Live", "Movies", "Series").</summary>
     public Dictionary<string, string> ListSort { get; set; } = [];

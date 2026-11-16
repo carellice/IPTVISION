@@ -186,6 +186,7 @@ struct MovieDetail: View {
     let entry: TitleEntry<Movie>
     @State var selected: Movie?
     @State var info: VodInfo?
+    @State var tm: Tmdb.Card?
 
     private var movie: Movie { selected ?? entry.item }
 
@@ -195,7 +196,7 @@ struct MovieDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 16) {
-                    RemoteImage(url: movie.poster, placeholder: TextHelpers.initials(movie.name))
+                    RemoteImage(url: Tmdb.img(tm?.poster, "w500") ?? movie.poster, placeholder: TextHelpers.initials(movie.name))
                         .aspectRatio(2 / 3, contentMode: .fit)
                         .frame(width: 130)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.corner(12)))
@@ -227,7 +228,7 @@ struct MovieDetail: View {
                         .buttonStyle(.bordered).accessibilityLabel("La mia lista")
                 }
                 .controlSize(.large)
-                if let p = info?.plot { Text(p) }
+                if let p = info?.plot ?? tm.flatMap({ $0.overview.isEmpty ? nil : $0.overview }) { Text(p) }
                 if let d = info?.director { Text("Regia: \(d)").font(.subheadline).foregroundStyle(.secondary) }
                 if let c = info?.cast { Text("Cast: \(c)").font(.subheadline).foregroundStyle(.secondary) }
             }
@@ -235,8 +236,10 @@ struct MovieDetail: View {
             .frame(maxWidth: 800, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .background(alignment: .top) { TmdbBackdrop(card: tm) }
         .navigationBarTitleDisplayMode(.inline)
         .task(id: movie.streamId) { info = try? await model.client?.vodInfo(movie.streamId) }
+        .task(id: movie.streamId) { tm = await Tmdb.lookup(model.tmdbKey, .movie, movie.name, movie.year) }
     }
 }
 
@@ -247,6 +250,7 @@ struct SeriesDetail: View {
     let entry: TitleEntry<Series>
     @State var selected: Series?
     @State var info: SeriesInfo?
+    @State var tm: Tmdb.Card?
     @State var loading = true
     @State var season = 1
 
@@ -259,7 +263,7 @@ struct SeriesDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 16) {
-                    RemoteImage(url: show.cover, placeholder: TextHelpers.initials(show.name))
+                    RemoteImage(url: Tmdb.img(tm?.poster, "w500") ?? show.cover, placeholder: TextHelpers.initials(show.name))
                         .aspectRatio(2 / 3, contentMode: .fit)
                         .frame(width: 130)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.corner(12)))
@@ -285,7 +289,7 @@ struct SeriesDetail: View {
                         .buttonStyle(.bordered).accessibilityLabel("La mia lista")
                 }
                 .controlSize(.large)
-                if let p = info?.plot ?? show.plot { Text(p) }
+                if let p = info?.plot ?? show.plot ?? tm.flatMap({ $0.overview.isEmpty ? nil : $0.overview }) { Text(p) }
                 if loading { ProgressView().frame(maxWidth: .infinity) }
                 if seasons.count > 1 {
                     Picker("Stagione", selection: $season) {
@@ -301,7 +305,9 @@ struct SeriesDetail: View {
             .frame(maxWidth: 800, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .background(alignment: .top) { TmdbBackdrop(card: tm) }
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: show.seriesId) { tm = await Tmdb.lookup(model.tmdbKey, .tv, show.name, show.year) }
         .task(id: show.seriesId) {
             loading = true
             info = try? await model.client?.seriesInfo(show.seriesId)
@@ -332,5 +338,21 @@ struct EpisodeRow: View {
             if model.positions.isWatched(episode.key) { Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent) }
         }
         .contentShape(Rectangle())
+    }
+}
+
+/// Con la chiave TMDB la scena del titolo sfuma dietro la scheda.
+struct TmdbBackdrop: View {
+    let card: Tmdb.Card?
+
+    var body: some View {
+        if let url = Tmdb.img(card?.backdrop, "w1280") {
+            RemoteImage(url: url, placeholder: "")
+                .frame(height: 360).frame(maxWidth: .infinity).clipped()
+                .opacity(0.4)
+                .mask(LinearGradient(stops: [.init(color: .black, location: 0.25), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom))
+                .ignoresSafeArea(edges: .top)
+                .allowsHitTesting(false)
+        }
     }
 }

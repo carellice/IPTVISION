@@ -9,16 +9,26 @@ struct HomeView: View {
 
     private var tabs: some View {
         TabView {
-            NavigationStack { LiveCategories() }
-                .tabItem { Label(AppSection.live.title, systemImage: AppSection.live.icon) }
-            NavigationStack { MovieCategories() }
-                .tabItem { Label(AppSection.movies.title, systemImage: AppSection.movies.icon) }
-            NavigationStack { SeriesCategories() }
-                .tabItem { Label(AppSection.series.title, systemImage: AppSection.series.icon) }
-            NavigationStack { SearchView() }
-                .tabItem { Label(AppSection.search.title, systemImage: AppSection.search.icon) }
-            NavigationStack { SettingsView() }
-                .tabItem { Label(AppSection.settings.title, systemImage: AppSection.settings.icon) }
+            ForEach(model.sections) { s in
+                NavigationStack { SectionPage(section: s) }
+                    .tabItem { Label(s.title, systemImage: s.icon) }
+            }
+        }
+    }
+}
+
+/// La pagina di una sezione (con la chiave TMDB film e serie sono una sola, "Film e serie").
+struct SectionPage: View {
+    let section: AppSection
+
+    var body: some View {
+        switch section {
+        case .live: LiveCategories()
+        case .movies: MovieCategories()
+        case .series: SeriesCategories()
+        case .discover: DiscoverView()
+        case .search: SearchView()
+        case .settings: SettingsView()
         }
     }
 }
@@ -26,6 +36,7 @@ struct HomeView: View {
 /// Modern UI (pivot di Windows Phone): nome dell'app in maiuscoletto, le sezioni come grandi voci minuscole
 /// (quella aperta in bianco), le pagine che si scorrono di lato col dito o si aprono toccando la voce.
 struct PivotHome: View {
+    @EnvironmentObject var model: AppModel
     @State private var section: AppSection = .live
 
     var body: some View {
@@ -34,7 +45,7 @@ struct PivotHome: View {
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .firstTextBaseline, spacing: 20) {
-                        ForEach(AppSection.allCases) { s in
+                        ForEach(model.sections) { s in
                             Text(s.pivotTitle)
                                 .font(.system(size: 44, weight: .light))
                                 .foregroundStyle(s == section ? Color.white : Color.white.opacity(0.4))
@@ -47,11 +58,9 @@ struct PivotHome: View {
                 .onChange(of: section) { s in withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo(s, anchor: .leading) } }
             }
             TabView(selection: $section) {
-                NavigationStack { LiveCategories().navigationBarTitleDisplayMode(.inline) }.tag(AppSection.live)
-                NavigationStack { MovieCategories().navigationBarTitleDisplayMode(.inline) }.tag(AppSection.movies)
-                NavigationStack { SeriesCategories().navigationBarTitleDisplayMode(.inline) }.tag(AppSection.series)
-                NavigationStack { SearchView().navigationBarTitleDisplayMode(.inline) }.tag(AppSection.search)
-                NavigationStack { SettingsView().navigationBarTitleDisplayMode(.inline) }.tag(AppSection.settings)
+                ForEach(model.sections) { s in
+                    NavigationStack { SectionPage(section: s).navigationBarTitleDisplayMode(.inline) }.tag(s)
+                }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
         }
@@ -65,6 +74,7 @@ extension AppSection {
         switch self {
         case .live: "tv"
         case .series: "serie"
+        case .discover: "film e serie"
         default: title.lowercased()
         }
     }

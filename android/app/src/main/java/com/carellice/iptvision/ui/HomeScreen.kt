@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Theaters
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.filled.History
@@ -100,6 +101,7 @@ private fun Section.icon(): ImageVector = when (this) {
     Section.Live -> Icons.Default.Tv
     Section.Movies -> Icons.Default.Movie
     Section.Series -> Icons.Default.ViewModule
+    Section.Discover -> Icons.Default.Theaters
     Section.Search -> Icons.Default.Search
     Section.Downloads -> Icons.Default.Download
     Section.Settings -> Icons.Default.Settings
@@ -244,6 +246,7 @@ private fun Content(vm: AppViewModel, onVoiceSearch: () -> Unit, section: Sectio
         Section.Live -> LiveSection(vm)
         Section.Movies -> MoviesSection(vm)
         Section.Series -> SeriesSection(vm)
+        Section.Discover -> DiscoverSection(vm)
         Section.Search -> SearchSection(vm, onVoiceSearch)
         Section.Downloads -> DownloadsSection(vm)
         Section.Settings -> SettingsSection(vm)

@@ -47,7 +47,7 @@ public sealed partial class MainViewModel
     [ObservableProperty] private string _tvDate = "";
 
     public bool ShowTvLayer => IsTvMode && IsTvBrowsing;
-    public bool ShowVideo => !ShowTvLayer;
+    public bool ShowVideo => !ShowTvLayer && !ShowDiscover;
     public bool IsTvSearchScreen => TvScreen == TvScreen.Search;
     public bool IsTvSeriesScreen => TvScreen == TvScreen.Series;
     public bool IsTvSearchZone => TvZone == TvZone.Search;

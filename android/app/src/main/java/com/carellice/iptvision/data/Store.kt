@@ -58,6 +58,11 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
         get() = p.getString("skin", "classic") ?: "classic"
         set(v) = p.edit().putString("skin", v).apply()
 
+    /** Chiave API o token di TMDB, solo su questo dispositivo: con questa film e serie diventano "Film e serie". */
+    var tmdbKey: String
+        get() = p.getString("tmdbKey", "") ?: ""
+        set(v) = p.edit().putString("tmdbKey", v).apply()
+
     /** Nasconde le categorie con "XXX" nel nome (canali, film e serie). */
     var hideAdult: Boolean
         get() = p.getBoolean("hideAdult", false)

@@ -247,8 +247,8 @@ public sealed partial class MainViewModel
 
     // Il video è una finestra nativa che copre la grafica WPF: sul desktop la scelta compare nel pannello,
     // in modalità TV (dove i riquadri nascondono il video) a schermo intero.
-    public bool ShowVariantOverlay => IsVariantChooserOpen && ShowTvLayer;
-    public bool ShowVariantPanel => IsVariantChooserOpen && !ShowTvLayer;
+    public bool ShowVariantOverlay => IsVariantChooserOpen && (ShowTvLayer || ShowDiscover);
+    public bool ShowVariantPanel => IsVariantChooserOpen && !ShowTvLayer && !ShowDiscover;
 
     partial void OnVariantOwnerChanged(ArtworkItem? value) => NotifyVariantChooser();
 
@@ -316,10 +316,13 @@ public sealed partial class MainViewModel
         switch (item)
         {
             case Movie m:
+                ShowDiscover = false;
                 PlayMovie(m);
                 if (IsTvMode) IsTvBrowsing = false;
                 break;
             case Series s:
+                ShowDiscover = false;
+                if (HasTmdb && Mode != LibraryMode.Series && !IsTvMode) Mode = LibraryMode.Series;
                 OpenSeriesFromList(s);
                 break;
         }

@@ -108,6 +108,7 @@ struct SettingsView: View {
                      : skin == "dueffe" ? "Fondo quasi nero, superfici calde, avorio e oro, titoli in Bricolage Grotesque."
                      : "Lo stile di sempre, con le schede in basso.")
             }
+            TmdbSection()
             Section {
                 Toggle("Nascondi XXX", isOn: $model.hideAdult)
                 Picker("Formato della diretta", selection: $model.outputFormat) {
@@ -133,5 +134,40 @@ struct SettingsView: View {
         .navigationTitle("Impostazioni")
         .task { await model.loadServerLists() }
         .sheet(isPresented: $adding) { LoginView(isSheet: true).environmentObject(model) }
+    }
+}
+
+/// La chiave TMDB di questo dispositivo: con questa film e serie diventano una sola schermata con copertine, tendenze e generi.
+struct TmdbSection: View {
+    @EnvironmentObject var model: AppModel
+    @State private var value = ""
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        Section {
+            if model.tmdbKey.isEmpty {
+                SecureField("Chiave API o token TMDB", text: $value)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                if let error { Text(error).foregroundStyle(.red).font(.footnote) }
+                Button(busy ? "Controllo…" : "Salva chiave") {
+                    let k = value.trimmingCharacters(in: .whitespaces)
+                    guard !k.isEmpty else { return }
+                    busy = true; error = nil
+                    Task {
+                        do { try await Tmdb.check(k); model.setTmdbKey(k); value = "" } catch { self.error = error.localizedDescription }
+                        busy = false
+                    }
+                }
+                .disabled(busy)
+            } else {
+                LabeledContent("Chiave", value: "Inserita")
+                Button("Rimuovi chiave", role: .destructive) { model.setTmdbKey("") }
+            }
+        } header: {
+            Text("TMDB")
+        } footer: {
+            Text("Con una chiave di themoviedb.org (la \"Chiave API\" o il \"Token di accesso in lettura\" che trovi nel tuo profilo TMDB, alla voce API) film e serie diventano una sola schermata, \"Film e serie\", con copertine, tendenze e generi.")
+        }
     }
 }

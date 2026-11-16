@@ -417,7 +417,7 @@ fun SeriesSection(vm: AppViewModel) {
 }
 
 @Composable
-private fun RemoveContinueDialog(title: String, myList: Boolean, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+internal fun RemoveContinueDialog(title: String, myList: Boolean, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = C.Panel,
@@ -429,7 +429,7 @@ private fun RemoveContinueDialog(title: String, myList: Boolean, onDismiss: () -
 }
 
 @Composable
-private fun <T> EntryList(
+internal fun <T> EntryList(
     vm: AppViewModel,
     section: Section,
     list: List<Entry<T>>,

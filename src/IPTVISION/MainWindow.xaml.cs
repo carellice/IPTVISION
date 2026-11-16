@@ -497,8 +497,17 @@ public partial class MainWindow : Window
             _ => key,
         };
 
+        // "Film e serie": la pagina scorre da sola (rotellina, frecce, Tab); Esc torna all'elenco.
+        if (_vm.ShowDiscover && !ctrl)
+        {
+            if (key != Key.Escape) return false;
+            _vm.CloseDiscoverCommand.Execute(null);
+            return true;
+        }
+
         if (ctrl && key == Key.F)
         {
+            _vm.ShowDiscover = false;
             if (_fullscreen) ToggleFullscreen();
             if (_vm.OpenSeries != null) _vm.CloseSeriesCommand.Execute(null);
             SetPanel(true, save: true);
@@ -514,6 +523,8 @@ public partial class MainWindow : Window
         }
         if (ctrl && key is Key.D1 or Key.D2 or Key.D3 or Key.NumPad1 or Key.NumPad2 or Key.NumPad3)
         {
+            if (_vm.HasTmdb && key is not (Key.D1 or Key.NumPad1)) { _vm.OpenDiscoverCommand.Execute(null); return true; }
+            _vm.ShowDiscover = false;
             _vm.Mode = key is Key.D1 or Key.NumPad1 ? LibraryMode.Live : key is Key.D2 or Key.NumPad2 ? LibraryMode.Movies : LibraryMode.Series;
             if (!_panelVisible) SetPanel(true, save: !_fullscreen);
             return true;
@@ -1157,6 +1168,51 @@ public partial class MainWindow : Window
     {
         await _vm.ConnectServerAsync(ServerPasswordBox.Password);
         if (_vm.IsHomeServer) ServerPasswordBox.Clear();
+    }
+
+    // ======================= Film e serie (TMDB) =======================
+
+    private void SaveTmdbKey_Click(object sender, RoutedEventArgs e)
+    {
+        _vm.SaveTmdbKeyCommand.Execute(TmdbKeyBox.Password);
+        TmdbKeyBox.Clear();
+    }
+
+    private void DiscoverCategories_Click(object sender, RoutedEventArgs e) => _vm.IsDiscoverCategoriesOpen = !_vm.IsDiscoverCategoriesOpen;
+
+    private void DiscoverCategory_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ListBox { SelectedItem: Category c } list) return;
+        list.SelectedItem = null;
+        if (list.Tag as string == "m") _vm.OpenDiscoverMovieCategoryCommand.Execute(c.Id);
+        else _vm.OpenDiscoverSeriesCategoryCommand.Execute(c.Id);
+    }
+
+    /// <summary>Le righe scorrono di lato: la rotellina deve far scorrere la pagina, non fermarsi sulla riga.</summary>
+    private void DiscoverList_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (FindChild<ScrollViewer>(DiscoverList) is not { } sv) return;
+        sv.ScrollToVerticalOffset(sv.VerticalOffset - e.Delta);
+        e.Handled = true;
+    }
+
+    /// <summary>Frecce ai lati di una riga: una schermata di riquadri avanti o indietro.</summary>
+    private void DiscoverRowArrow_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Parent: Grid g, Tag: string dir }) return;
+        if (g.Children.OfType<ScrollViewer>().FirstOrDefault() is not { } sv) return;
+        sv.ScrollToHorizontalOffset(sv.HorizontalOffset + int.Parse(dir) * sv.ViewportWidth * 0.85);
+    }
+
+    private static T? FindChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var c = VisualTreeHelper.GetChild(parent, i);
+            if (c is T t) return t;
+            if (FindChild<T>(c) is { } found) return found;
+        }
+        return null;
     }
 
     // ======================= Finestra =======================

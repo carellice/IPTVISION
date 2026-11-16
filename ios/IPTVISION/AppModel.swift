@@ -2,13 +2,14 @@ import Foundation
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case live, movies, series, search, settings
+    case live, movies, series, discover, search, settings
     var id: String { rawValue }
     var title: String {
         switch self {
         case .live: "TV in diretta"
         case .movies: "Film"
         case .series: "Serie TV"
+        case .discover: "Film e serie"
         case .search: "Cerca"
         case .settings: "Impostazioni"
         }
@@ -18,6 +19,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .live: "tv"
         case .movies: "film"
         case .series: "square.stack"
+        case .discover: "film.stack"
         case .search: "magnifyingglass"
         case .settings: "gearshape"
         }
@@ -143,6 +145,38 @@ final class AppModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
             }
         }
+    }
+
+    // MARK: - TMDB
+
+    @Published var tmdbKey = AppSettings.tmdbKey
+    @Published var tmdbRows: [Tmdb.Row]?
+    @Published var tmdbError: String?
+    private var tmdbLoading = false
+
+    /// Le sezioni: con la chiave TMDB film e serie sono una sola, "Film e serie".
+    var sections: [AppSection] {
+        tmdbKey.isEmpty ? [.live, .movies, .series, .search, .settings] : [.live, .discover, .search, .settings]
+    }
+
+    func setTmdbKey(_ key: String) {
+        tmdbKey = key.trimmingCharacters(in: .whitespaces)
+        AppSettings.tmdbKey = tmdbKey
+        tmdbRows = nil
+        tmdbError = nil
+        Task { await Tmdb.clearCache() }
+    }
+
+    /// Le righe di TMDB, chieste una volta per chiave.
+    func loadTmdb() async {
+        let key = tmdbKey
+        guard !key.isEmpty, tmdbRows == nil, !tmdbLoading else { return }
+        tmdbLoading = true
+        defer { tmdbLoading = false }
+        tmdbError = nil
+        do { try await Tmdb.check(key) } catch { tmdbError = error.localizedDescription }
+        let rows = await Tmdb.loadRows(key)
+        if key == tmdbKey { tmdbRows = rows }
     }
 
     // MARK: - Account

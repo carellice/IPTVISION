@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
@@ -42,6 +43,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -209,6 +213,8 @@ fun SettingsSection(vm: AppViewModel) {
             color = C.Text3, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp),
         )
 
+        TmdbGroup(vm)
+
         Group("Riproduzione")
         Toggle("Formato HLS (m3u8) per la TV in diretta", "Di solito MPEG-TS è più stabile; prova HLS se un canale non parte.", vm.settings.outputFormat == "m3u8") {
             vm.settings.outputFormat = if (it) "m3u8" else "ts"
@@ -268,6 +274,45 @@ fun SettingsSection(vm: AppViewModel) {
         )
         VSpace(24.dp)
     }
+}
+
+/** La chiave TMDB di questo dispositivo: con questa film e serie diventano una sola schermata con copertine, tendenze e generi. */
+@Composable
+private fun TmdbGroup(vm: AppViewModel) {
+    Group("TMDB")
+    Text(
+        "Con una chiave di themoviedb.org (la \"Chiave API\" o il \"Token di accesso in lettura\" che trovi nel tuo profilo TMDB, " +
+            "alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi.",
+        color = C.Text3, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp),
+    )
+    if (vm.hasTmdb) {
+        Info("Chiave", "Inserita")
+        ActionButton("Rimuovi chiave", Icons.Default.Delete, modifier = Modifier.padding(vertical = 6.dp)) { vm.setTmdb("") }
+        return
+    }
+    var value by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    var busy by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var error by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val save = {
+        if (value.isNotBlank() && !busy) {
+            busy = true; error = null
+            scope.launch {
+                try {
+                    com.carellice.iptvision.data.Tmdb.check(value)
+                    vm.setTmdb(value)
+                    value = ""
+                    android.widget.Toast.makeText(context, "Chiave TMDB salvata: trovi tutto in \"Film e serie\"", android.widget.Toast.LENGTH_SHORT).show()
+                } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message } finally { busy = false }
+            }
+        }
+    }
+    Column(Modifier.widthIn(max = 520.dp).padding(top = 6.dp)) {
+        Field(value, { value = it }, "Chiave API o token TMDB", null, androidx.compose.ui.text.input.KeyboardType.Password, password = true, done = { save() })
+    }
+    error?.let { Text(it, color = C.Danger, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp)) }
+    ActionButton(if (busy) "Controllo…" else "Salva chiave", Icons.Default.Check, primary = true, modifier = Modifier.padding(vertical = 6.dp)) { save() }
 }
 
 /** Server di casa: acceso, l'app passa da IPTVISION su CasaOS; spento, parla direttamente col provider. */

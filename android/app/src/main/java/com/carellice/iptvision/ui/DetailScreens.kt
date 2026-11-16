@@ -57,11 +57,20 @@ import com.carellice.iptvision.data.Episode
 import com.carellice.iptvision.data.Movie
 import com.carellice.iptvision.data.Series
 import com.carellice.iptvision.data.TextHelpers
+import com.carellice.iptvision.data.Tmdb
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.fillMaxHeight
 
 @Composable
-private fun DetailFrame(vm: AppViewModel, content: @Composable (wide: Boolean) -> Unit) {
+private fun DetailFrame(vm: AppViewModel, backdrop: String? = null, content: @Composable (wide: Boolean) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize().material(C.Bg).statusBarsPadding().navigationBarsPadding()) {
         val wide = maxWidth >= 720.dp
+        // Con la chiave TMDB la scena del titolo sfuma dietro la scheda.
+        if (backdrop != null) Box(Modifier.fillMaxWidth().fillMaxHeight(if (wide) 0.78f else 0.55f)) {
+            coil.compose.AsyncImage(backdrop, null, Modifier.fillMaxSize().alpha(0.4f), contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = androidx.compose.ui.BiasAlignment(0f, -0.6f))
+            Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(0.25f to Color.Transparent, 1f to C.Bg)))
+        }
         Column(Modifier.fillMaxSize().padding(horizontal = if (wide) 40.dp else 16.dp, vertical = 12.dp)) {
             if (!vm.isTv) IconButton(onClick = { vm.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro", tint = C.Text) }
             content(wide)
@@ -75,9 +84,11 @@ fun MovieDetailScreen(vm: AppViewModel, m: Movie) {
     @Suppress("UNUSED_VARIABLE") val pv = vm.positionsVersion
     val resume = vm.positions.resumeMs(m.key)
     val info = vm.vodInfo
+    val tm = rememberTmdb(vm, Tmdb.Kind.Movie, m.name, m.year)
+    val poster = Tmdb.img(tm?.poster, "w500") ?: m.poster
     val play = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { play.requestFocus() } }
-    DetailFrame(vm) { wide ->
+    DetailFrame(vm, Tmdb.img(tm?.backdrop, "w1280")) { wide ->
         val body: @Composable () -> Unit = {
             Column {
                 Text(m.name, color = C.Text, fontSize = if (wide) 32.sp else 24.sp, fontWeight = FontWeight.Bold)
@@ -97,20 +108,20 @@ fun MovieDetailScreen(vm: AppViewModel, m: Movie) {
                     if (!vm.isTv) DownloadButton(vm, m.key) { vm.downloadMovie(m) }
                 }
                 VSpace(18.dp)
-                info?.plot?.let { Text(it, color = C.Text, fontSize = 15.sp, lineHeight = 22.sp) }
+                (info?.plot?.ifBlank { null } ?: tm?.overview?.ifBlank { null })?.let { Text(it, color = C.Text, fontSize = 15.sp, lineHeight = 22.sp) }
                 info?.director?.let { VSpace(10.dp); Text("Regia: $it", color = C.Text2, fontSize = 13.sp) }
                 info?.cast?.let { VSpace(4.dp); Text("Cast: $it", color = C.Text2, fontSize = 13.sp, maxLines = 3, overflow = TextOverflow.Ellipsis) }
             }
         }
         if (wide) {
             Row(Modifier.fillMaxSize().padding(top = 20.dp)) {
-                Artwork(m.poster, m.initials, Modifier.width(260.dp).aspectRatio(2f / 3f).clip(skinCorners(14.dp)), fontSize = 30)
+                Artwork(poster, m.initials, Modifier.width(260.dp).aspectRatio(2f / 3f).clip(skinCorners(14.dp)), fontSize = 30)
                 HSpace(32.dp)
                 Box(Modifier.weight(1f).verticalScroll(rememberScrollState())) { body() }
             }
         } else {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                Artwork(m.poster, m.initials, Modifier.width(180.dp).aspectRatio(2f / 3f).clip(skinCorners(12.dp)).align(Alignment.CenterHorizontally), fontSize = 26)
+                Artwork(poster, m.initials, Modifier.width(180.dp).aspectRatio(2f / 3f).clip(skinCorners(12.dp)).align(Alignment.CenterHorizontally), fontSize = 26)
                 VSpace(16.dp)
                 body()
             }
@@ -123,6 +134,7 @@ fun MovieDetailScreen(vm: AppViewModel, m: Movie) {
 fun SeriesDetailScreen(vm: AppViewModel, s: Series) {
     @Suppress("UNUSED_VARIABLE") val pv = vm.positionsVersion
     val info = vm.seriesInfo
+    val tm = rememberTmdb(vm, Tmdb.Kind.Tv, s.name, s.year)
     val episodes = info?.episodes ?: emptyList()
     val seasons = remember(episodes) { episodes.map { it.season }.distinct().sorted() }
     val resumeEp = remember(episodes, vm.positionsVersion) { vm.resumeEpisode(episodes, s.seriesId) }
@@ -132,18 +144,18 @@ fun SeriesDetailScreen(vm: AppViewModel, s: Series) {
     val play = remember { FocusRequester() }
     LaunchedEffect(resumeEp != null) { if (resumeEp != null) runCatching { play.requestFocus() } }
 
-    DetailFrame(vm) { wide ->
+    DetailFrame(vm, Tmdb.img(tm?.backdrop, "w1280")) { wide ->
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)) {
             item {
                 Row {
-                    Artwork(s.cover, s.initials, Modifier.width(if (wide) 180.dp else 110.dp).aspectRatio(2f / 3f).clip(skinCorners(12.dp)), fontSize = 24)
+                    Artwork(Tmdb.img(tm?.poster, "w500") ?: s.cover, s.initials, Modifier.width(if (wide) 180.dp else 110.dp).aspectRatio(2f / 3f).clip(skinCorners(12.dp)), fontSize = 24)
                     HSpace(20.dp)
                     Column(Modifier.weight(1f)) {
                         Text(s.name, color = C.Text, fontSize = if (wide) 30.sp else 22.sp, fontWeight = FontWeight.Bold)
                         VSpace(4.dp)
                         Text(TextHelpers.joinMeta(info?.year ?: s.year, info?.genre ?: s.genre, if (seasons.isNotEmpty()) "${seasons.size} stagioni" else null), color = C.Text2, fontSize = 13.sp)
                         VSpace(10.dp)
-                        (info?.plot ?: s.plot)?.let { Text(it, color = C.Text, fontSize = 14.sp, maxLines = if (wide) 6 else 4, overflow = TextOverflow.Ellipsis) }
+                        (info?.plot?.ifBlank { null } ?: s.plot?.ifBlank { null } ?: tm?.overview?.ifBlank { null })?.let { Text(it, color = C.Text, fontSize = 14.sp, maxLines = if (wide) 6 else 4, overflow = TextOverflow.Ellipsis) }
                         VSpace(14.dp)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             if (resumeEp != null) {

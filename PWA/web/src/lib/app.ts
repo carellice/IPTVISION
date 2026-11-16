@@ -10,6 +10,7 @@ import {
   library, search as searchLib, sortChannels, sortMovies, sortSeries, toChannels, toMovies, toSeries,
 } from './library.ts'
 import { PlayerController } from './player.ts'
+import { hasTmdb, setTmdbKey } from './tmdb.ts'
 import { toast } from '../components/ui.tsx'
 
 // AppViewModel.kt for the browser: navigation, catalog, favorites and positions, playback.
@@ -29,7 +30,8 @@ export type Playing =
 
 export type VariantChoice = { kind: 'Films'; title: string; items: Movie[] } | { kind: 'Shows'; title: string; items: Series[] }
 
-export const sections: Section[] = ['Live', 'Movies', 'Series', 'Search', 'Settings']
+/** With a TMDB key films and series become one screen, "Film e serie". */
+export const sectionList = (): Section[] => (hasTmdb() ? ['Live', 'Discover', 'Search', 'Settings'] : ['Live', 'Movies', 'Series', 'Search', 'Settings'])
 
 // --- per device settings (SharedPreferences "settings" of the phone) ---------------------------------
 
@@ -224,7 +226,16 @@ export function setSection(s: Section) {
   app.section = s
   if (s === 'Movies') ensureMovies()
   if (s === 'Series') ensureSeries()
+  if (s === 'Discover') { ensureMovies(); ensureSeries() }
   emit()
+}
+
+export function setTmdb(key: string) {
+  setTmdbKey(key)
+  app.open = { ...app.open, Discover: null }
+  if (hasTmdb() && (app.section === 'Movies' || app.section === 'Series')) setSection('Discover')
+  else if (!hasTmdb() && app.section === 'Discover') setSection('Movies')
+  else emit()
 }
 
 export function openCategory(s: Section, id: string) {
@@ -399,6 +410,7 @@ export function refreshAll() {
     loadEpg(true)
     if (app.section === 'Movies') ensureMovies(true)
     if (app.section === 'Series') ensureSeries(true)
+    if (app.section === 'Discover') { ensureMovies(true); ensureSeries(true) }
   })()
   emit()
 }
@@ -706,6 +718,11 @@ export function changeScope(s: SearchScope) {
 export const search = (q: string, scope: SearchScope) => searchLib(q, scope, app.live, app.movies, app.series)
 
 export function openCategoryHit(c: CategoryHit) {
+  if (hasTmdb() && c.section !== 'Live') {
+    setSection('Discover')
+    openCategory('Discover', `${c.section === 'Movies' ? 'm' : 's'}:${c.id}`)
+    return
+  }
   app.section = c.section
   openCategory(c.section, c.id)
 }

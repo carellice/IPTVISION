@@ -59,6 +59,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         InitUpdates();
         InitDownloads();
         InitServer();
+        InitDiscover();
     }
 
     public PlayerService Player { get; }
@@ -418,6 +419,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsLiveMode));
         OnPropertyChanged(nameof(IsMoviesMode));
         OnPropertyChanged(nameof(IsSeriesMode));
+        OnPropertyChanged(nameof(IsDiscoverMode));
         OnPropertyChanged(nameof(FooterInfo));
         LoadBrowsePrefs();
         RebuildCategories();

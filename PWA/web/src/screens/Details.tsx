@@ -3,14 +3,23 @@ import type { Episode, Movie, Series } from '../../../shared/model.ts'
 import { episodeDuration, episodeLabel, episodeTitle, formatTime, joinMeta } from '../../../shared/text.ts'
 import { ActionButton, Artwork, Empty, Icon, IconButton, Loading, Pill, ProgressLine, Clickable, useWide } from '../components/ui.tsx'
 import { app, back, inMyList, playEpisode, playMovie, progress, resumeEpisode, resumeMs, toggleMyList, useApp } from '../lib/app.ts'
+import { hasTmdb, img, useLookup } from '../lib/tmdb.ts'
 
 // ui/DetailScreens.kt: the card of a film and of a series with its seasons and episodes.
 
-function DetailFrame({ children }: { children: (wide: boolean) => ReactNode }) {
+/** With a TMDB key the scene of the title fades in behind the card. */
+function DetailFrame({ children, backdrop }: { children: (wide: boolean) => ReactNode; backdrop?: string | null }) {
   const wide = useWide()
   return (
-    <div className="safe" style={{ height: '100%', background: 'var(--bg)' }}>
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: `12px ${wide ? 40 : 16}px` }}>
+    <div className="safe" style={{ height: '100%', background: 'var(--bg)', position: 'relative', overflow: 'hidden' }}>
+      {backdrop && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: wide ? '78%' : '55%', backgroundImage: `url(${backdrop})`,
+          backgroundSize: 'cover', backgroundPosition: 'center 20%', opacity: 0.4,
+          maskImage: 'linear-gradient(180deg, #000 25%, transparent)', WebkitMaskImage: 'linear-gradient(180deg, #000 25%, transparent)',
+        }} />
+      )}
+      <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', padding: `12px ${wide ? 40 : 16}px` }}>
         <IconButton icon="arrow_back" title="Indietro" onClick={() => back()} />
         {children(wide)}
       </div>
@@ -22,6 +31,9 @@ export function MovieDetail({ movie: m }: { movie: Movie }) {
   useApp()
   const resume = resumeMs(m.key)
   const info = app.vodInfo
+  const tm = useLookup('movie', m.name, m.year, undefined, hasTmdb())
+  const poster = img(tm?.poster, 'w500') ?? m.poster
+  const plot = info?.plot || tm?.overview
   const body = (wide: boolean) => (
     <div>
       <div style={{ color: 'var(--text)', fontSize: wide ? 32 : 24, lineHeight: wide ? '40px' : '32px', fontWeight: 700 }}>{m.name}</div>
@@ -36,21 +48,21 @@ export function MovieDetail({ movie: m }: { movie: Movie }) {
         <MyListButton item={m} />
       </div>
       <div style={{ height: 18 }} />
-      {info?.plot && <div style={{ color: 'var(--text)', fontSize: 15, lineHeight: '22px', userSelect: 'text' }}>{info.plot}</div>}
+      {plot && <div style={{ color: 'var(--text)', fontSize: 15, lineHeight: '22px', userSelect: 'text' }}>{plot}</div>}
       {info?.director && <div style={{ color: 'var(--text2)', fontSize: 13, marginTop: 10 }}>Regia: {info.director}</div>}
       {info?.cast && <div className="clamp3" style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>Cast: {info.cast}</div>}
     </div>
   )
   return (
-    <DetailFrame>
+    <DetailFrame backdrop={img(tm?.backdrop, 'w1280')}>
       {(wide) => wide ? (
         <div style={{ display: 'flex', flex: 1, minHeight: 0, paddingTop: 20 }}>
-          <Artwork url={m.poster} initials={m.initials} fontSize={30} style={{ width: 260, aspectRatio: '2 / 3', borderRadius: 14, alignSelf: 'flex-start' }} />
+          <Artwork url={poster} initials={m.initials} fontSize={30} style={{ width: 260, aspectRatio: '2 / 3', borderRadius: 14, alignSelf: 'flex-start' }} />
           <div className="scroll" style={{ flex: 1, marginLeft: 32 }}>{body(wide)}</div>
         </div>
       ) : (
         <div className="scroll" style={{ flex: 1 }}>
-          <Artwork url={m.poster} initials={m.initials} fontSize={26} style={{ width: 180, aspectRatio: '2 / 3', borderRadius: 12, margin: '0 auto' }} />
+          <Artwork url={poster} initials={m.initials} fontSize={26} style={{ width: 180, aspectRatio: '2 / 3', borderRadius: 12, margin: '0 auto' }} />
           <div style={{ height: 16 }} />
           {body(wide)}
         </div>
@@ -62,6 +74,7 @@ export function MovieDetail({ movie: m }: { movie: Movie }) {
 export function SeriesDetail({ series: s }: { series: Series }) {
   useApp()
   const info = app.seriesInfo
+  const tm = useLookup('tv', s.name, s.year, undefined, hasTmdb())
   const episodes = info?.episodes ?? []
   const seasons = useMemo(() => [...new Set(episodes.map((e) => e.season))].sort((a, b) => a - b), [episodes])
   const resumeEp = useMemo(() => resumeEpisode(episodes, s.seriesId), [episodes, app.positionsVersion])
@@ -73,12 +86,13 @@ export function SeriesDetail({ series: s }: { series: Series }) {
     pills.current?.querySelector('[data-selected="true"]')?.scrollIntoView({ inline: 'center', block: 'nearest' })
   }, [seasons.length])
 
+  const plot = info?.plot || s.plot || tm?.overview
   return (
-    <DetailFrame>
+    <DetailFrame backdrop={img(tm?.backdrop, 'w1280')}>
       {(wide) => (
         <div className="scroll" style={{ flex: 1, padding: '8px 4px' }}>
           <div style={{ display: 'flex' }}>
-            <Artwork url={s.cover} initials={s.initials} fontSize={24} style={{ width: wide ? 180 : 110, aspectRatio: '2 / 3', borderRadius: 12 }} />
+            <Artwork url={img(tm?.poster, 'w500') ?? s.cover} initials={s.initials} fontSize={24} style={{ width: wide ? 180 : 110, aspectRatio: '2 / 3', borderRadius: 12 }} />
             <div style={{ flex: 1, minWidth: 0, marginLeft: 20 }}>
               <div style={{ color: 'var(--text)', fontSize: wide ? 30 : 22, lineHeight: wide ? '38px' : '28px', fontWeight: 700 }}>{s.name}</div>
               <div style={{ height: 4 }} />
@@ -86,7 +100,7 @@ export function SeriesDetail({ series: s }: { series: Series }) {
                 {joinMeta(info?.year ?? s.year, info?.genre ?? s.genre, seasons.length ? `${seasons.length} stagioni` : null)}
               </div>
               <div style={{ height: 10 }} />
-              {(info?.plot ?? s.plot) && <div className={wide ? 'clamp6' : 'clamp4'} style={{ color: 'var(--text)', fontSize: 14 }}>{info?.plot ?? s.plot}</div>}
+              {plot && <div className={wide ? 'clamp6' : 'clamp4'} style={{ color: 'var(--text)', fontSize: 14 }}>{plot}</div>}
               <div style={{ height: 14 }} />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                 {resumeEp && (() => {

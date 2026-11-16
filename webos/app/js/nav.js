@@ -35,6 +35,14 @@
 
   /** Porta l'elemento dentro la sua area scorrevole (".scroll"), con un po' di margine. */
   function reveal(el) {
+    // Righe che scorrono di lato ("Film e serie"): il riquadro col focus entra in vista.
+    var row = el.parentNode;
+    while (row && row !== document.body && !(row.classList && row.classList.contains('hscroll'))) row = row.parentNode;
+    if (row && row !== document.body) {
+      var er = el.getBoundingClientRect(), rr = row.getBoundingClientRect(), pad = rr.width * 0.08;
+      if (er.left < rr.left + pad) row.scrollLeft -= (rr.left + pad - er.left);
+      else if (er.right > rr.right - pad) row.scrollLeft += (er.right - (rr.right - pad));
+    }
     var box = el.parentNode;
     while (box && box !== document.body && !(box.classList && box.classList.contains('scroll'))) box = box.parentNode;
     if (!box || box === document.body) return;

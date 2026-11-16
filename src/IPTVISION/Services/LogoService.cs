@@ -16,22 +16,23 @@ public sealed class LogoService
     private readonly SemaphoreSlim _gate = new(6);
     private readonly ConcurrentDictionary<string, Task<ImageSource?>> _memory = new();
 
-    public void Request(string? url, Action<ImageSource> apply)
+    /// <param name="width">Larghezza di decodifica: 112 per loghi e locandine, di più per le immagini grandi di "Film e serie".</param>
+    public void Request(string? url, Action<ImageSource> apply, int width = 112)
     {
         if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out _)) return;
-        _ = LoadAsync(url, apply);
+        _ = LoadAsync(url, apply, width);
     }
 
-    private async Task LoadAsync(string url, Action<ImageSource> apply)
+    private async Task LoadAsync(string url, Action<ImageSource> apply, int width)
     {
-        var img = await _memory.GetOrAdd(url, u => Task.Run(() => FetchAsync(u)));
+        var img = await _memory.GetOrAdd(width == 112 ? url : $"{width}|{url}", _ => Task.Run(() => FetchAsync(url, width)));
         if (img == null) return;
         var d = Application.Current?.Dispatcher;
         if (d == null) return;
         _ = d.BeginInvoke(() => apply(img));
     }
 
-    private async Task<ImageSource?> FetchAsync(string url)
+    private async Task<ImageSource?> FetchAsync(string url, int width)
     {
         var file = Path.Combine(AppPaths.Logos, AppPaths.Hash(url) + ".img");
         try
@@ -61,7 +62,7 @@ public sealed class LogoService
                     _gate.Release();
                 }
             }
-            return bytes is { Length: > 0 } ? Decode(bytes) : null;
+            return bytes is { Length: > 0 } ? Decode(bytes, width) : null;
         }
         catch (Exception ex)
         {
@@ -70,7 +71,7 @@ public sealed class LogoService
         }
     }
 
-    private static ImageSource? Decode(byte[] bytes)
+    private static ImageSource? Decode(byte[] bytes, int width)
     {
         try
         {
@@ -78,7 +79,7 @@ public sealed class LogoService
             bmp.BeginInit();
             bmp.CacheOption = BitmapCacheOption.OnLoad;
             bmp.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-            bmp.DecodePixelWidth = 112;
+            bmp.DecodePixelWidth = width;
             bmp.StreamSource = new MemoryStream(bytes);
             bmp.EndInit();
             bmp.Freeze();

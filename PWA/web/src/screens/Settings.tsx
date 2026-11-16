@@ -3,7 +3,8 @@ import { ActionButton, Clickable, Dialog, Pill, SectionTitle, Switch, TextButton
 import { api } from '../lib/api.ts'
 import { NetworkStatus } from '../components/network.tsx'
 import { type Skin, setSkin, useSkin } from '../lib/skin.ts'
-import { type XtreamList, addXtreamList, app, clearCache, logoutXtream, refreshAll, setHideAdult, updateSettings, useApp, switchXtreamList } from '../lib/app.ts'
+import { type XtreamList, addXtreamList, app, clearCache, logoutXtream, refreshAll, setHideAdult, setTmdb, updateSettings, useApp, switchXtreamList } from '../lib/app.ts'
+import { checkKey, hasTmdb } from '../lib/tmdb.ts'
 
 // SettingsSection (ui/SearchSettings.kt) plus what the browser version adds: the account on the
 // home server, the devices connected to it and how to use it from the IPTVISION apps.
@@ -98,6 +99,9 @@ export function SettingsSection() {
         </Row>
         <Text>{skinNotes[skin]}</Text>
 
+        <Group title="TMDB" />
+        <TmdbKey />
+
         <Group title="Riproduzione" />
         <Toggle title="Riprendi l'ultimo canale all'avvio" subtitle="Apri l'app e il canale riparte da dov'eri rimasto."
           checked={app.settings.autoPlayLast} onChange={(v) => updateSettings({ autoPlayLast: v })} />
@@ -165,6 +169,44 @@ const skinNotes: Record<Skin, string> = {
   metro: 'Lo stile di Windows Phone: nero, piatto, angoli vivi, titoli grandi e sezioni da scorrere in alto.',
   dueffe: 'Fondo quasi nero, superfici calde, avorio e oro, angoli morbidi e pulsanti che rimbalzano.',
   nothing: 'Nero OLED, bianco e un solo rosso, caratteri a matrice di punti e monospazio, linee sottili al posto delle ombre.',
+}
+
+/** The TMDB key of this device: with it films and series become one screen with artwork, trends and genres. */
+function TmdbKey() {
+  const [value, setValue] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const save = async () => {
+    if (value.trim() === '') return
+    setBusy(true)
+    setError(null)
+    try {
+      await checkKey(value)
+      setTmdb(value)
+      setValue('')
+      toast('Chiave TMDB salvata: trovi tutto in "Film e serie"')
+    } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+  }
+  return (
+    <>
+      <Text>
+        Con una chiave di themoviedb.org (la "Chiave API" o il "Token di accesso in lettura" che trovi nel tuo profilo TMDB,
+        alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi.
+      </Text>
+      {hasTmdb() ? (
+        <>
+          <Info label="Chiave" value="Inserita" />
+          <Row><ActionButton text="Rimuovi chiave" icon="delete" onClick={() => setTmdb('')} /></Row>
+        </>
+      ) : (
+        <>
+          <TextField value={value} onChange={setValue} label="Chiave API o token TMDB" type="password" autoComplete="off" onDone={save} style={{ maxWidth: 520, marginTop: 6 }} />
+          {error && <div style={{ color: 'var(--danger)', fontSize: 14, paddingTop: 6 }}>{error}</div>}
+          <Row><ActionButton text={busy ? 'Controllo…' : 'Salva chiave'} icon="check" primary disabled={busy} onClick={save} /></Row>
+        </>
+      )}
+    </>
+  )
 }
 
 function Group({ title }: { title: string }) {

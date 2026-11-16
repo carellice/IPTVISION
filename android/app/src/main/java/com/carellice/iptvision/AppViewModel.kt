@@ -31,6 +31,7 @@ import com.carellice.iptvision.data.ServerApi
 import com.carellice.iptvision.data.ServerException
 import com.carellice.iptvision.data.Settings
 import com.carellice.iptvision.data.TextHelpers
+import com.carellice.iptvision.data.Tmdb
 import com.carellice.iptvision.data.UpdateInfo
 import com.carellice.iptvision.data.UpdateService
 import com.carellice.iptvision.data.VodInfo
@@ -49,7 +50,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-enum class Section(val title: String) { Live("TV in diretta"), Movies("Film"), Series("Serie TV"), Search("Cerca"), Downloads("Download"), Settings("Impostazioni") }
+enum class Section(val title: String) { Live("TV in diretta"), Movies("Film"), Series("Serie TV"), Discover("Film e serie"), Search("Cerca"), Downloads("Download"), Settings("Impostazioni") }
 
 enum class ListSort(val label: String) {
     Default("Predefinito"), Number("Numero"), NameAsc("Nome (A-Z)"), NameDesc("Nome (Z-A)"),
@@ -112,8 +113,45 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val player = PlayerController(app)
     val downloads = Downloads.get(app)
 
-    /** Sezioni del menu: i download ci sono solo su telefoni e tablet. */
-    val sections: List<Section> get() = Section.entries.filter { it != Section.Downloads || !isTv }
+    /** Sezioni del menu: i download ci sono solo su telefoni e tablet; con la chiave TMDB film e serie sono una sezione sola. */
+    val sections: List<Section>
+        get() = Section.entries.filter {
+            (it != Section.Downloads || !isTv) &&
+                if (hasTmdb) it != Section.Movies && it != Section.Series else it != Section.Discover
+        }
+
+    // ---------- TMDB ----------
+    var tmdbKey by mutableStateOf(settings.tmdbKey); private set
+    val hasTmdb get() = tmdbKey.isNotEmpty()
+    var tmdbRows by mutableStateOf<List<Tmdb.Row>?>(null); private set
+    var tmdbError by mutableStateOf<String?>(null); private set
+    private var tmdbJob: Job? = null
+
+    fun setTmdb(key: String) {
+        tmdbKey = key.trim()
+        settings.tmdbKey = tmdbKey
+        Tmdb.clearCache()
+        tmdbRows = null
+        tmdbJob?.cancel(); tmdbJob = null
+        discoverOpen = null
+        if (hasTmdb && (section == Section.Movies || section == Section.Series)) section = Section.Discover
+        else if (!hasTmdb && section == Section.Discover) section = Section.Movies
+    }
+
+    /** Le righe di TMDB, chieste una volta per chiave. */
+    fun ensureTmdb() {
+        ensureMovies(); ensureSeries()
+        if (!hasTmdb || tmdbJob != null) return
+        val key = tmdbKey
+        tmdbError = null
+        tmdbJob = viewModelScope.launch {
+            launch { try { Tmdb.check(key) } catch (e: CancellationException) { throw e } catch (e: Exception) { tmdbError = e.message } }
+            tmdbRows = Tmdb.loadRows(key)
+        }
+    }
+
+    /** "Film e serie": la categoria aperta, "m:<id>" per i film e "s:<id>" per le serie; null = schermata principale. */
+    var discoverOpen by mutableStateOf<String?>(null)
 
     var client: XtreamClient? = null; private set
 
@@ -170,6 +208,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         Section.Live -> liveOpen
         Section.Movies -> moviesOpen
         Section.Series -> seriesOpen
+        Section.Discover -> discoverOpen
         else -> null
     }
 
@@ -185,6 +224,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Section.Live -> { liveOpen = id; settings.lastCategoryId = id }
             Section.Movies -> moviesOpen = id
             Section.Series -> seriesOpen = id
+            Section.Discover -> discoverOpen = id
             else -> {}
         }
     }
@@ -194,6 +234,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Section.Live -> liveOpen = null
             Section.Movies -> moviesOpen = null
             Section.Series -> seriesOpen = null
+            Section.Discover -> discoverOpen = null
             else -> {}
         }
     }
@@ -453,8 +494,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         movies = null; series = null
         openAccount(c.account, autoPlay = false)
         viewModelScope.launch { loadEpg(c, force = true) }
-        if (section == Section.Movies) ensureMovies()
-        if (section == Section.Series) ensureSeries()
+        if (section == Section.Movies || section == Section.Discover) ensureMovies()
+        if (section == Section.Series || section == Section.Discover) ensureSeries()
     }
 
     fun clearCache() {
@@ -482,11 +523,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val hadMovies = movies != null
         val hadSeries = series != null
         movies = null; series = null
-        liveOpen = null; moviesOpen = null; seriesOpen = null
+        liveOpen = null; moviesOpen = null; seriesOpen = null; discoverOpen = null
         viewModelScope.launch {
             withContext(Dispatchers.IO) { loadLive(c.account.key) }?.let { live = it }
-            if (hadMovies || section == Section.Movies) ensureMovies()
-            if (hadSeries || section == Section.Series) ensureSeries()
+            if (hadMovies || section == Section.Movies || section == Section.Discover) ensureMovies()
+            if (hadSeries || section == Section.Series || section == Section.Discover) ensureSeries()
         }
     }
 
@@ -904,7 +945,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun reopen() {
         refreshJob?.cancel()
         live = null; movies = null; series = null
-        liveOpen = null; moviesOpen = null; seriesOpen = null
+        liveOpen = null; moviesOpen = null; seriesOpen = null; discoverOpen = null
         error = null
         stack.clear()
         val account = settings.account
@@ -936,6 +977,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openCategoryHit(c: CategoryHit) {
+        if (hasTmdb && c.section != Section.Live) {
+            section = Section.Discover
+            openCategory(Section.Discover, "${if (c.section == Section.Movies) "m" else "s"}:${c.id}")
+            return
+        }
         section = c.section
         openCategory(c.section, c.id)
     }
