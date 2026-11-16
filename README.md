@@ -75,6 +75,9 @@ Prima scegli la categoria, poi vedi canali, film o serie. Ogni sezione si può m
 ### 🙈 Nascondi XXX
 Nelle impostazioni (su Windows, Android, TV LG e TV Samsung) c'è **Nascondi XXX**: spariscono tutte le categorie che hanno "XXX" nel nome, in TV in diretta, film e serie, insieme al loro contenuto, che non compare più nemmeno in **Tutti** e nella ricerca. Non distingue maiuscole e minuscole ed è spenta di base; spegnendola torna tutto com'era.
 
+### 👥 Profili (server di casa)
+Con il server di casa, in **Impostazioni → Profili** (nel browser e nell'app Android) si creano più profili sullo stesso account, come su Netflix: ognuno ha un nome, un PIN facoltativo (da 4 a 8 cifre) e i suoi preferiti, **Continua a guardare** e **La mia lista**; nel browser anche **Nascondi XXX**. Con più di un profilo, all'apertura compare **Chi guarda?**. I dati di prima restano nel profilo principale, che non si può eliminare. Le app di Windows, iOS e dei TV per ora usano il profilo scelto l'ultima volta su quel dispositivo (all'inizio il principale).
+
 ### 📋 Più liste IPTV
 Si possono salvare più account Xtream Codes, ognuno con un nome a scelta (per esempio "Casa" o "Sport"). In **Impostazioni → Liste IPTV** (Windows, Android, TV LG e Samsung, browser) si vede per ogni lista la data di scadenza dell'abbonamento, se il provider la indica, e si passa dall'una all'altra senza riscrivere la password. **Aggiungi lista** apre la schermata di accesso; dopo **Esci dall'account** le liste salvate si scelgono con un clic. Con il **server di casa** collegato le liste sono quelle del server, uguali su tutti i dispositivi: quelle già salvate sul dispositivo si aggiungono al momento del collegamento e cambiare lista da un dispositivo la cambia per tutti.
 

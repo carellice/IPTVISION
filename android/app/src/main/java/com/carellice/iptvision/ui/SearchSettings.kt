@@ -191,6 +191,7 @@ fun SettingsSection(vm: AppViewModel) {
         ListsGroup(vm)
 
         ServerGroup(vm)
+        ProfilesGroup(vm) { Group(it) }
 
         Group("Aspetto")
         val skin = vm.settings.skin

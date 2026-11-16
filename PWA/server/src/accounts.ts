@@ -23,10 +23,12 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT N
 const sessionColumns = (db.prepare('PRAGMA table_info(sessions)').all() as { name: string }[]).map((c) => c.name)
 if (!sessionColumns.includes('device')) db.exec("ALTER TABLE sessions ADD COLUMN device TEXT NOT NULL DEFAULT ''")
 if (!sessionColumns.includes('lastSeen')) db.exec('ALTER TABLE sessions ADD COLUMN lastSeen INTEGER NOT NULL DEFAULT 0')
+// Added with the profiles: the profile a browser or device is using (0 = main, the data from before).
+if (!sessionColumns.includes('profile')) db.exec('ALTER TABLE sessions ADD COLUMN profile INTEGER NOT NULL DEFAULT 0')
 
 export class AccountError extends Error {}
 
-export type User = { id: number; username: string; token: string }
+export type User = { id: number; username: string; token: string; profile: number }
 
 /** Set by the installer: who knows it can create an account. Empty = anyone who reaches the server. */
 const INVITE_CODE = (process.env.INVITE_CODE ?? '').trim()
@@ -118,8 +120,8 @@ const seen = new Map<string, number>()
 
 export function sessionUser(token: string | undefined): User | null {
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null
-  const row = db.prepare('SELECT u.id, u.username FROM sessions s JOIN users u ON u.id = s.userId WHERE s.token = ?').get(token) as
-    { id: number; username: string } | undefined
+  const row = db.prepare('SELECT u.id, u.username, s.profile FROM sessions s JOIN users u ON u.id = s.userId WHERE s.token = ?').get(token) as
+    { id: number; username: string; profile: number } | undefined
   if (!row) return null
   // "Last used" for the devices list, written at most every 10 minutes per session.
   const now = Date.now()
@@ -127,7 +129,17 @@ export function sessionUser(token: string | undefined): User | null {
     seen.set(token, now)
     db.prepare('UPDATE sessions SET lastSeen = ? WHERE token = ?').run(now, token)
   }
-  return { id: Number(row.id), username: row.username, token }
+  return { id: Number(row.id), username: row.username, token, profile: Number(row.profile) }
+}
+
+/** The profile this browser or device uses from now on. */
+export function setSessionProfile(token: string, profile: number) {
+  db.prepare('UPDATE sessions SET profile = ? WHERE token = ?').run(profile, token)
+}
+
+/** A removed profile: the devices that were using it go back to the main one. */
+export function resetProfile(userId: number, profile: number) {
+  db.prepare('UPDATE sessions SET profile = 0 WHERE userId = ? AND profile = ?').run(userId, profile)
 }
 
 export function endSession(token: string) {

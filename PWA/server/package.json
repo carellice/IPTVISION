@@ -6,7 +6,8 @@
   "description": "Server di IPTVISION PWA: account, preferiti e posizioni in SQLite, liste e guida dal provider IPTV, flussi per il browser e per le app IPTVISION in modalità server.",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/main.ts",
-    "dev": "node --disable-warning=ExperimentalWarning --watch src/main.ts"
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/main.ts",
+    "test": "node test/profiles.mjs"
   },
   "engines": {
     "node": ">=24"

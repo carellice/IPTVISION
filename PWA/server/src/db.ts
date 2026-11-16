@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Op, UserState } from '../../shared/model.ts'
 import { MAX_POSITIONS } from '../../shared/positions.ts'
@@ -22,35 +22,47 @@ CREATE TABLE IF NOT EXISTS my_list (key TEXT PRIMARY KEY NOT NULL, u INTEGER NOT
 `
 
 // --- accounts: every account has its own database, picked per request -------------------------
+// Profiles: the main one (0) keeps its data in the account database, as before profiles existed;
+// every other profile has favorites, positions, lists and "Nascondi XXX" in profile-<id>.db.
+// The IPTV account, the TMDB key and the profile list stay in the account database.
 
-type UserData = { id: number; db: DatabaseSync }
+type UserData = { id: number; profile: number; db: DatabaseSync; pdb: DatabaseSync }
 
-const opened = new Map<number, UserData>()
+const files = new Map<string, DatabaseSync>()
 const current = new AsyncLocalStorage<UserData>()
 
 export const userDir = (userId: number) => join(dataDir, 'users', String(userId))
+const profileFile = (userId: number, profile: number) => join(userDir(userId), profile === 0 ? 'iptvision.db' : `profile-${profile}.db`)
 
-function open(userId: number): UserData {
-  const known = opened.get(userId)
+function openFile(userId: number, profile: number): DatabaseSync {
+  const key = `${userId}:${profile}`
+  const known = files.get(key)
   if (known) return known
-  const dir = userDir(userId)
-  mkdirSync(dir, { recursive: true })
-  const db = new DatabaseSync(join(dir, 'iptvision.db'))
+  mkdirSync(userDir(userId), { recursive: true })
+  const db = new DatabaseSync(profileFile(userId, profile))
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = OFF;')
   db.exec(schema)
-  const data = { id: userId, db }
-  opened.set(userId, data)
-  return data
+  files.set(key, db)
+  return db
 }
 
-/** Runs [work] on the data of [userId]: every function of this module then reads and writes there. */
-export function withUser<T>(userId: number, work: () => T): T {
-  return current.run(open(userId), work)
+/** Runs [work] on the data of [userId] and its [profile]: every function of this module then reads and writes there. */
+export function withUser<T>(userId: number, work: () => T, profile = 0): T {
+  return current.run({ id: userId, profile, db: openFile(userId, 0), pdb: openFile(userId, profile) }, work)
 }
 
 export function closeUser(userId: number) {
-  opened.get(userId)?.db.close()
-  opened.delete(userId)
+  for (const [key, db] of files) {
+    if (key.startsWith(`${userId}:`)) { db.close(); files.delete(key) }
+  }
+}
+
+/** Closes and deletes the data of one profile (never the main one). */
+export function removeProfileData(userId: number, profile: number) {
+  if (profile === 0) return
+  files.get(`${userId}:${profile}`)?.close()
+  files.delete(`${userId}:${profile}`)
+  for (const ext of ['', '-wal', '-shm']) rmSync(profileFile(userId, profile) + ext, { force: true })
 }
 
 function user(): UserData {
@@ -63,6 +75,23 @@ function user(): UserData {
 export const db = {
   prepare: (sql: string) => user().db.prepare(sql),
   exec: (sql: string) => user().db.exec(sql),
+}
+
+/** The database of the current profile: the account's own one for the main profile. */
+const pdb = {
+  prepare: (sql: string) => user().pdb.prepare(sql),
+}
+
+/** The profile in use for this request. */
+export const currentProfile = () => user().profile
+
+function getProfileMeta(key: string): string | null {
+  const row = pdb.prepare('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined
+  return row?.value ?? null
+}
+
+function setProfileMeta(key: string, value: string) {
+  pdb.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value)
 }
 
 // --- meta ------------------------------------------------------------------------------------
@@ -86,15 +115,18 @@ function touch() {
   setMeta('revision', String(revision() + 1))
 }
 
+/** One transaction on the account database and, for another profile, on the profile's too. */
 export function transaction<T>(work: () => T): T {
-  db.exec('BEGIN')
+  const u = user()
+  const both = u.pdb !== u.db ? [u.db, u.pdb] : [u.db]
+  for (const d of both) d.exec('BEGIN')
   try {
     const result = work()
     touch()
-    db.exec('COMMIT')
+    for (const d of both) d.exec('COMMIT')
     return result
   } catch (e) {
-    db.exec('ROLLBACK')
+    for (const d of both) d.exec('ROLLBACK')
     throw e
   }
 }
@@ -173,24 +205,24 @@ export function removeXtreamList(index: number) {
 /** Everything the clients sync: the same shape as the native positions.json, plus favorites. */
 export function state(): UserState {
   const positions: UserState['positions'] = {}
-  for (const r of db.prepare('SELECT key, p, d, u FROM positions').all() as { key: string; p: number; d: number; u: number }[]) {
+  for (const r of pdb.prepare('SELECT key, p, d, u FROM positions').all() as { key: string; p: number; d: number; u: number }[]) {
     positions[r.key] = { p: Number(r.p), d: Number(r.d), u: Number(r.u) }
   }
   const lastEpisode: UserState['lastEpisode'] = {}
-  for (const r of db.prepare('SELECT seriesId, episodeId, u FROM last_episode').all() as { seriesId: number; episodeId: string; u: number }[]) {
+  for (const r of pdb.prepare('SELECT seriesId, episodeId, u FROM last_episode').all() as { seriesId: number; episodeId: string; u: number }[]) {
     lastEpisode[String(r.seriesId)] = { id: r.episodeId, u: Number(r.u) }
   }
   const myList: UserState['myList'] = {}
-  for (const r of db.prepare('SELECT key, u FROM my_list').all() as { key: string; u: number }[]) myList[r.key] = Number(r.u)
+  for (const r of pdb.prepare('SELECT key, u FROM my_list').all() as { key: string; u: number }[]) myList[r.key] = Number(r.u)
   const x = xtreamAccount()
   return {
     revision: revision(),
-    favorites: (db.prepare('SELECT streamId FROM favorites ORDER BY u').all() as { streamId: number }[]).map((r) => Number(r.streamId)),
+    favorites: (pdb.prepare('SELECT streamId FROM favorites ORDER BY u').all() as { streamId: number }[]).map((r) => Number(r.streamId)),
     positions,
-    watched: (db.prepare('SELECT key FROM watched').all() as { key: string }[]).map((r) => r.key),
+    watched: (pdb.prepare('SELECT key FROM watched').all() as { key: string }[]).map((r) => r.key),
     lastEpisode,
     myList,
-    hideAdult: getMeta('hideAdult') === '1',
+    hideAdult: getProfileMeta('hideAdult') === '1',
     // Never set: absent, so a device with its own key sends it; removed: "" and every device drops it.
     ...(getMeta('tmdbKey') !== null ? { tmdbKey: getMeta('tmdbKey')! } : {}),
     xtream: x ? { server: x.server, username: x.username } : null,
@@ -209,36 +241,36 @@ export function applyOps(ops: Op[]) {
       switch (o?.op) {
         case 'position':
           if (!validKey(o.key) || !validInt(o.p) || !validInt(o.d)) break
-          db.prepare('INSERT OR REPLACE INTO positions (key, p, d, u) VALUES (?, ?, ?, ?)').run(o.key, Math.round(o.p), Math.round(o.d), now)
-          db.prepare('DELETE FROM watched WHERE key = ?').run(o.key)
+          pdb.prepare('INSERT OR REPLACE INTO positions (key, p, d, u) VALUES (?, ?, ?, ?)').run(o.key, Math.round(o.p), Math.round(o.d), now)
+          pdb.prepare('DELETE FROM watched WHERE key = ?').run(o.key)
           break
         case 'watched':
           if (!validKey(o.key)) break
-          db.prepare('DELETE FROM positions WHERE key = ?').run(o.key)
-          db.prepare('INSERT OR IGNORE INTO watched (key) VALUES (?)').run(o.key)
+          pdb.prepare('DELETE FROM positions WHERE key = ?').run(o.key)
+          pdb.prepare('INSERT OR IGNORE INTO watched (key) VALUES (?)').run(o.key)
           break
         case 'forgetPosition':
-          if (validKey(o.key)) db.prepare('DELETE FROM positions WHERE key = ?').run(o.key)
+          if (validKey(o.key)) pdb.prepare('DELETE FROM positions WHERE key = ?').run(o.key)
           break
         case 'lastEpisode':
           if (!validInt(o.seriesId) || typeof o.id !== 'string' || o.id.length > 64) break
-          db.prepare('INSERT OR REPLACE INTO last_episode (seriesId, episodeId, u) VALUES (?, ?, ?)').run(o.seriesId, o.id, now)
+          pdb.prepare('INSERT OR REPLACE INTO last_episode (seriesId, episodeId, u) VALUES (?, ?, ?)').run(o.seriesId, o.id, now)
           break
         case 'forgetSeries':
-          if (validInt(o.seriesId)) db.prepare('DELETE FROM last_episode WHERE seriesId = ?').run(o.seriesId)
+          if (validInt(o.seriesId)) pdb.prepare('DELETE FROM last_episode WHERE seriesId = ?').run(o.seriesId)
           break
         case 'favorite':
           if (!validInt(o.streamId)) break
-          if (o.on) db.prepare('INSERT OR IGNORE INTO favorites (streamId, u) VALUES (?, ?)').run(o.streamId, now)
-          else db.prepare('DELETE FROM favorites WHERE streamId = ?').run(o.streamId)
+          if (o.on) pdb.prepare('INSERT OR IGNORE INTO favorites (streamId, u) VALUES (?, ?)').run(o.streamId, now)
+          else pdb.prepare('DELETE FROM favorites WHERE streamId = ?').run(o.streamId)
           break
         case 'myList':
           if (!validKey(o.key) || o.key.startsWith('e:')) break
-          if (o.on) db.prepare('INSERT OR IGNORE INTO my_list (key, u) VALUES (?, ?)').run(o.key, now)
-          else db.prepare('DELETE FROM my_list WHERE key = ?').run(o.key)
+          if (o.on) pdb.prepare('INSERT OR IGNORE INTO my_list (key, u) VALUES (?, ?)').run(o.key, now)
+          else pdb.prepare('DELETE FROM my_list WHERE key = ?').run(o.key)
           break
         case 'hideAdult':
-          setMeta('hideAdult', o.on ? '1' : '0')
+          setProfileMeta('hideAdult', o.on ? '1' : '0')
           break
         case 'tmdbKey':
           if (typeof o.key === 'string' && o.key.length <= 1024) setMeta('tmdbKey', o.key.trim())
@@ -246,7 +278,7 @@ export function applyOps(ops: Op[]) {
       }
     }
     // Like the native store: only the 600 most recent positions are kept.
-    db.prepare(`DELETE FROM positions WHERE key NOT IN (SELECT key FROM positions ORDER BY u DESC LIMIT ${MAX_POSITIONS})`).run()
+    pdb.prepare(`DELETE FROM positions WHERE key NOT IN (SELECT key FROM positions ORDER BY u DESC LIMIT ${MAX_POSITIONS})`).run()
   })
 }
 
@@ -263,21 +295,21 @@ export function importNative(input: {
 }) {
   transaction(() => {
     if (Array.isArray(input.favorites)) {
-      for (const id of input.favorites) if (validInt(id)) db.prepare('INSERT OR IGNORE INTO favorites (streamId, u) VALUES (?, ?)').run(id, Date.now())
+      for (const id of input.favorites) if (validInt(id)) pdb.prepare('INSERT OR IGNORE INTO favorites (streamId, u) VALUES (?, ?)').run(id, Date.now())
     }
     if (Array.isArray(input.watched)) {
       for (const k of input.watched) if (validKey(k)) {
-        db.prepare('INSERT OR IGNORE INTO watched (key) VALUES (?)').run(k)
-        db.prepare('DELETE FROM positions WHERE key = ?').run(k)
+        pdb.prepare('INSERT OR IGNORE INTO watched (key) VALUES (?)').run(k)
+        pdb.prepare('DELETE FROM positions WHERE key = ?').run(k)
       }
     }
     if (input.positions && typeof input.positions === 'object') {
       for (const [k, v] of Object.entries(input.positions as Record<string, { p?: number; d?: number; u?: number }>)) {
         if (!validKey(k) || !v || !validInt(v.p) || !validInt(v.d)) continue
-        if (db.prepare('SELECT 1 FROM watched WHERE key = ?').get(k)) continue
+        if (pdb.prepare('SELECT 1 FROM watched WHERE key = ?').get(k)) continue
         const u = validInt(v.u) ? v.u : Date.now()
-        const old = db.prepare('SELECT u FROM positions WHERE key = ?').get(k) as { u: number } | undefined
-        if (!old || Number(old.u) < u) db.prepare('INSERT OR REPLACE INTO positions (key, p, d, u) VALUES (?, ?, ?, ?)').run(k, v.p, v.d, u)
+        const old = pdb.prepare('SELECT u FROM positions WHERE key = ?').get(k) as { u: number } | undefined
+        if (!old || Number(old.u) < u) pdb.prepare('INSERT OR REPLACE INTO positions (key, p, d, u) VALUES (?, ?, ?, ?)').run(k, v.p, v.d, u)
       }
     }
     if (input.lastEpisode && typeof input.lastEpisode === 'object') {
@@ -285,13 +317,13 @@ export function importNative(input: {
         const sid = Number(k)
         if (!validInt(sid) || !v || typeof v.id !== 'string') continue
         const u = validInt(v.u) ? v.u : Date.now()
-        const old = db.prepare('SELECT u FROM last_episode WHERE seriesId = ?').get(sid) as { u: number } | undefined
-        if (!old || Number(old.u) < u) db.prepare('INSERT OR REPLACE INTO last_episode (seriesId, episodeId, u) VALUES (?, ?, ?)').run(sid, v.id, u)
+        const old = pdb.prepare('SELECT u FROM last_episode WHERE seriesId = ?').get(sid) as { u: number } | undefined
+        if (!old || Number(old.u) < u) pdb.prepare('INSERT OR REPLACE INTO last_episode (seriesId, episodeId, u) VALUES (?, ?, ?)').run(sid, v.id, u)
       }
     }
     if (input.myList && typeof input.myList === 'object') {
       for (const [k, u] of Object.entries(input.myList as Record<string, unknown>)) {
-        if (validKey(k) && !k.startsWith('e:')) db.prepare('INSERT OR IGNORE INTO my_list (key, u) VALUES (?, ?)').run(k, validInt(u) ? u : Date.now())
+        if (validKey(k) && !k.startsWith('e:')) pdb.prepare('INSERT OR IGNORE INTO my_list (key, u) VALUES (?, ?)').run(k, validInt(u) ? u : Date.now())
       }
     }
   })

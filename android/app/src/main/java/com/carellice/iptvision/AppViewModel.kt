@@ -23,6 +23,8 @@ import com.carellice.iptvision.data.Episode
 import com.carellice.iptvision.data.Log
 import com.carellice.iptvision.data.Movie
 import com.carellice.iptvision.data.PositionStore
+import com.carellice.iptvision.data.Profile
+import com.carellice.iptvision.data.Profiles
 import com.carellice.iptvision.data.SavedList
 import com.carellice.iptvision.data.Quiz
 import com.carellice.iptvision.data.Series
@@ -311,6 +313,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         player.onEnded = { onPlaybackEnded() }
         player.onFailed = { playError = "Impossibile riprodurre il contenuto."; back() }
         settings.account?.let { openAccount(it, autoPlay = settings.autoPlayLastChannel) }
+        if (settings.homeServer != null) loadProfiles(atStart = true)
         if (settings.autoCheckUpdates) checkUpdates(silent = true)
         viewModelScope.launch {
             // Avanzamento dei programmi in onda e salvataggio periodico delle posizioni.
@@ -877,6 +880,103 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         else if (hasTmdb) queueServerOp(JSONObject().put("op", "tmdbKey").put("key", tmdbKey), now = true)
     }
 
+    // ---------- Profili del server di casa ----------
+    var profiles by mutableStateOf<List<Profile>>(emptyList()); private set
+    var currentProfile by mutableStateOf(0); private set
+    /** "Chi guarda?": "start" all'apertura (si deve scegliere), "switch" dalle impostazioni (si può annullare). */
+    var profilePicker by mutableStateOf<String?>(null); private set
+    var profileError by mutableStateOf<String?>(null)
+    var profileBusy by mutableStateOf(false); private set
+    /** All'apertura, finché non si sa se ci sono più profili: blocca la ripresa automatica del canale. */
+    // Dichiarata dopo init (che chiama loadProfiles): il valore iniziale si calcola qui, non in loadProfiles.
+    private var profilesPending = settings.homeServer != null && settings.password != null
+
+    private fun showProfiles(p: Profiles) {
+        profiles = p.list
+        currentProfile = p.current
+    }
+
+    fun loadProfiles(atStart: Boolean = false) {
+        val url = settings.homeServer ?: return
+        val token = settings.password ?: return
+        viewModelScope.launch {
+            try {
+                val p = ServerApi.profiles(url, token)
+                showProfiles(p)
+                if (atStart && p.list.size > 1) profilePicker = "start"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Server più vecchio o non raggiungibile: si resta sul profilo di sempre.
+            } finally {
+                if (atStart) {
+                    profilesPending = false
+                    if (profilePicker == null && settings.autoPlayLastChannel) autoPlayLast()
+                }
+            }
+        }
+    }
+
+    fun openProfilePicker(open: Boolean) {
+        profileError = null
+        profilePicker = if (open) "switch" else null
+    }
+
+    /** Passa a un altro profilo: prima partono le modifiche fatte qui, poi arrivano preferiti e posizioni del nuovo. */
+    fun switchProfile(p: Profile, pin: String, onDone: () -> Unit = {}) {
+        val url = settings.homeServer ?: return
+        val token = settings.password ?: return
+        profileBusy = true
+        profileError = null
+        viewModelScope.launch {
+            try {
+                val ops = synchronized(pendingOps) { pendingOps.toList().also { pendingOps.clear() } }
+                if (ops.isNotEmpty()) ServerApi.ops(url, token, JSONArray(ops))
+                val o = ServerApi.useProfile(url, token, p.id, pin)
+                val start = profilePicker == "start"
+                if (playing != null) { savePosition(); player.stop(); playing = null }
+                showProfiles(Profiles.from(o))
+                settings.homeRevision = -1
+                applyServerState(o.getJSONObject("state"))
+                profilePicker = null
+                onDone()
+                if (start && settings.autoPlayLastChannel) autoPlayLast()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                profileError = (e as? ServerException)?.message ?: "Cambio di profilo non riuscito."
+            } finally {
+                profileBusy = false
+            }
+        }
+    }
+
+    /** Nuovo profilo ([id] null) oppure nome e PIN di quello in uso ([pin] null: resta quello di prima). */
+    fun saveProfile(id: Int?, name: String, pin: String?, onDone: () -> Unit) = profileCall(onDone) { url, token ->
+        if (id == null) ServerApi.addProfile(url, token, name, pin ?: "") else ServerApi.editProfile(url, token, id, name, pin)
+    }
+
+    fun removeProfile(p: Profile, pin: String, onDone: () -> Unit) = profileCall(onDone) { url, token -> ServerApi.removeProfile(url, token, p.id, pin) }
+
+    private fun profileCall(onDone: () -> Unit, work: suspend (String, String) -> Profiles) {
+        val url = settings.homeServer ?: return
+        val token = settings.password ?: return
+        profileBusy = true
+        profileError = null
+        viewModelScope.launch {
+            try {
+                showProfiles(work(url, token))
+                onDone()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                profileError = (e as? ServerException)?.message ?: "Operazione non riuscita."
+            } finally {
+                profileBusy = false
+            }
+        }
+    }
+
     /**
      * Collega il server di casa: accede (o crea l'account), porta sul server l'account IPTV di questo
      * dispositivo se lì manca, unisce preferiti e posizioni di qui a quelli del server, poi usa il server
@@ -1030,7 +1130,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Riproduzione ----------
     private fun autoPlayLast() {
         val id = settings.lastStreamId ?: return
-        if (playing != null) return
+        // Con il server di casa si aspetta "Chi guarda?": niente canale che parte dietro.
+        if (playing != null || profilesPending || profilePicker != null) return
         val ch = live?.items?.firstOrNull { it.streamId == id } ?: return
         val cat = settings.lastCategoryId ?: ALL_ID
         playChannel(ch, channelsFor(cat).takeIf { l -> l.any { it.streamId == id } } ?: live!!.items)

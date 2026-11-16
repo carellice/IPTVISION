@@ -127,6 +127,13 @@ export const app = {
   searchScope: 'All' as SearchScope,
   variantChoice: null as VariantChoice | null,
   quizOpen: false,
+
+  /** Profiles of the account: each has its own favorites, positions and lists. */
+  profiles: [] as Profile[],
+  profile: 0,
+  /** "Chi guarda?" over the app: at start when there are several profiles, or from Impostazioni. */
+  /** "start" cannot be dismissed: whoever opens the app picks a profile (and its PIN). */
+  choosingProfile: false as false | 'start' | 'switch',
 }
 
 export const player = new PlayerController()
@@ -264,6 +271,34 @@ export const setGrid = (s: Section, v: boolean) => updateSettings({ grids: { ...
 
 // --- session and account ---------------------------------------------------------------------------
 
+export type Profile = { id: number; name: string; hasPin: boolean }
+type ProfilesView = { current: number; profiles: Profile[] }
+
+export async function loadProfiles(): Promise<ProfilesView> {
+  const r = await api<ProfilesView>('/api/profiles')
+  app.profiles = r.profiles
+  app.profile = r.current
+  emit()
+  return r
+}
+
+/** Switches this browser to another profile; throws with the message to show (e.g. "PIN sbagliato"). */
+export async function switchProfile(id: number, pin = '') {
+  await flush()
+  const r = await api<ProfilesView & { state: UserState }>(`/api/profiles/${id}/use`, { method: 'POST', json: { pin } })
+  app.profiles = r.profiles
+  app.profile = r.current
+  app.choosingProfile = false
+  app.revision = -1
+  applyState(r.state)
+  emit()
+}
+
+export function chooseProfile(open: boolean) {
+  app.choosingProfile = open ? 'switch' : false
+  emit()
+}
+
 /** After the PWA login: this account's settings, its data, its IPTV account. */
 export async function start(username: string) {
   app.username = username
@@ -275,12 +310,14 @@ export async function start(username: string) {
   } catch (e) {
     app.error = (e as Error).message
   }
+  // Several profiles: "Chi guarda?" first, and no channel starting behind it.
+  try { app.choosingProfile = (await loadProfiles()).profiles.length > 1 ? 'start' : false } catch { /* older server: no profiles */ }
   if (!app.xtream) {
     app.stack = [{ kind: 'Login' }]
     emit()
     return
   }
-  openAccount(app.settings.autoPlayLast)
+  openAccount(app.settings.autoPlayLast && !app.choosingProfile)
 }
 
 function applyState(s: UserState & { unchanged?: boolean }) {

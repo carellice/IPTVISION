@@ -28,6 +28,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import com.carellice.iptvision.ui.C
 import com.carellice.iptvision.ui.HomeScreen
+import com.carellice.iptvision.ui.ProfilePicker
 import com.carellice.iptvision.ui.IptvTheme
 import com.carellice.iptvision.ui.Skin
 import com.carellice.iptvision.ui.material
@@ -131,6 +132,7 @@ class MainActivity : ComponentActivity() {
                     VariantDialog(vm)
                     QuizDialog(vm)
                     ServerDialog(vm)
+                    ProfilePicker(vm)
                 }
             }
         }

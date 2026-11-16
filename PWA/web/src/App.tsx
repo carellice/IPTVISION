@@ -8,6 +8,7 @@ import { Home } from './screens/Home.tsx'
 import { MovieDetail, SeriesDetail } from './screens/Details.tsx'
 import { Player } from './screens/Player.tsx'
 import { QuizDialog, VariantDialog } from './screens/Dialogs.tsx'
+import { ProfilePicker } from './screens/Profiles.tsx'
 
 type Session = { loggedIn: boolean; username: string | null; version: string; inviteRequired: boolean }
 
@@ -49,6 +50,7 @@ export function App() {
       {s.kind === 'Player' && <Player />}
       <VariantDialog />
       <QuizDialog />
+      <ProfilePicker />
       <ToastHost />
     </div>
   )

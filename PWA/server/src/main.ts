@@ -3,6 +3,7 @@ import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import * as data from './db.ts'
 import * as accounts from './accounts.ts'
+import * as profiles from './profiles.ts'
 import * as xtream from './xtream.ts'
 import * as relay from './relay.ts'
 import * as play from './play.ts'
@@ -103,7 +104,7 @@ function accountCall<T>(work: () => T): T {
   try {
     return work()
   } catch (e) {
-    if (e instanceof accounts.AccountError) throw new HttpError(400, e.message)
+    if (e instanceof accounts.AccountError || e instanceof profiles.ProfileError) throw new HttpError(400, e.message)
     throw e
   }
 }
@@ -244,6 +245,51 @@ route('GET', '/api/devices', (_req, res, _p, _u, user) => json(res, 200, account
 route('DELETE', '/api/devices/:id', (_req, res, p, _u, user) => {
   accounts.endDevice(user.id, p[0])
   json(res, 200, accounts.devices(user.id, user.token))
+})
+
+// --- profiles: favorites, "Continua a guardare" and "La mia lista" of each person ---------------------
+
+const profilesView = (user: accounts.User) => ({ current: user.profile, profiles: profiles.profiles(user.username) })
+
+route('GET', '/api/profiles', (_req, res, _p, _u, user) => json(res, 200, profilesView(user)))
+
+route('POST', '/api/profiles', async (req, res, _p, _u, user) => {
+  const b = await readJson<{ name?: string; pin?: string }>(req)
+  accountCall(() => profiles.addProfile(user.username, b.name, b.pin))
+  json(res, 200, profilesView(user))
+})
+
+async function wrongPin(): Promise<never> {
+  await new Promise((r) => setTimeout(r, 800))
+  throw new HttpError(403, 'PIN sbagliato')
+}
+
+/** Switches this browser or device to another profile; answers with that profile's state. */
+route('POST', '/api/profiles/:id/use', async (req, res, p, _u, user) => {
+  const id = Number(p[0])
+  const { pin } = await readJson<{ pin?: string }>(req)
+  if (!accountCall(() => profiles.canUse(user.username, id, pin))) await wrongPin()
+  accounts.setSessionProfile(user.token, id)
+  json(res, 200, { ...profilesView({ ...user, profile: id }), state: data.withUser(user.id, data.state, id) })
+})
+
+/** Name and PIN of the profile in use ("pin": "" removes it, absent keeps it). */
+route('POST', '/api/profiles/:id', async (req, res, p, _u, user) => {
+  const id = Number(p[0])
+  if (id !== user.profile) throw new HttpError(403, 'Si modifica solo il profilo in uso.')
+  const b = await readJson<{ name?: string; pin?: string }>(req)
+  accountCall(() => profiles.editProfile(user.username, id, b.name, b.pin))
+  json(res, 200, profilesView(user))
+})
+
+route('POST', '/api/profiles/:id/delete', async (req, res, p, _u, user) => {
+  const id = Number(p[0])
+  if (id === user.profile) throw new HttpError(400, 'Passa a un altro profilo prima di eliminare questo.')
+  const { pin } = await readJson<{ pin?: string }>(req)
+  if (!accountCall(() => profiles.canUse(user.username, id, pin))) await wrongPin()
+  accountCall(() => profiles.removeProfile(user.id, user.username, id))
+  accounts.resetProfile(user.id, id)
+  json(res, 200, profilesView(user))
 })
 
 /** How the server reaches the Internet: through the VPN or not, with country and address. */
@@ -471,8 +517,8 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
         const match = pattern.exec(path)
         if (match && method === req.method) {
           // Everything the handler reads or writes belongs to the logged in account.
-          if (user) await data.withUser(user.id, () => handler(req, res, match.slice(1), url, user))
-          else await handler(req, res, match.slice(1), url, { id: 0, username: '', token: '' })
+          if (user) await data.withUser(user.id, () => handler(req, res, match.slice(1), url, user), user.profile)
+          else await handler(req, res, match.slice(1), url, { id: 0, username: '', token: '', profile: 0 })
           return
         }
       }

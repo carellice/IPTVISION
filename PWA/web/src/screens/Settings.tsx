@@ -5,6 +5,7 @@ import { NetworkStatus } from '../components/network.tsx'
 import { type Skin, setSkin, useSkin } from '../lib/skin.ts'
 import { type XtreamList, addXtreamList, app, clearCache, logoutXtream, refreshAll, setHideAdult, setTmdb, updateSettings, useApp, switchXtreamList } from '../lib/app.ts'
 import { checkKey, hasTmdb } from '../lib/tmdb.ts'
+import { ProfilesSettings } from './Profiles.tsx'
 
 // SettingsSection (ui/SearchSettings.kt) plus what the browser version adds: the account on the
 // home server, the devices connected to it and how to use it from the IPTVISION apps.
@@ -72,6 +73,9 @@ export function SettingsSection() {
         <Info label="Server" value={app.xtream?.server ?? ''} />
         <Info label="Utente" value={app.xtream?.username ?? ''} />
         {expires && <Info label="Scadenza" value={expires} />}
+
+        <Group title="Profili" />
+        <ProfilesSettings />
 
         <Group title="Liste IPTV" />
         {lists.length > 0 && (

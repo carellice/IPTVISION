@@ -26,6 +26,21 @@ class ServerException(message: String) : Exception(message)
 
 data class ServerLogin(val username: String, val token: String, val hasXtream: Boolean)
 
+/** Un profilo dell'account del server: preferiti, Continua a guardare e La mia lista suoi. */
+data class Profile(val id: Int, val name: String, val hasPin: Boolean)
+
+/** Profili dell'account e quello in uso su questo dispositivo, da {"current", "profiles"} del server. */
+data class Profiles(val current: Int, val list: List<Profile>) {
+    companion object {
+        fun from(o: JSONObject): Profiles {
+            val a = o.optJSONArray("profiles") ?: JSONArray()
+            return Profiles(o.optInt("current"), (0 until a.length()).map { i ->
+                a.getJSONObject(i).let { Profile(it.getInt("id"), it.getString("name"), it.optBoolean("hasPin")) }
+            })
+        }
+    }
+}
+
 object ServerApi {
     private val json = "application/json; charset=utf-8".toMediaType()
     private val http by lazy { XtreamClient.http.newBuilder().callTimeout(30, TimeUnit.SECONDS).followRedirects(false).build() }
@@ -85,6 +100,23 @@ object ServerApi {
     }
 
     suspend fun ops(url: String, token: String, ops: JSONArray): JSONObject = call(url, "POST", "/api/ops", token, JSONObject().put("ops", ops))
+
+    // Profili (server 2.14.0 e successivi; i server più vecchi rispondono 404).
+    suspend fun profiles(url: String, token: String): Profiles = Profiles.from(call(url, "GET", "/api/profiles", token, null))
+
+    suspend fun addProfile(url: String, token: String, name: String, pin: String): Profiles =
+        Profiles.from(call(url, "POST", "/api/profiles", token, JSONObject().put("name", name).put("pin", pin)))
+
+    /** Passa questo dispositivo al profilo [id]: torna profili e stato (preferiti e posizioni) del profilo. */
+    suspend fun useProfile(url: String, token: String, id: Int, pin: String): JSONObject =
+        call(url, "POST", "/api/profiles/$id/use", token, JSONObject().put("pin", pin))
+
+    /** Nome e PIN del profilo in uso; [pin] null lascia quello di prima, "" lo toglie. */
+    suspend fun editProfile(url: String, token: String, id: Int, name: String, pin: String?): Profiles =
+        Profiles.from(call(url, "POST", "/api/profiles/$id", token, JSONObject().put("name", name).apply { if (pin != null) put("pin", pin) }))
+
+    suspend fun removeProfile(url: String, token: String, id: Int, pin: String): Profiles =
+        Profiles.from(call(url, "POST", "/api/profiles/$id/delete", token, JSONObject().put("pin", pin)))
 
     /** Come esce su Internet il server di casa: VPN sì o no, paese, indirizzo ("label" è già pronto da mostrare). */
     suspend fun network(url: String, token: String): JSONObject = call(url, "GET", "/api/network", token, null)
