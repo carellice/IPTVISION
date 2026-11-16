@@ -105,6 +105,9 @@
       S.set('homeRevision', o.revision);
       S.set('favorites', o.favorites || []);
       Pos.replaceWith(o);
+      // Chiave TMDB dell'account: se il server non l'ha mai avuta, diventa quella di questo TV.
+      if (typeof o.tmdbKey === 'string') { if (o.tmdbKey !== (S.get('tmdbKey') || '') && Server.onTmdbKey) Server.onTmdbKey(o.tmdbKey); }
+      else if (S.get('tmdbKey')) Server.queue({ op: 'tmdbKey', key: S.get('tmdbKey') }, true);
       if (Server.onState) Server.onState();
     },
 

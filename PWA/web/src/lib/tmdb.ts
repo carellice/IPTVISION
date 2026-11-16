@@ -1,5 +1,5 @@
 // TMDB (themoviedb.org): artwork, trends and genres for the "Film e serie" screen.
-// The key is per device, like the graphic style; the catalog stays the provider's, TMDB only picks and dresses it.
+// The key is the account's (saved on the server, cached here); the catalog stays the provider's, TMDB only picks and dresses it.
 import { useEffect, useState } from 'react'
 import type { Movie, Series } from '../../../shared/model.ts'
 import { type Entry, groupVariants, variantKey } from '../../../shared/text.ts'

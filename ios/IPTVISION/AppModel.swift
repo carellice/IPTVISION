@@ -159,8 +159,10 @@ final class AppModel: ObservableObject {
         tmdbKey.isEmpty ? [.live, .movies, .series, .search, .settings] : [.live, .discover, .search, .settings]
     }
 
-    func setTmdbKey(_ key: String) {
+    /// Con il server di casa la chiave è dell'account: la ricevono tutti i dispositivi collegati.
+    func setTmdbKey(_ key: String, fromServer: Bool = false) {
         tmdbKey = key.trimmingCharacters(in: .whitespaces)
+        if !fromServer { queueServerOp(["op": "tmdbKey", "key": tmdbKey], now: true) }
         AppSettings.tmdbKey = tmdbKey
         tmdbRows = nil
         tmdbError = nil
@@ -396,6 +398,9 @@ final class AppModel: ObservableObject {
         positions.replace(with: o)
         positionsVersion += 1
         if let h = o["hideAdult"] as? Bool, h != hideAdult { hideAdult = h }
+        // Chiave TMDB dell'account: se il server non l'ha mai avuta, diventa quella di questo dispositivo.
+        if let k = o["tmdbKey"] as? String { if k != tmdbKey { setTmdbKey(k, fromServer: true) } }
+        else if !tmdbKey.isEmpty { queueServerOp(["op": "tmdbKey", "key": tmdbKey], now: true) }
     }
 
     // MARK: - Liste

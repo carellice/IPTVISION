@@ -1201,7 +1201,7 @@
 
                                     <TextBlock Text="TMDB" Style="{StaticResource SectionTitle}" />
                                     <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,10"
-                                               Text="Con una chiave di themoviedb.org (la &#x22;Chiave API&#x22; o il &#x22;Token di accesso in lettura&#x22; che trovi nel tuo profilo TMDB, alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi." />
+                                               Text="Con una chiave di themoviedb.org (la &#x22;Chiave API&#x22; o il &#x22;Token di accesso in lettura&#x22; che trovi nel tuo profilo TMDB, alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi. Con il server di casa vale per tutti i dispositivi collegati." />
                                     <StackPanel Visibility="{Binding HasTmdb, Converter={StaticResource BoolToVis}}">
                                         <TextBlock Text="Chiave inserita." FontSize="13" Margin="2,0,0,10" />
                                         <Button Style="{StaticResource SecondaryButton}" Content="Rimuovi chiave" Command="{Binding RemoveTmdbKeyCommand}" HorizontalAlignment="Left" />

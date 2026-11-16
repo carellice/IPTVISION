@@ -211,7 +211,14 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void RemoveTmdbKey() => SetTmdbKey("");
 
+    /// <summary>Con il server di casa la chiave è dell'account: la ricevono tutti i dispositivi collegati.</summary>
     private void SetTmdbKey(string key)
+    {
+        ApplyTmdbKey(key);
+        QueueServerOp(new System.Text.Json.Nodes.JsonObject { ["op"] = "tmdbKey", ["key"] = _settings.TmdbKey ?? "" }, now: true);
+    }
+
+    private void ApplyTmdbKey(string key)
     {
         _settings.TmdbKey = key.Length == 0 ? null : key;
         TmdbKeyNow = _settings.TmdbKey;

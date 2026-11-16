@@ -191,6 +191,8 @@ export function state(): UserState {
     lastEpisode,
     myList,
     hideAdult: getMeta('hideAdult') === '1',
+    // Never set: absent, so a device with its own key sends it; removed: "" and every device drops it.
+    ...(getMeta('tmdbKey') !== null ? { tmdbKey: getMeta('tmdbKey')! } : {}),
     xtream: x ? { server: x.server, username: x.username } : null,
   }
 }
@@ -237,6 +239,9 @@ export function applyOps(ops: Op[]) {
           break
         case 'hideAdult':
           setMeta('hideAdult', o.on ? '1' : '0')
+          break
+        case 'tmdbKey':
+          if (typeof o.key === 'string' && o.key.length <= 1024) setMeta('tmdbKey', o.key.trim())
           break
       }
     }

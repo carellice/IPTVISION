@@ -167,7 +167,7 @@ struct TmdbSection: View {
         } header: {
             Text("TMDB")
         } footer: {
-            Text("Con una chiave di themoviedb.org (la \"Chiave API\" o il \"Token di accesso in lettura\" che trovi nel tuo profilo TMDB, alla voce API) film e serie diventano una sola schermata, \"Film e serie\", con copertine, tendenze e generi.")
+            Text("Con una chiave di themoviedb.org (la \"Chiave API\" o il \"Token di accesso in lettura\" che trovi nel tuo profilo TMDB, alla voce API) film e serie diventano una sola schermata, \"Film e serie\", con copertine, tendenze e generi. Con il server di casa vale per tutti i dispositivi collegati.")
         }
     }
 }

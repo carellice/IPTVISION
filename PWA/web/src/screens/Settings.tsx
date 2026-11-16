@@ -191,7 +191,7 @@ function TmdbKey() {
     <>
       <Text>
         Con una chiave di themoviedb.org (la "Chiave API" o il "Token di accesso in lettura" che trovi nel tuo profilo TMDB,
-        alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi.
+        alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi. La chiave vale per tutto l'account: la ricevono anche le app collegate a questo server.
       </Text>
       {hasTmdb() ? (
         <>

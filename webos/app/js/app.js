@@ -853,7 +853,7 @@
   /** La chiave TMDB del TV: con questa film e serie diventano una sola schermata con copertine, tendenze e generi. */
   function tmdbSettings(box) {
     box.appendChild(h('div', { class: 'group-title', text: 'TMDB' }));
-    box.appendChild(h('div', { class: 'dim', style: 'margin:0.3rem 0 0.6rem', text: 'Con una chiave di themoviedb.org (la "Chiave API" o il "Token di accesso in lettura" che trovi nel tuo profilo TMDB, alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi.' }));
+    box.appendChild(h('div', { class: 'dim', style: 'margin:0.3rem 0 0.6rem', text: 'Con una chiave di themoviedb.org (la "Chiave API" o il "Token di accesso in lettura" che trovi nel tuo profilo TMDB, alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi. Con il server di casa vale per tutti i dispositivi collegati.' }));
     if (S.get('tmdbKey')) {
       box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Chiave' }), 'Inserita']));
       box.appendChild(V.focusable(h('div', { class: 'btn', data: { key: 'tmdb-remove' }, text: 'Rimuovi chiave' }), function () { setTmdbKey(''); }));
@@ -873,13 +873,21 @@
     box.appendChild(V.focusable(h('div', { class: 'btn primary', text: 'Salva chiave' }), save));
   }
 
-  function setTmdbKey(k) {
+  /** Con il server di casa la chiave è dell'account: la ricevono tutti i dispositivi collegati. */
+  function setTmdbKey(k, fromServer) {
     S.set('tmdbKey', k);
+    if (!fromServer) Server.queue({ op: 'tmdbKey', key: k }, true);
     IPTV.Tmdb.clear();
     A.tmdbRows = null; A.tmdbError = null; A.tmdbLoading = false;
     A.openCat.Discover = null;
+    if (fromServer) {
+      if (!S.get('tmdbKey') && A.section === 'Discover') A.section = 'Live';
+      if (S.get('tmdbKey') && (A.section === 'Movies' || A.section === 'Series')) A.section = 'Discover';
+      return; // ridisegna Server.onState
+    }
     render(false, root.querySelector('[data-key="nav-Settings"]'));
   }
+  Server.onTmdbKey = function (k) { setTmdbKey(k, true); };
 
   // ---------- Film e serie (TMDB) ----------
 

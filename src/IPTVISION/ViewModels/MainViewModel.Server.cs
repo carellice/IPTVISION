@@ -126,6 +126,12 @@ public sealed partial class MainViewModel
             if (SelectedCategory?.IsFavorites == true) ApplyFilter();
         }
         else RefreshContinueCount();
+        // Chiave TMDB dell'account: il server non l'ha mai avuta, allora diventa quella di questo PC.
+        if (state["tmdbKey"] is JsonValue k && k.TryGetValue<string>(out var key))
+        {
+            if (key != (_settings.TmdbKey ?? "")) ApplyTmdbKey(key);
+        }
+        else if (HasTmdb) QueueServerOp(new JsonObject { ["op"] = "tmdbKey", ["key"] = _settings.TmdbKey }, now: true);
     }
 
     /// <summary>

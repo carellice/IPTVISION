@@ -127,8 +127,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var tmdbError by mutableStateOf<String?>(null); private set
     private var tmdbJob: Job? = null
 
-    fun setTmdb(key: String) {
+    /** Con il server di casa la chiave è dell'account: la ricevono tutti i dispositivi collegati. */
+    fun setTmdb(key: String, fromServer: Boolean = false) {
         tmdbKey = key.trim()
+        if (!fromServer) queueServerOp(JSONObject().put("op", "tmdbKey").put("key", tmdbKey), now = true)
         settings.tmdbKey = tmdbKey
         Tmdb.clearCache()
         tmdbRows = null
@@ -870,6 +872,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         settings.favorites = favorites
         positions.replaceWith(o)
         positionsVersion++
+        // Chiave TMDB dell'account: se il server non l'ha mai avuta, diventa quella di questo dispositivo.
+        if (o.has("tmdbKey")) o.optString("tmdbKey").let { if (it != tmdbKey) setTmdb(it, fromServer = true) }
+        else if (hasTmdb) queueServerOp(JSONObject().put("op", "tmdbKey").put("key", tmdbKey), now = true)
     }
 
     /**

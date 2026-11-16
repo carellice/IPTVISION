@@ -92,6 +92,8 @@ export type UserState = {
   /** "La mia lista": films ("m:{id}") and series ("s:{id}") with when they were added. */
   myList: Record<string, number>
   hideAdult: boolean
+  /** TMDB key of the account, for "Film e serie" on every device; absent if it was never set. */
+  tmdbKey?: string
   /** The IPTV account is set (its password never leaves the server). */
   xtream: { server: string; username: string } | null
 }
@@ -106,3 +108,4 @@ export type Op =
   | { op: 'favorite'; streamId: number; on: boolean }
   | { op: 'myList'; key: string; on: boolean }
   | { op: 'hideAdult'; on: boolean }
+  | { op: 'tmdbKey'; key: string }

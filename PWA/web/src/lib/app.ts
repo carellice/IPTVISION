@@ -10,7 +10,7 @@ import {
   library, search as searchLib, sortChannels, sortMovies, sortSeries, toChannels, toMovies, toSeries,
 } from './library.ts'
 import { PlayerController } from './player.ts'
-import { hasTmdb, setTmdbKey } from './tmdb.ts'
+import { hasTmdb, setTmdbKey, tmdbKey } from './tmdb.ts'
 import { toast } from '../components/ui.tsx'
 
 // AppViewModel.kt for the browser: navigation, catalog, favorites and positions, playback.
@@ -230,7 +230,13 @@ export function setSection(s: Section) {
   emit()
 }
 
+/** The TMDB key is the account's: saved on the server, so every device gets it. */
 export function setTmdb(key: string) {
+  applyTmdb(key)
+  queue({ op: 'tmdbKey', key: tmdbKey() }, true)
+}
+
+function applyTmdb(key: string) {
   setTmdbKey(key)
   app.open = { ...app.open, Discover: null }
   if (hasTmdb() && (app.section === 'Movies' || app.section === 'Series')) setSection('Discover')
@@ -289,6 +295,9 @@ function applyState(s: UserState & { unchanged?: boolean }) {
   app.pos = { positions: s.positions, watched: new Set(s.watched), lastEpisode: s.lastEpisode }
   app.positionsVersion++
   if (hideChanged) rebuildLibraries()
+  // The server never had a key: this device's one becomes the account's.
+  if (s.tmdbKey === undefined) { if (hasTmdb()) queue({ op: 'tmdbKey', key: tmdbKey() }, true) }
+  else if (s.tmdbKey !== tmdbKey()) { applyTmdb(s.tmdbKey); return }
   emit()
 }
 
