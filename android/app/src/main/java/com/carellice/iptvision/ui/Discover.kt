@@ -81,6 +81,15 @@ import com.carellice.iptvision.data.groupVariants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -125,7 +134,7 @@ private enum class Filter { All, Movie, Tv }
 private val LocalTvPin = compositionLocalOf { false }
 
 /** Aperta dal menu, la pagina riparte dall'inizio. */
-fun resetDiscoverScroll() { Saved.index = 0; Saved.offset = 0 }
+fun resetDiscoverScroll() { Saved.index = 0; Saved.offset = 0; Saved.rows.clear(); Saved.focusAll = null }
 
 /**
  * Sul TV la riga o la locandina col focus si porta sempre allo stesso punto (in alto, a sinistra) invece
@@ -145,7 +154,16 @@ private fun TvRow(content: @Composable () -> Unit) {
 }
 
 /** Dove si era quando si è aperto un titolo o una categoria, per tornare allo stesso punto. */
-private object Saved { var filter = Filter.All; var index = 0; var offset = 0 }
+private object Saved {
+    var filter = Filter.All; var index = 0; var offset = 0
+    /** Fin dove era scorsa ogni riga, per titolo. */
+    val rows = HashMap<String, Pair<Int, Int>>()
+    /** La riga da cui si è aperto "Guarda tutto": al ritorno il focus torna lì. */
+    var focusAll: String? = null
+    /** Righe TMDB già confrontate col catalogo: tornando alla pagina non si rifà il lavoro (e la pagina non salta). */
+    var matchKey: List<Any?>? = null
+    var match: List<Pair<Tmdb.Row, List<Title>>>? = null
+}
 
 private fun AppViewModel.openTitle(t: Title) {
     if (t.movie != null) openMovieEntry(t.movie) else openSeriesEntry(t.show!!)
@@ -196,8 +214,11 @@ private fun DiscoverHome(vm: AppViewModel) {
 
     // Le liste di TMDB diventano titoli del catalogo, ognuno una volta per riga (lavoro pesante: fuori dal thread della UI).
     val rows = vm.tmdbRows
-    val matched by produceState<List<Pair<Tmdb.Row, List<Title>>>?>(null, movies, series, rows) {
+    val matchKey = listOf(System.identityHashCode(movies), System.identityHashCode(series), System.identityHashCode(rows))
+    val known0 = Saved.match.takeIf { Saved.matchKey == matchKey && rows != null }
+    val matched by produceState(known0, movies, series, rows) {
         if (rows == null) { value = null; return@produceState }
+        if (known0 != null) { value = known0; return@produceState }
         value = withContext(Dispatchers.Default) {
             val index = Tmdb.index(movies.items, series.items)
             rows.map { r ->
@@ -212,6 +233,7 @@ private fun DiscoverHome(vm: AppViewModel) {
                 }
             }
         }
+        Saved.matchKey = matchKey; Saved.match = value
     }
     val known = remember(matched) { matched.orEmpty().flatMap { it.second }.associate { it.key to it.tmdb } }
 
@@ -269,13 +291,13 @@ private fun DiscoverHome(vm: AppViewModel) {
     LazyColumn(state = state, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = if (tv) 300.dp else 30.dp)) {
         // Da bordo a bordo: i filtri stanno sopra l'immagine in alto, come nelle app di streaming.
         when {
-            hero.isNotEmpty() -> item("hero") {
+            hero.isNotEmpty() && !tv -> item("hero") {
                 Box {
                     Hero(vm, hero, wide)
                     chips(Modifier.padding(top = chipsTop))
                 }
             }
-            tmdbPending && vm.hasTmdb -> item("hero") {
+            tmdbPending && vm.hasTmdb && !tv -> item("hero") {
                 Box {
                     HeroSkeleton(wide, edge)
                     chips(Modifier.padding(top = chipsTop))
@@ -441,10 +463,25 @@ private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = edge + 2.dp)) {
             Text(title, color = C.Text, fontSize = if (wide) 20.sp else 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         }
+        val tv = LocalTvPin.current
+        val st = rememberLazyListState(Saved.rows[title]?.first ?: 0, Saved.rows[title]?.second ?: 0)
+        DisposableEffect(title) { onDispose { Saved.rows[title] = st.firstVisibleItemIndex to st.firstVisibleItemScrollOffset } }
+        val first = remember { FocusRequester() }
+        val scope = rememberCoroutineScope()
+        // TV: arrivando con ▲ ▼ da un'altra riga si parte sempre dal primo titolo, anche se la riga era scorsa.
+        @OptIn(ExperimentalComposeUiApi::class)
+        val enter = if (!tv) Modifier else Modifier.focusProperties {
+            onEnter = {
+                if (requestedFocusDirection == FocusDirection.Up || requestedFocusDirection == FocusDirection.Down) {
+                    if (st.firstVisibleItemIndex == 0) first.requestFocus()
+                    else { cancelFocusChange(); scope.launch { st.scrollToItem(0); first.requestFocus() } }
+                }
+            }
+        }.focusGroup()
         // Spazio attorno per il riquadro che si ingrandisce quando ha il focus.
-        TvRow { LazyRow(horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp)) {
-            content()
-            if (onAll != null) item("__all") { SeeAllTile(onAll) }
+        TvRow { LazyRow(state = st, modifier = enter, horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp)) {
+            FirstTagged(this, first).content()
+            if (onAll != null) item("__all") { SeeAllTile(restore = Saved.focusAll == title) { Saved.focusAll = title; onAll() } }
         } }
     }
 }
@@ -466,10 +503,13 @@ private fun PosterTile(vm: AppViewModel, t: Title, known: Tmdb.Card?, lookup: Bo
 
 /** In fondo alla riga, grande come una locandina: apre tutti i titoli della categoria. */
 @Composable
-private fun SeeAllTile(onClick: () -> Unit) {
+private fun SeeAllTile(restore: Boolean, onClick: () -> Unit) {
     val wide = LocalWide.current
+    val me = remember { FocusRequester() }
+    // Tornando da "Guarda tutto" il focus riparte da qui.
+    if (restore) LaunchedEffect(Unit) { Saved.focusAll = null; delay(60); runCatching { me.requestFocus() } }
     Box(
-        Modifier.width(if (wide) 154.dp else 112.dp).aspectRatio(2f / 3f)
+        Modifier.width(if (wide) 154.dp else 112.dp).aspectRatio(2f / 3f).focusRequester(me)
             .tvClickable(shape = RoundedCornerShape(8.dp), focusScale = 1.08f, background = C.Surface, focusedBackground = C.SurfacePressed, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -479,6 +519,25 @@ private fun SeeAllTile(onClick: () -> Unit) {
             }
             Text("Guarda tutto", color = C.Text, fontSize = if (wide) 15.sp else 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
         }
+    }
+}
+
+/** Il primo titolo della riga riceve [first], qualunque sia il modo in cui la riga elenca i suoi titoli. */
+private class FirstTagged(private val inner: LazyListScope, private val first: FocusRequester) : LazyListScope by inner {
+    private var tagged = false
+
+    override fun item(key: Any?, contentType: Any?, content: @Composable LazyItemScope.() -> Unit) {
+        if (tagged) return inner.item(key, contentType, content)
+        tagged = true
+        val f = first
+        inner.item(key, contentType) { Box(Modifier.focusRequester(f)) { content() } }
+    }
+
+    override fun items(count: Int, key: ((Int) -> Any)?, contentType: (Int) -> Any?, itemContent: @Composable LazyItemScope.(Int) -> Unit) {
+        if (tagged || count == 0) return inner.items(count, key, contentType, itemContent)
+        tagged = true
+        val f = first
+        inner.items(count, key, contentType) { i -> if (i == 0) Box(Modifier.focusRequester(f)) { itemContent(i) } else itemContent(i) }
     }
 }
 

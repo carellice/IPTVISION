@@ -150,8 +150,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         tmdbError = null
         tmdbJob = viewModelScope.launch {
             launch { try { Tmdb.check(key) } catch (e: CancellationException) { throw e } catch (e: Exception) { tmdbError = e.message } }
-            tmdbRows = Tmdb.loadRows(key)
+            tmdbRows = tmdbRowsOfToday(key)
         }
+    }
+
+    /** Le classifiche di TMDB cambiano una volta al giorno: si scaricano al primo avvio della giornata e poi si rileggono dal file. */
+    private suspend fun tmdbRowsOfToday(key: String): List<Tmdb.Row> {
+        val f = File(cacheDir, "tmdb_rows.json")
+        val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(java.util.Date())
+        withContext(Dispatchers.IO) {
+            try { if (f.exists()) Tmdb.rowsFromJson(f.readText(), key, day) else null } catch (e: Exception) { null }
+        }?.let { return it }
+        val rows = Tmdb.loadRows(key)
+        // Solo se TMDB ha risposto: righe vuote (rete assente) non devono restare per tutto il giorno.
+        if (rows.any { it.items.isNotEmpty() }) withContext(Dispatchers.IO) {
+            try { f.writeText(Tmdb.rowsToJson(rows, key, day)) } catch (e: Exception) { Log.w("Righe TMDB non salvate", e) }
+        }
+        return rows
     }
 
     /** "Film e serie": la categoria aperta, "m:<id>" per i film e "s:<id>" per le serie; null = schermata principale. */

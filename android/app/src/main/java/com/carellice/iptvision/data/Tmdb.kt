@@ -174,6 +174,36 @@ object Tmdb {
         }.awaitAll()
     }
 
+    /** Righe salvate in [json] se sono di [day] e della stessa chiave; altrimenti null. */
+    fun rowsFromJson(json: String, key: String, day: String): List<Row>? {
+        val o = JSONObject(json)
+        if (o.optString("day") != day || o.optInt("key") != key.hashCode()) return null
+        val rs = o.getJSONArray("rows")
+        return (0 until rs.length()).map { i ->
+            val r = rs.getJSONObject(i)
+            val cs = r.getJSONArray("items")
+            Row(r.getString("id"), r.getString("title"), (0 until cs.length()).map { j ->
+                val c = cs.getJSONObject(j)
+                val ks = c.getJSONArray("keys")
+                Card(
+                    c.getInt("id"), Kind.valueOf(c.getString("kind")), c.getString("title"), c.optString("year").ifEmpty { null },
+                    c.optString("overview"), c.optString("poster").ifEmpty { null }, c.optString("backdrop").ifEmpty { null },
+                    c.optDouble("vote", 0.0), (0 until ks.length()).map { ks.getString(it) },
+                )
+            }, r.optBoolean("top"))
+        }
+    }
+
+    fun rowsToJson(rows: List<Row>, key: String, day: String): String = JSONObject()
+        .put("day", day).put("key", key.hashCode())
+        .put("rows", org.json.JSONArray(rows.map { r ->
+            JSONObject().put("id", r.id).put("title", r.title).put("top", r.top).put("items", org.json.JSONArray(r.items.map { c ->
+                JSONObject().put("id", c.id).put("kind", c.kind.name).put("title", c.title).put("year", c.year ?: "")
+                    .put("overview", c.overview).put("poster", c.poster ?: "").put("backdrop", c.backdrop ?: "")
+                    .put("vote", c.vote).put("keys", org.json.JSONArray(c.keys))
+            }))
+        })).toString()
+
     /** La scheda TMDB di un titolo del catalogo (continua a guardare, schede di dettaglio). */
     suspend fun lookup(key: String, kind: Kind, name: String, year: String?): Card? {
         val query = matchKey(name)
