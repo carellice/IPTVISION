@@ -1,12 +1,6 @@
 package com.carellice.iptvision.ui
 
 import androidx.compose.animation.core.tween
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -81,7 +75,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
@@ -89,7 +82,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -302,7 +294,7 @@ private fun DiscoverHome(vm: AppViewModel) {
     val pinRows = remember(density) { with(density) { pinTo(44.dp.toPx()) } }
     @OptIn(ExperimentalFoundationApi::class)
     CompositionLocalProvider(LocalTvPin provides tv, LocalBringIntoViewSpec provides (if (tv) pinRows else LocalBringIntoViewSpec.current)) {
-    LazyColumn(state = state, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = if (tv) 300.dp else 30.dp)) {
+    LazyColumn(state = state, modifier = Modifier.fillMaxSize(), overscrollEffect = if (tv) null else androidx.compose.foundation.rememberOverscrollEffect(), contentPadding = PaddingValues(bottom = if (tv) 300.dp else 30.dp)) {
         item("chips") { chips(Modifier.padding(top = if (edge > 0.dp) 12.dp else 0.dp, bottom = 12.dp)) }
         vm.tmdbError?.let { e ->
             item("error") { Text("$e Controlla la chiave in Impostazioni → TMDB.", color = C.Danger, fontSize = 14.sp, modifier = Modifier.padding(start = edge + 2.dp, top = 12.dp, end = edge)) }
@@ -383,43 +375,22 @@ private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> 
         val tv = LocalTvPin.current
         val st = rememberLazyListState(Saved.rows[title]?.first ?: 0, Saved.rows[title]?.second ?: 0)
         DisposableEffect(title) { onDispose { Saved.rows[title] = st.firstVisibleItemIndex to st.firstVisibleItemScrollOffset } }
-        val first = remember { FocusRequester() }
-        val scope = rememberCoroutineScope()
-        // TV: arrivando con ▲ ▼ da un'altra riga si parte sempre dal primo titolo, anche se la riga era scorsa.
-        // Lasciata con ▲ ▼, la riga torna subito all'inizio: al ritorno il primo titolo è già lì e il focus ci
-        // va diretto, senza scorrimenti in corsa che lo spostano mentre si scende veloci.
-        val leaving = remember { booleanArrayOf(false) }
+        // Un FocusRequester per riquadro (per posizione nella riga), per scegliere dove entra il focus.
+        val reqs = remember { HashMap<Int, FocusRequester>() }
+        // TV: arrivando con ▲ ▼ da un'altra riga il focus va sul riquadro fermo a sinistra (il primo, se la riga
+        // non è scorsa) e la riga resta com'è: nessuno scorrimento di lato mentre ci si sposta in verticale.
         @OptIn(ExperimentalComposeUiApi::class)
-        val enter = if (!tv) Modifier else Modifier.onPreviewKeyEvent {
-            if (it.type == KeyEventType.KeyDown) leaving[0] = it.key == Key.DirectionUp || it.key == Key.DirectionDown
-            false
-        }.onFocusChanged {
-            if (!it.hasFocus && leaving[0]) { leaving[0] = false; scope.launch { st.scrollToItem(0) } }
-        }.focusProperties {
+        val enter = if (!tv) Modifier else Modifier.focusProperties {
             onEnter = {
                 if (requestedFocusDirection == FocusDirection.Up || requestedFocusDirection == FocusDirection.Down) {
-                    if (st.firstVisibleItemIndex == 0) first.requestFocus()
-                    // Riga scorsa: il focus entra subito (mai bloccato fuori), poi la riga torna all'inizio e
-                    // il focus passa al primo titolo appena è disegnato.
-                    else scope.launch {
-                        st.scrollToItem(0)
-                        repeat(10) {
-                            withFrameNanos { }
-                            if (runCatching { first.requestFocus() }.isSuccess && st.firstVisibleItemIndex == 0) {
-                                // Lo scorrimento verso il titolo di prima può essere ancora in corso: si riallinea all'inizio.
-                                withFrameNanos { }
-                                st.scrollToItem(0)
-                                return@launch
-                            }
-                        }
-                    }
+                    val k = st.layoutInfo.visibleItemsInfo.firstOrNull { it.offset >= -4 }?.index ?: st.firstVisibleItemIndex
+                    reqs[k]?.let { r -> runCatching { r.requestFocus() } }
                 }
             }
         }.focusGroup()
         // Spazio attorno per il riquadro che si ingrandisce quando ha il focus.
-        CompositionLocalProvider(LocalRowId provides title) { TvRow { LazyRow(state = st, modifier = enter, horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp)) {
-            FirstTagged(this, first).content()
-            if (onAll != null) item("__all") { SeeAllTile(captions, restore = Saved.focusAll == title) { Saved.focusAll = title; onAll() } }
+        CompositionLocalProvider(LocalRowId provides title) { TvRow { LazyRow(state = st, modifier = enter, overscrollEffect = if (tv) null else androidx.compose.foundation.rememberOverscrollEffect(), horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp)) {
+            Tagged(this, reqs).apply(content).item("__all", onAll != null) { SeeAllTile(captions, restore = Saved.focusAll == title) { Saved.focusAll = title; onAll?.invoke() } }
         } } }
     }
 }
@@ -464,23 +435,24 @@ private fun SeeAllTile(captions: Boolean, restore: Boolean, onClick: () -> Unit)
     }
 }
 
-/** Il primo titolo della riga riceve [first], qualunque sia il modo in cui la riga elenca i suoi titoli. */
-private class FirstTagged(private val inner: LazyListScope, private val first: FocusRequester) : LazyListScope by inner {
-    private var tagged = false
+/** Ogni riquadro della riga avvolto col suo FocusRequester, indicizzato per posizione. */
+private class Tagged(private val inner: LazyListScope, private val reqs: HashMap<Int, FocusRequester>) : LazyListScope by inner {
+    private var next = 0
+    private fun req(i: Int) = reqs.getOrPut(i) { FocusRequester() }
 
     override fun item(key: Any?, contentType: Any?, content: @Composable LazyItemScope.() -> Unit) {
-        if (tagged) return inner.item(key, contentType, content)
-        tagged = true
-        val f = first
+        val f = req(next++)
         inner.item(key, contentType) { Box(Modifier.focusRequester(f)) { content() } }
     }
 
     override fun items(count: Int, key: ((Int) -> Any)?, contentType: (Int) -> Any?, itemContent: @Composable LazyItemScope.(Int) -> Unit) {
-        if (tagged || count == 0) return inner.items(count, key, contentType, itemContent)
-        tagged = true
-        val f = first
-        inner.items(count, key, contentType) { i -> if (i == 0) Box(Modifier.focusRequester(f)) { itemContent(i) } else itemContent(i) }
+        val base = next
+        next += count
+        val r = reqs
+        inner.items(count, key, contentType) { i -> Box(Modifier.focusRequester(r.getOrPut(base + i) { FocusRequester() })) { itemContent(i) } }
     }
+
+    fun item(key: Any, show: Boolean, content: @Composable LazyItemScope.() -> Unit) { if (show) item(key, null, content) }
 }
 
 @Composable
