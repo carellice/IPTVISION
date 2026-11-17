@@ -85,6 +85,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
@@ -351,7 +352,7 @@ private fun DiscoverHome(vm: AppViewModel) {
             val titles = remember(id, isMovie, movies, series, vm.positionsVersion) {
                 if (isMovie) vm.moviesFor(id).take(30).map { it.title() } else vm.seriesFor(id).take(30).map { it.title() }
             }
-            if (titles.isNotEmpty()) DRow(if (isMovie) name else "$name · Serie", gap, onAll = { vm.openCategory(Section.Discover, "${if (isMovie) "m" else "s"}:$id") }) {
+            if (titles.isNotEmpty()) DRow(if (isMovie) name else "$name · Serie", gap, onAll = { vm.openCategory(Section.Discover, "${if (isMovie) "m" else "s"}:$id") }, captions = true) {
                 items(titles, key = { it.key }) { t -> PosterTile(vm, t, null, caption = true) }
             }
         }
@@ -459,7 +460,7 @@ private fun HeroButton(text: String?, icon: androidx.compose.ui.graphics.vector.
 // ---------- Le righe ----------
 
 @Composable
-private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> Unit)? = null, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> Unit)? = null, captions: Boolean = false, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
     val wide = LocalWide.current
     val edge = LocalEdge.current
     Column(Modifier.padding(top = top)) {
@@ -477,14 +478,27 @@ private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> 
             onEnter = {
                 if (requestedFocusDirection == FocusDirection.Up || requestedFocusDirection == FocusDirection.Down) {
                     if (st.firstVisibleItemIndex == 0) first.requestFocus()
-                    else { cancelFocusChange(); scope.launch { st.scrollToItem(0); first.requestFocus() } }
+                    // Riga scorsa: il focus entra subito (mai bloccato fuori), poi la riga torna all'inizio e
+                    // il focus passa al primo titolo appena è disegnato.
+                    else scope.launch {
+                        st.scrollToItem(0)
+                        repeat(10) {
+                            withFrameNanos { }
+                            if (runCatching { first.requestFocus() }.isSuccess && st.firstVisibleItemIndex == 0) {
+                                // Lo scorrimento verso il titolo di prima può essere ancora in corso: si riallinea all'inizio.
+                                withFrameNanos { }
+                                st.scrollToItem(0)
+                                return@launch
+                            }
+                        }
+                    }
                 }
             }
         }.focusGroup()
         // Spazio attorno per il riquadro che si ingrandisce quando ha il focus.
         TvRow { LazyRow(state = st, modifier = enter, horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp)) {
             FirstTagged(this, first).content()
-            if (onAll != null) item("__all") { SeeAllTile(restore = Saved.focusAll == title) { Saved.focusAll = title; onAll() } }
+            if (onAll != null) item("__all") { SeeAllTile(captions, restore = Saved.focusAll == title) { Saved.focusAll = title; onAll() } }
         } }
     }
 }
@@ -506,22 +520,25 @@ private fun PosterTile(vm: AppViewModel, t: Title, known: Tmdb.Card?, lookup: Bo
 
 /** In fondo alla riga, grande come una locandina: apre tutti i titoli della categoria. */
 @Composable
-private fun SeeAllTile(restore: Boolean, onClick: () -> Unit) {
+private fun SeeAllTile(captions: Boolean, restore: Boolean, onClick: () -> Unit) {
     val wide = LocalWide.current
     val me = remember { FocusRequester() }
     // Tornando da "Guarda tutto" il focus riparte da qui.
     if (restore) LaunchedEffect(Unit) { Saved.focusAll = null; delay(60); runCatching { me.requestFocus() } }
-    Box(
-        Modifier.width(if (wide) 154.dp else 112.dp).aspectRatio(2f / 3f).focusRequester(me)
-            .tvClickable(shape = RoundedCornerShape(8.dp), focusScale = 1.08f, background = C.Surface, focusedBackground = C.SurfacePressed, onClick = onClick),
-        contentAlignment = Alignment.Center,
+    // Alta come le locandine della riga (titolo sotto compreso): così ▲ ▼ escono dalla riga anche da qui.
+    Column(
+        Modifier.width(if (wide) 154.dp else 112.dp).focusRequester(me)
+            .tvClickable(shape = RoundedCornerShape(8.dp), focusScale = 1.08f, background = Color.Transparent, focusedBackground = Color.Transparent, onClick = onClick),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(if (wide) 46.dp else 38.dp).clip(CircleShape).border(2.dp, C.Text2, CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = C.Text, modifier = Modifier.size(if (wide) 24.dp else 20.dp))
+        Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(8.dp)).background(C.Surface), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(if (wide) 46.dp else 38.dp).clip(CircleShape).border(2.dp, C.Text2, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = C.Text, modifier = Modifier.size(if (wide) 24.dp else 20.dp))
+                }
+                Text("Guarda tutto", color = C.Text, fontSize = if (wide) 15.sp else 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
             }
-            Text("Guarda tutto", color = C.Text, fontSize = if (wide) 15.sp else 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
         }
+        if (captions) Box(Modifier.height(38.dp))
     }
 }
 
@@ -721,10 +738,11 @@ private fun BoxScope.LoadingBadge(vm: AppViewModel, extra: String?) {
     var shown by remember { mutableStateOf("") }
     androidx.compose.runtime.SideEffect { if (text != null) shown = text }
     AnimatedVisibility(text != null, Modifier.align(Alignment.TopCenter), enter = fadeIn(), exit = fadeOut()) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        // In alto a destra: non copre i titoli delle righe.
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
             LinearProgressIndicator(Modifier.fillMaxWidth().height(3.dp), color = C.Accent, trackColor = Color.Transparent)
             Row(
-                Modifier.padding(top = 10.dp).clip(RoundedCornerShape(50)).background(Color(0xD9000000)).padding(horizontal = 14.dp, vertical = 8.dp),
+                Modifier.padding(top = 10.dp, end = 20.dp).clip(RoundedCornerShape(50)).background(Color(0xD9000000)).padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
