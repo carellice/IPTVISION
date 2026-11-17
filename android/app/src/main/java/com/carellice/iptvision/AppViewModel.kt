@@ -193,6 +193,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return true
         }
         if (screen == Screen.Home && openCategory(section) != null) { closeCategory(section); return true }
+        // TV, "Film e serie": Indietro riapre il menu a sinistra; un altro Indietro torna alla TV in diretta.
+        if (isTv && screen == Screen.Home && section == Section.Discover && !menuFocused) { focusMenu++; return true }
         if (screen == Screen.Home && section != Section.Live) { section = Section.Live; return true }
         return false
     }
@@ -218,6 +220,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var seriesProgress by mutableStateOf<Pair<Long, Long>?>(null); private set
     /** Film o serie che si aggiornano in sottofondo: la lista salvata resta a schermo. */
     var catalogUpdating by mutableStateOf(0); private set
+    /** TV: il menu a sinistra ha il focus. */
+    var menuFocused = false
+    /** TV: cresce quando il menu a sinistra deve prendere il focus (e aprirsi). */
+    var focusMenu by mutableStateOf(0); private set
     /** TV: sezione appena scelta dal menu, il focus deve passare ai contenuti (lo prende la sezione, se sa dove). */
     var focusContent by mutableStateOf(false)
     /** Messaggio breve da mostrare una volta (es. "12 film nuovi"). */

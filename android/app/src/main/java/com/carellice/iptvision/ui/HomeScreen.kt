@@ -131,9 +131,9 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
             // Modern UI: pivot sugli schermi larghi, sul telefono la barra in basso come gli altri stili.
             if (Skin.metro && wide) Pivot(vm, wide, onVoiceSearch)
             else if (wide) {
-                // TV, tranne la TV in diretta: il menu è una colonna di icone che si apre sopra i contenuti
+                // TV: il menu è una colonna di icone che si apre sopra i contenuti
                 // quando ci arriva il focus, come nelle app di streaming. Sempre lo stesso SideNav, così il focus non si perde.
-                val rail = vm.isTv && vm.section != Section.Live
+                val rail = vm.isTv
                 Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Row(Modifier.fillMaxSize()) {
                     Box(Modifier.width(if (rail) RailWidth else NavWidth))
@@ -295,6 +295,7 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { if (vm.isTv) runCatching { first.requestFocus() } }
     var inside by remember { mutableStateOf(false) }
+    LaunchedEffect(vm.focusMenu) { if (vm.focusMenu > 0) runCatching { first.requestFocus() } }
     // Scelta una voce, il menu si chiude subito e resta chiuso finché il focus non ci torna.
     var closed by remember { mutableStateOf(false) }
     val open = !rail || (inside && !closed)
@@ -307,7 +308,7 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
                 if (open) Modifier.material(C.Panel)
                 else Modifier.background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(C.Bg, C.Bg.copy(alpha = 0.6f))))
             )
-            .onFocusChanged { inside = it.hasFocus; if (!it.hasFocus) closed = false }
+            .onFocusChanged { inside = it.hasFocus; vm.menuFocused = it.hasFocus; if (!it.hasFocus) closed = false }
             // Entrando con ◀ si torna sulla sezione aperta, non sulla voce più vicina.
             .focusProperties { onEnter = { first.requestFocus() } }
             .focusGroup()
@@ -334,8 +335,7 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
                         ) { // Col telecomando si scorre il menu e si apre la sezione solo con OK.
                             if (s == Section.Discover) resetDiscoverScroll()
                             vm.section = s
-                            // Conta la sezione scelta, non quella di prima: dalla TV in diretta il menu era ancora aperto.
-                            if (vm.isTv && s != Section.Live) {
+                            if (vm.isTv) {
                                 closed = true
                                 vm.focusContent = true
                                 // La sezione che sa dove mettere il focus lo prende da sé; altrimenti il primo elemento a destra.
