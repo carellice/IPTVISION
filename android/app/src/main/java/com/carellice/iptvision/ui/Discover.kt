@@ -1,6 +1,12 @@
 package com.carellice.iptvision.ui
 
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -136,6 +142,10 @@ fun resetDiscoverScroll() { Saved.index = 0; Saved.offset = 0; Saved.rows.clear(
  */
 @OptIn(ExperimentalFoundationApi::class)
 private fun pinTo(leadPx: Float) = object : BringIntoViewSpec {
+    // Curva fissa e non la molla predefinita: con i tasti premuti in fretta la molla accumula velocità e
+    // supera il punto, poi torna indietro (il "rimbalzo").
+    @Deprecated("") override val scrollAnimationSpec: androidx.compose.animation.core.AnimationSpec<Float> =
+        tween(180, easing = androidx.compose.animation.core.CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f))
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = offset - leadPx
 }
 
@@ -376,8 +386,16 @@ private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> 
         val first = remember { FocusRequester() }
         val scope = rememberCoroutineScope()
         // TV: arrivando con ▲ ▼ da un'altra riga si parte sempre dal primo titolo, anche se la riga era scorsa.
+        // Lasciata con ▲ ▼, la riga torna subito all'inizio: al ritorno il primo titolo è già lì e il focus ci
+        // va diretto, senza scorrimenti in corsa che lo spostano mentre si scende veloci.
+        val leaving = remember { booleanArrayOf(false) }
         @OptIn(ExperimentalComposeUiApi::class)
-        val enter = if (!tv) Modifier else Modifier.focusProperties {
+        val enter = if (!tv) Modifier else Modifier.onPreviewKeyEvent {
+            if (it.type == KeyEventType.KeyDown) leaving[0] = it.key == Key.DirectionUp || it.key == Key.DirectionDown
+            false
+        }.onFocusChanged {
+            if (!it.hasFocus && leaving[0]) { leaving[0] = false; scope.launch { st.scrollToItem(0) } }
+        }.focusProperties {
             onEnter = {
                 if (requestedFocusDirection == FocusDirection.Up || requestedFocusDirection == FocusDirection.Down) {
                     if (st.firstVisibleItemIndex == 0) first.requestFocus()
