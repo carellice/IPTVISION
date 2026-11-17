@@ -137,6 +137,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setTmdb(key: String, fromServer: Boolean = false) {
         val own = key.trim()
         if (fromServer && own == settings.tmdbKey) return
+        // Stessa chiave di adesso (per esempio quella integrata ricevuta dal server): niente da ricaricare,
+        // altrimenti "Film e serie" ricaricava le righe e il titolo col focus spariva.
+        if (fromServer && own.ifEmpty { BuildConfig.TMDB_KEY } == tmdbKey) { settings.tmdbKey = own; return }
         tmdbKey = own.ifEmpty { BuildConfig.TMDB_KEY }
         // Al server va solo la chiave messa a mano: quella integrata resta nell'app.
         if (!fromServer) queueServerOp(JSONObject().put("op", "tmdbKey").put("key", own), now = true)
@@ -233,6 +236,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var focusMenu by mutableStateOf(0); private set
     /** TV: sezione appena scelta dal menu, il focus deve passare ai contenuti (lo prende la sezione, se sa dove). */
     var focusContent by mutableStateOf(false)
+    /** TV: ultimo tasto premuto e ultimo ◀ (il menu si apre solo se ci si va con ◀ o lo chiede l'app). */
+    var lastKeyAt = 0L
+    var lastLeftAt = 0L
     /** Messaggio breve da mostrare una volta (es. "12 film nuovi"). */
     var notice by mutableStateOf<String?>(null)
     /** Liste da riscaricare anche se la copia salvata è recente ("Aggiorna"). */
@@ -930,7 +936,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         positionsVersion++
         // Chiave TMDB dell'account: se il server non l'ha mai avuta, diventa quella di questo dispositivo.
         if (o.has("tmdbKey")) o.optString("tmdbKey").let { if (it != settings.tmdbKey) setTmdb(it, fromServer = true) }
-        else if (hasTmdb) queueServerOp(JSONObject().put("op", "tmdbKey").put("key", tmdbKey), now = true)
+        // Al server va solo una chiave messa a mano, mai quella integrata.
+        else if (ownTmdb) queueServerOp(JSONObject().put("op", "tmdbKey").put("key", settings.tmdbKey), now = true)
     }
 
     // ---------- Profili del server di casa ----------

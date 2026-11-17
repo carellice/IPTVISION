@@ -118,6 +118,10 @@ class MainActivity : ComponentActivity() {
 
                 Box(
                     Modifier.fillMaxSize().material(C.Bg).onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown) {
+                            vm.lastKeyAt = android.os.SystemClock.uptimeMillis()
+                            if (e.key == Key.DirectionLeft) vm.lastLeftAt = vm.lastKeyAt
+                        }
                         // Indietro del telecomando: si naviga subito, senza che Compose lo usi prima per togliere il focus.
                         // Il player gestisce da sé il proprio.
                         val handled = e.key == Key.Back && vm.screen != Screen.Player && vm.canGoBack

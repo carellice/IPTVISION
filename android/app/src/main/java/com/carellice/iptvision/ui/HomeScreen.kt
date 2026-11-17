@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -302,9 +303,11 @@ private val RailWidth = 76.dp
 private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false, homeFocused: () -> Boolean = { false }) {
     val first = remember { FocusRequester() }
     // All'avvio il focus va al menu; tornando da una scheda o dal player solo se la sezione non l'ha già rimesso dov'era.
-    LaunchedEffect(Unit) { if (vm.isTv) { delay(150); if (!homeFocused()) runCatching { first.requestFocus() } } }
+    // Il focus chiesto da qui (avvio, Indietro) apre il menu; quello arrivato da solo no (vedi onFocusChanged).
+    val asked = remember { booleanArrayOf(false) }
+    LaunchedEffect(Unit) { if (vm.isTv) { delay(150); if (!homeFocused()) { asked[0] = true; runCatching { first.requestFocus() } } } }
     var inside by remember { mutableStateOf(false) }
-    LaunchedEffect(vm.focusMenu) { if (vm.focusMenu > 0) runCatching { first.requestFocus() } }
+    LaunchedEffect(vm.focusMenu) { if (vm.focusMenu > 0) { asked[0] = true; runCatching { first.requestFocus() } } }
     // Scelta una voce, il menu si chiude subito e resta chiuso finché il focus non ci torna.
     var closed by remember { mutableStateOf(false) }
     val open = !rail || (inside && !closed)
@@ -324,11 +327,32 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false, h
                 layout(w, p.height) { p.place(0, 0) }
             }
             .fillMaxHeight()
+            .clipToBounds()
             .then(
                 if (open) Modifier.material(C.Panel)
                 else Modifier.background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(C.Bg, C.Bg.copy(alpha = 0.6f))))
             )
-            .onFocusChanged { inside = it.hasFocus; vm.menuFocused = it.hasFocus; if (!it.hasFocus) closed = false }
+            .onFocusChanged {
+                val gained = it.hasFocus && !inside
+                inside = it.hasFocus; vm.menuFocused = it.hasFocus
+                if (!it.hasFocus) closed = false
+                // Il titolo col focus sparisce (righe ricaricate, titolo rimosso) e Android passa il focus al menu:
+                // senza ◀ dell'utente il menu resta chiuso e il focus torna ai contenuti appena possibile.
+                if (gained && rail && !asked[0] && (vm.section == Section.Discover || vm.section == Section.MyList) &&
+                    android.os.SystemClock.uptimeMillis() - vm.lastLeftAt > 600
+                ) {
+                    closed = true
+                    val start = vm.lastKeyAt
+                    scope.launch {
+                        repeat(120) {
+                            if (!inside || vm.lastKeyAt != start) return@launch
+                            if (runCatching { focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Right) }.getOrDefault(false)) return@launch
+                            delay(250)
+                        }
+                    }
+                }
+                if (gained) asked[0] = false
+            }
             // Entrando con ◀ si torna sulla sezione aperta, non sulla voce più vicina.
             .focusProperties { onEnter = { first.requestFocus() } }
             .focusGroup()
@@ -379,7 +403,9 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false, h
                 }
             }
         }
-        Column(fade) {
+        // Larghezza fissa da menu aperto: nella colonna stretta orologio e rete andavano a capo lettera per lettera,
+        // diventavano altissimi e schiacciavano le icone del menu compatto.
+        Column(fade.wrapContentWidth(Alignment.Start, unbounded = true).width(NavWidth - 28.dp)) {
             if (!compact) Clock()
             ServerNetworkLine(vm, Modifier.padding(horizontal = 6.dp))
         }
