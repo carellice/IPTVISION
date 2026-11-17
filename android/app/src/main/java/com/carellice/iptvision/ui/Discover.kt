@@ -563,6 +563,7 @@ private fun CategoryGrid(vm: AppViewModel, id: String) {
             Column(Modifier.weight(1f).padding(start = 6.dp)) {
                 Text(name, color = C.Text, fontSize = if (wide) 24.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            SortButton(vm, section, compact = !wide)
         }
         Box(Modifier.weight(1f)) {
             if (isMovie) {

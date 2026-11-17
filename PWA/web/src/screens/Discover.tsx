@@ -8,7 +8,7 @@ import {
 } from '../lib/app.ts'
 import { ALL_ID, CONTINUE_ID, MYLIST_ID } from '../lib/library.ts'
 import { type Kind, type Title, type Tmdb, type TmdbRow, checkKey, findInCatalog, img, indexCatalog, loadRows, tmdbKey, useLookup } from '../lib/tmdb.ts'
-import { Poster } from './Browse.tsx'
+import { Poster, SortButton } from './Browse.tsx'
 
 // "Film e serie" with a TMDB key: one screen for films and series, like the streaming apps.
 // Rows: continue watching, my list, trends, genres, and the provider's categories.
@@ -336,6 +336,7 @@ function CategoryGrid({ id }: { id: string }) {
           <div className="ellipsis" style={{ color: 'var(--text)', fontSize: wide ? 24 : 20, fontWeight: 700 }}>{name}</div>
           <div style={{ color: 'var(--text2)', fontSize: 12 }}>{kind === 'movie' ? (n === 1 ? '1 film' : `${n} film`) : n === 1 ? '1 serie' : `${n} serie`}</div>
         </div>
+        <SortButton section={kind === 'movie' ? 'Movies' : 'Series'} compact={!wide} />
       </div>
       {n === 0 ? <Empty text="Nessun contenuto." /> : (
         <VirtualGrid key={id} count={n} minCell={wide ? 150 : 110} gap={12} rowGap={14} padding={[12, 12]}

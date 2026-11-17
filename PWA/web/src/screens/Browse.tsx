@@ -98,7 +98,7 @@ function ListHeader({ section, title, count }: { section: Section; title: string
   )
 }
 
-function SortButton({ section, compact }: { section: Section; compact: boolean }) {
+export function SortButton({ section, compact }: { section: Section; compact: boolean }) {
   const [open, setOpen] = useState(false)
   const anchor = useRef<HTMLDivElement>(null)
   const current = sortOf(section)

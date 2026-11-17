@@ -202,7 +202,7 @@ private fun ListHeader(vm: AppViewModel, section: Section, title: String, count:
 }
 
 @Composable
-private fun SortButton(vm: AppViewModel, section: Section, compact: Boolean) {
+internal fun SortButton(vm: AppViewModel, section: Section, compact: Boolean) {
     var open by remember { mutableStateOf(false) }
     val current = vm.sortOf(section)
     Box {
