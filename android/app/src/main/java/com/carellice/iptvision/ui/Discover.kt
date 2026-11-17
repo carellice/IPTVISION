@@ -34,6 +34,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
@@ -119,8 +121,11 @@ private fun Entry<Movie>.title(t: Tmdb.Card? = null) = Title(this, null, t)
 
 private enum class Filter { All, Movie, Tv }
 
-/** Sul TV: chi riceve il titolo col focus, che va in primo piano in alto. Null altrove. */
-private val LocalSpot = compositionLocalOf<((Title) -> Unit)?> { null }
+/** Sul TV righe e locandine col focus si fermano sempre allo stesso punto. */
+private val LocalTvPin = compositionLocalOf { false }
+
+/** Aperta dal menu, la pagina riparte dall'inizio. */
+fun resetDiscoverScroll() { Saved.index = 0; Saved.offset = 0 }
 
 /**
  * Sul TV la riga o la locandina col focus si porta sempre allo stesso punto (in alto, a sinistra) invece
@@ -134,7 +139,7 @@ private fun pinTo(leadPx: Float) = object : BringIntoViewSpec {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TvRow(content: @Composable () -> Unit) {
-    if (LocalSpot.current == null) { content(); return }
+    if (!LocalTvPin.current) { content(); return }
     val lead = with(LocalDensity.current) { (LocalEdge.current + 2.dp).toPx() }
     CompositionLocalProvider(LocalBringIntoViewSpec provides remember(lead) { pinTo(lead) }, content = content)
 }
@@ -242,29 +247,28 @@ private fun DiscoverHome(vm: AppViewModel) {
 
     val chips = @Composable { m: Modifier ->
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 2.dp), modifier = m) {
-            item { Pill("Tutto", filter == Filter.All) { filter = Filter.All; Saved.filter = filter } }
+            item {
+                // TV: scelta la sezione dal menu, il focus parte da qui, in cima alla pagina.
+                val first = remember { androidx.compose.ui.focus.FocusRequester() }
+                if (vm.isTv && vm.focusContent) LaunchedEffect(Unit) { vm.focusContent = false; runCatching { first.requestFocus() } }
+                Pill("Tutto", filter == Filter.All, modifier = Modifier.focusRequester(first)) { filter = Filter.All; Saved.filter = filter }
+            }
             item { Pill("Film", filter == Filter.Movie) { filter = Filter.Movie; Saved.filter = filter } }
             item { Pill("Serie TV", filter == Filter.Tv) { filter = Filter.Tv; Saved.filter = filter } }
             item { Pill("Categorie", false, Icons.Default.KeyboardArrowDown) { categories = true } }
         }
     }
     val chipsTop = if (edge > 0.dp) 12.dp else 8.dp
-    // TV: in alto, fermo, il titolo col focus (immagine, trama); sotto scorrono le righe.
     val tv = vm.isTv && wide
-    var spot by remember { mutableStateOf<Title?>(null) }
-    val spotFn: ((Title) -> Unit)? = if (tv) { t -> spot = t } else null
     val density = LocalDensity.current
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-    val listTop = if (tv) maxHeight * 0.46f else 0.dp
-    if (tv) Spotlight(vm, spot ?: hero.firstOrNull() ?: continueRow.firstOrNull() ?: recent.firstOrNull(), edge, listTop)
+    Box(Modifier.fillMaxSize()) {
     val pinRows = remember(density) { with(density) { pinTo(44.dp.toPx()) } }
     @OptIn(ExperimentalFoundationApi::class)
-    CompositionLocalProvider(LocalSpot provides spotFn, LocalBringIntoViewSpec provides (if (tv) pinRows else LocalBringIntoViewSpec.current)) {
-    LazyColumn(state = state, modifier = Modifier.fillMaxSize().padding(top = listTop), contentPadding = PaddingValues(bottom = if (tv) 300.dp else 30.dp)) {
+    CompositionLocalProvider(LocalTvPin provides tv, LocalBringIntoViewSpec provides (if (tv) pinRows else LocalBringIntoViewSpec.current)) {
+    LazyColumn(state = state, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = if (tv) 300.dp else 30.dp)) {
         // Da bordo a bordo: i filtri stanno sopra l'immagine in alto, come nelle app di streaming.
         when {
-            tv -> item("chips") { TvRow { chips(Modifier.padding(top = 4.dp, bottom = 4.dp)) } }
             hero.isNotEmpty() -> item("hero") {
                 Box {
                     Hero(vm, hero, wide)
@@ -436,13 +440,12 @@ private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> 
     Column(Modifier.padding(top = top)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = edge + 2.dp)) {
             Text(title, color = C.Text, fontSize = if (wide) 20.sp else 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            if (onAll != null) Text(
-                "Vedi tutto ›", color = C.Accent2, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                modifier = Modifier.padding(start = 10.dp).tvClickable(shape = RoundedCornerShape(6.dp), background = Color.Transparent, onClick = onAll).padding(horizontal = 6.dp, vertical = 4.dp),
-            )
         }
         // Spazio attorno per il riquadro che si ingrandisce quando ha il focus.
-        TvRow { LazyRow(horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp), content = content) }
+        TvRow { LazyRow(horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp)) {
+            content()
+            if (onAll != null) item("__all") { SeeAllTile(onAll) }
+        } }
     }
 }
 
@@ -451,14 +454,31 @@ private fun PosterTile(vm: AppViewModel, t: Title, known: Tmdb.Card?, lookup: Bo
     val wide = LocalWide.current
     val tm = rememberTmdb(vm, t.kind, t.name, t.year, known, lookup)
     val p = vm.progressOf(t)
-    val spot = LocalSpot.current
-    Column(Modifier.width(if (wide) 154.dp else 112.dp).tvClickable(shape = RoundedCornerShape(8.dp), focusScale = 1.08f, background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong, onFocus = spot?.let { f -> { f(Title(t.movie, t.show, tm ?: t.tmdb)) } }) { vm.openTitle(t) }) {
+    Column(Modifier.width(if (wide) 154.dp else 112.dp).tvClickable(shape = RoundedCornerShape(8.dp), focusScale = 1.08f, background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong) { vm.openTitle(t) }) {
         Box {
             Artwork(Tmdb.img(tm?.poster) ?: t.poster, t.initials, Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(skinCorners(8.dp)), fontSize = 20)
             if (p > 0f && p < 1f) ProgressLine(p, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(6.dp))
             if (!t.isMovie && !caption) KindBadge()
         }
         if (caption) Text(t.name, color = C.Text2, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+    }
+}
+
+/** In fondo alla riga, grande come una locandina: apre tutti i titoli della categoria. */
+@Composable
+private fun SeeAllTile(onClick: () -> Unit) {
+    val wide = LocalWide.current
+    Box(
+        Modifier.width(if (wide) 154.dp else 112.dp).aspectRatio(2f / 3f)
+            .tvClickable(shape = RoundedCornerShape(8.dp), focusScale = 1.08f, background = C.Surface, focusedBackground = C.SurfacePressed, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(if (wide) 46.dp else 38.dp).clip(CircleShape).border(2.dp, C.Text2, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = C.Text, modifier = Modifier.size(if (wide) 24.dp else 20.dp))
+            }
+            Text("Guarda tutto", color = C.Text, fontSize = if (wide) 15.sp else 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
+        }
     }
 }
 
@@ -475,7 +495,7 @@ private fun TopTile(vm: AppViewModel, t: Title, n: Int) {
     val wide = LocalWide.current
     val h = if (wide) 210.dp else 150.dp
     Row(
-        Modifier.height(h).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent, onFocus = LocalSpot.current?.let { f -> { f(t) } }) { vm.openTitle(t) }.padding(end = 4.dp),
+        Modifier.height(h).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent) { vm.openTitle(t) }.padding(end = 4.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
         // Il numero grande col solo contorno, mezzo nascosto dietro la locandina.
@@ -495,8 +515,7 @@ private fun WideTile(vm: AppViewModel, t: Title, known: Tmdb.Card?, onLong: () -
     val wide = LocalWide.current
     val tm = rememberTmdb(vm, t.kind, t.name, t.year, known)
     val p = vm.progressOf(t)
-    val spot = LocalSpot.current
-    Column(Modifier.width(if (wide) 290.dp else 220.dp).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong, onFocus = spot?.let { f -> { f(Title(t.movie, t.show, tm ?: t.tmdb)) } }) { vm.playTitle(t) }) {
+    Column(Modifier.width(if (wide) 290.dp else 220.dp).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong) { vm.playTitle(t) }) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(skinCorners(8.dp))) {
             Artwork(Tmdb.img(tm?.backdrop, "w780") ?: t.poster, t.initials, Modifier.fillMaxSize(), fontSize = 20)
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color(0xB3000000))))
@@ -649,42 +668,6 @@ private fun BoxScope.LoadingBadge(vm: AppViewModel, extra: String?) {
             ) {
                 CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
                 Text(text ?: shown, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            }
-        }
-    }
-}
-
-// ---------- TV: il titolo col focus in primo piano ----------
-
-@Composable
-private fun Spotlight(vm: AppViewModel, t: Title?, edge: Dp, height: Dp) {
-    // Con un attimo di ritardo: scorrendo veloce non si chiede TMDB per ogni locandina.
-    val shown by produceState(t, t) { delay(200); value = t }
-    val bg = C.Bg
-    Box(Modifier.fillMaxWidth().height(height + 40.dp)) {
-        if (shown == null) { Box(Modifier.fillMaxSize().shimmer()); return@Box }
-        val s = shown!!
-        val tm = rememberTmdb(vm, s.kind, s.name, s.year, s.tmdb)
-        val img = Tmdb.img(tm?.backdrop, "w1280")
-        Box(Modifier.align(Alignment.TopEnd).fillMaxWidth(0.72f).fillMaxHeight()) {
-            AnimatedContent(img, transitionSpec = { fadeIn(tween(450)) togetherWith fadeOut(tween(450)) }, label = "spot") { u ->
-                if (u != null) AsyncImage(u, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = BiasAlignment(0f, -0.4f))
-            }
-            Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to bg, 0.35f to bg.copy(alpha = 0.55f), 0.7f to Color.Transparent)))
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to bg)))
-        }
-        AnimatedContent(s.key, transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(150)) }, label = "spotText", modifier = Modifier.padding(start = edge + 20.dp, top = 28.dp).fillMaxWidth(0.5f)) { _ ->
-            Column {
-                Text(if (s.isMovie) "FILM" else "SERIE TV", color = C.Accent2, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
-                Text(
-                    tm?.title?.ifEmpty { null } ?: s.name, color = C.Text, fontSize = 38.sp, lineHeight = 44.sp, fontWeight = FontWeight.ExtraBold,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
-                )
-                val meta = listOfNotNull(tm?.year ?: s.year, tm?.vote?.takeIf { it > 0 }?.let { "★ " + String.format(java.util.Locale.ITALY, "%.1f", it) }).joinToString("  ·  ")
-                if (meta.isNotEmpty()) Text(meta, color = C.Text2, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                tm?.overview?.takeIf { it.isNotEmpty() }?.let {
-                    Text(it, color = C.Text2, fontSize = 15.sp, lineHeight = 22.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
-                }
             }
         }
     }

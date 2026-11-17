@@ -203,6 +203,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var seriesProgress by mutableStateOf<Pair<Long, Long>?>(null); private set
     /** Film o serie che si aggiornano in sottofondo: la lista salvata resta a schermo. */
     var catalogUpdating by mutableStateOf(0); private set
+    /** TV: sezione appena scelta dal menu, il focus deve passare ai contenuti (lo prende la sezione, se sa dove). */
+    var focusContent by mutableStateOf(false)
     /** Messaggio breve da mostrare una volta (es. "12 film nuovi"). */
     var notice by mutableStateOf<String?>(null)
     /** Liste da riscaricare anche se la copia salvata è recente ("Aggiorna"). */

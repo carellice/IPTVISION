@@ -95,6 +95,7 @@ import com.carellice.iptvision.Section
 import com.carellice.iptvision.data.Category
 import com.carellice.iptvision.data.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -167,7 +168,7 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                         vm.sections.forEach { s ->
                             NavigationBarItem(
                                 selected = vm.section == s,
-                                onClick = { vm.section = s },
+                                onClick = { if (s == Section.Discover) resetDiscoverScroll(); vm.section = s },
                                 icon = { Icon(s.icon(), null) },
                                 label = {
                                     val l = navLabel(s)
@@ -294,7 +295,11 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { if (vm.isTv) runCatching { first.requestFocus() } }
     var inside by remember { mutableStateOf(false) }
-    val open = !rail || inside
+    // Scelta una voce, il menu si chiude subito e resta chiuso finché il focus non ci torna.
+    var closed by remember { mutableStateOf(false) }
+    val open = !rail || (inside && !closed)
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val w by androidx.compose.animation.core.animateDpAsState(if (open) NavWidth else RailWidth, label = "rail")
     Column(
         Modifier.width(w).fillMaxHeight()
@@ -302,7 +307,7 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
                 if (open) Modifier.material(C.Panel)
                 else Modifier.background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(C.Bg, C.Bg.copy(alpha = 0.6f))))
             )
-            .onFocusChanged { inside = it.hasFocus }
+            .onFocusChanged { inside = it.hasFocus; if (!it.hasFocus) closed = false }
             // Entrando con ◀ si torna sulla sezione aperta, non sulla voce più vicina.
             .focusProperties { onEnter = { first.requestFocus() } }
             .focusGroup()
@@ -326,7 +331,20 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
                             focusScale = 1.02f,
                             background = if (selected) C.AccentSoft else Color.Transparent,
                             focusedBackground = C.SurfacePressed,
-                        ) { vm.section = s } // Col telecomando si scorre il menu e si apre la sezione solo con OK.
+                        ) { // Col telecomando si scorre il menu e si apre la sezione solo con OK.
+                            if (s == Section.Discover) resetDiscoverScroll()
+                            vm.section = s
+                            // Conta la sezione scelta, non quella di prima: dalla TV in diretta il menu era ancora aperto.
+                            if (vm.isTv && s != Section.Live) {
+                                closed = true
+                                vm.focusContent = true
+                                // La sezione che sa dove mettere il focus lo prende da sé; altrimenti il primo elemento a destra.
+                                scope.launch {
+                                    delay(150)
+                                    if (vm.focusContent) { vm.focusContent = false; focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Right) }
+                                }
+                            }
+                        }
                         .padding(horizontal = 13.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
