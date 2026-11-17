@@ -107,6 +107,9 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(vm.playError) {
                     vm.playError?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show(); vm.playError = null }
                 }
+                LaunchedEffect(vm.notice) {
+                    vm.notice?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show(); vm.notice = null }
+                }
                 LaunchedEffect(vm.error) {
                     vm.error?.let { if (vm.live != null) { Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show(); vm.error = null } }
                 }

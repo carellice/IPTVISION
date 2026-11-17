@@ -72,6 +72,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.focusGroup
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -110,6 +112,9 @@ private fun Section.icon(): ImageVector = when (this) {
 /** Larghezza da tablet/TV: categorie a sinistra e menu laterale; sotto, layout da telefono. */
 val LocalWide = androidx.compose.runtime.compositionLocalOf { false }
 
+/** Margine laterale che la sezione mette da sé: "Film e serie" va da bordo a bordo, come le app di streaming. */
+val LocalEdge = androidx.compose.runtime.compositionLocalOf { 0.dp }
+
 @Composable
 fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
     // Rete del server di casa (VPN sì o no) appena si apre l'app; poi la aggiorna il giro ogni 30 secondi.
@@ -125,16 +130,30 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
             // Modern UI: pivot sugli schermi larghi, sul telefono la barra in basso come gli altri stili.
             if (Skin.metro && wide) Pivot(vm, wide, onVoiceSearch)
             else if (wide) {
-                Row(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-                    // Telefono in orizzontale: largo ma basso, il menu scorre e l'orologio sparisce.
-                    SideNav(vm, compact = short)
-                    Column(Modifier.weight(1f).fillMaxHeight().padding(start = 8.dp, end = 24.dp, top = 20.dp)) {
+                // TV, tranne la TV in diretta: il menu è una colonna di icone che si apre sopra i contenuti
+                // quando ci arriva il focus, come nelle app di streaming. Sempre lo stesso SideNav, così il focus non si perde.
+                val rail = vm.isTv && vm.section != Section.Live
+                Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                Row(Modifier.fillMaxSize()) {
+                    Box(Modifier.width(if (rail) RailWidth else NavWidth))
+                    if (vm.section == Section.Discover) {
+                        Column(Modifier.weight(1f).fillMaxHeight()) {
+                            androidx.compose.runtime.CompositionLocalProvider(LocalEdge provides 24.dp) { Content(vm, onVoiceSearch) }
+                        }
+                    } else Column(Modifier.weight(1f).fillMaxHeight().padding(start = 8.dp, end = 24.dp, top = 20.dp)) {
                         Content(vm, onVoiceSearch)
                     }
                 }
+                    // Telefono in orizzontale: largo ma basso, il menu scorre e l'orologio sparisce.
+                    SideNav(vm, compact = short, rail = rail)
+                }
             } else {
                 Column(Modifier.fillMaxSize().statusBarsPadding()) {
-                    Column(Modifier.weight(1f).padding(horizontal = 14.dp).padding(top = 12.dp)) { Content(vm, onVoiceSearch) }
+                    if (vm.section == Section.Discover) {
+                        Column(Modifier.weight(1f)) {
+                            androidx.compose.runtime.CompositionLocalProvider(LocalEdge provides 14.dp) { Content(vm, onVoiceSearch) }
+                        }
+                    } else Column(Modifier.weight(1f).padding(horizontal = 14.dp).padding(top = 12.dp)) { Content(vm, onVoiceSearch) }
                     // Dueffe: barra flottante alta 68, raggio 28, colore Nav con un filo di bordo oro.
                     val df = Skin.dueffe
                     NavigationBar(
@@ -254,7 +273,7 @@ private fun Pivot(vm: AppViewModel, wide: Boolean, onVoiceSearch: () -> Unit) {
 
 @Composable
 private fun Content(vm: AppViewModel, onVoiceSearch: () -> Unit, section: Section = vm.section) {
-    vm.status?.let { Text(it, color = C.Text2, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp)) }
+    vm.status?.let { Text(it, color = C.Text2, fontSize = 13.sp, modifier = Modifier.padding(start = LocalEdge.current, bottom = 6.dp)) }
     when (section) {
         Section.Live -> LiveSection(vm)
         Section.Movies -> MoviesSection(vm)
@@ -266,13 +285,24 @@ private fun Content(vm: AppViewModel, onVoiceSearch: () -> Unit, section: Sectio
     }
 }
 
+private val NavWidth = 220.dp
+private val RailWidth = 76.dp
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun SideNav(vm: AppViewModel, compact: Boolean) {
+private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { if (vm.isTv) runCatching { first.requestFocus() } }
+    var inside by remember { mutableStateOf(false) }
+    val open = !rail || inside
+    val w by androidx.compose.animation.core.animateDpAsState(if (open) NavWidth else RailWidth, label = "rail")
     Column(
-        Modifier.width(220.dp).fillMaxHeight().material(C.Panel)
+        Modifier.width(w).fillMaxHeight()
+            .then(
+                if (open) Modifier.material(C.Panel)
+                else Modifier.background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(C.Bg, C.Bg.copy(alpha = 0.6f))))
+            )
+            .onFocusChanged { inside = it.hasFocus }
             // Entrando con ◀ si torna sulla sezione aperta, non sulla voce più vicina.
             .focusProperties { onEnter = { first.requestFocus() } }
             .focusGroup()
@@ -282,8 +312,10 @@ private fun SideNav(vm: AppViewModel, compact: Boolean) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 6.dp, top = if (compact) 0.dp else 8.dp, bottom = if (compact) 6.dp else 18.dp)) {
                 Image(painterResource(R.drawable.logo), null, Modifier.size(34.dp).clip(skinCorners(8.dp)))
-                HSpace(10.dp)
-                Text("IPTVISION", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                if (open) {
+                    HSpace(10.dp)
+                    Text("IPTVISION", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 19.sp, maxLines = 1, softWrap = false)
+                }
             }
             vm.sections.forEach { s ->
                 val selected = vm.section == s
@@ -295,17 +327,21 @@ private fun SideNav(vm: AppViewModel, compact: Boolean) {
                             background = if (selected) C.AccentSoft else Color.Transparent,
                             focusedBackground = C.SurfacePressed,
                         ) { vm.section = s } // Col telecomando si scorre il menu e si apre la sezione solo con OK.
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                        .padding(horizontal = 13.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(s.icon(), null, tint = if (selected) C.Accent else C.Text2, modifier = Modifier.size(22.dp))
-                    HSpace(12.dp)
-                    Text(s.title, color = if (selected) C.Text else C.Text2, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+                    Icon(s.icon(), s.title, tint = if (selected) C.Accent else C.Text2, modifier = Modifier.size(22.dp))
+                    if (open) {
+                        HSpace(12.dp)
+                        Text(s.title, color = if (selected) C.Text else C.Text2, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, softWrap = false)
+                    }
                 }
             }
         }
-        if (!compact) Clock()
-        ServerNetworkLine(vm, Modifier.padding(horizontal = 6.dp))
+        if (open) {
+            if (!compact) Clock()
+            ServerNetworkLine(vm, Modifier.padding(horizontal = 6.dp))
+        }
     }
 }
 

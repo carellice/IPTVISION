@@ -201,6 +201,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Il primo download di film e serie: byte arrivati e totale (-1 se ignoto); null quando non si scarica. */
     var moviesProgress by mutableStateOf<Pair<Long, Long>?>(null); private set
     var seriesProgress by mutableStateOf<Pair<Long, Long>?>(null); private set
+    /** Film o serie che si aggiornano in sottofondo: la lista salvata resta a schermo. */
+    var catalogUpdating by mutableStateOf(0); private set
+    /** Messaggio breve da mostrare una volta (es. "12 film nuovi"). */
+    var notice by mutableStateOf<String?>(null)
+    /** Liste da riscaricare anche se la copia salvata è recente ("Aggiorna"). */
+    private val staleKinds = mutableSetOf<String>()
 
     var favorites by mutableStateOf(settings.favorites); private set
     // Prima si sceglie la categoria, poi si vede l'elenco: null = elenco delle categorie.
@@ -466,6 +472,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (autoPlay) autoPlayLast()
                 launch { loadEpg(c, force = false) }
             }
+            // Film e serie già scaricati: si leggono subito in sottofondo, così la sezione è pronta quando la apri.
+            if (file("vod", c.account.key).exists()) ensureMovies()
+            if (file("series", c.account.key).exists()) ensureSeries()
             status = if (cached == null) "Caricamento canali…" else null
             try {
                 val info = c.authenticate()
@@ -494,13 +503,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshAll() {
         val c = client ?: return
-        File(cacheDir, "vod_${c.account.key}.json").delete()
-        File(cacheDir, "series_${c.account.key}.json").delete()
-        movies = null; series = null
+        // Film e serie: la lista salvata resta a schermo, quella nuova si scarica in sottofondo e si annunciano le novità.
+        val m = movies != null || section == Section.Movies || section == Section.Discover
+        val s = series != null || section == Section.Series || section == Section.Discover
+        if (m) ensureMovies(refresh = true)
+        if (s) ensureSeries(refresh = true)
         openAccount(c.account, autoPlay = false)
         viewModelScope.launch { loadEpg(c, force = true) }
-        if (section == Section.Movies || section == Section.Discover) ensureMovies()
-        if (section == Section.Series || section == Section.Discover) ensureSeries()
     }
 
     fun clearCache() {
@@ -553,15 +562,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         epgVersion++
     }
 
-    fun ensureMovies() {
+    fun ensureMovies(refresh: Boolean = false) {
         val c = client ?: return
-        if (movies != null || moviesLoading) return
+        if ((movies != null && !refresh) || moviesLoading) return
+        if (refresh) staleKinds += "vod"
         moviesLoading = true
         viewModelScope.launch {
             try {
                 movies = loadOrDownload(
-                    c, "vod", "get_vod_categories", "get_vod_streams", XtreamClient::parseMovies, Movie::categoryId,
-                    onProgress = { moviesProgress = it }, onUpdated = { if (client === c) movies = it },
+                    c, "vod", "get_vod_categories", "get_vod_streams", XtreamClient::parseMovies, Movie::categoryId, XtreamClient.MOVIE_FIELDS,
+                    onProgress = { moviesProgress = it },
+                    onUpdated = { if (client === c) { announceNew(movies, it, Movie::streamId, "film nuovo", "film nuovi"); movies = it } },
                 )
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 error = (e as? XtreamException)?.message ?: "Impossibile caricare i film."
@@ -569,20 +580,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun ensureSeries() {
+    fun ensureSeries(refresh: Boolean = false) {
         val c = client ?: return
-        if (series != null || seriesLoading) return
+        if ((series != null && !refresh) || seriesLoading) return
+        if (refresh) staleKinds += "series"
         seriesLoading = true
         viewModelScope.launch {
             try {
                 series = loadOrDownload(
-                    c, "series", "get_series_categories", "get_series", XtreamClient::parseSeries, Series::categoryId,
-                    onProgress = { seriesProgress = it }, onUpdated = { if (client === c) series = it },
+                    c, "series", "get_series_categories", "get_series", XtreamClient::parseSeries, Series::categoryId, XtreamClient.SERIES_FIELDS,
+                    onProgress = { seriesProgress = it },
+                    onUpdated = { if (client === c) { announceNew(series, it, Series::seriesId, "serie nuova", "serie nuove"); series = it } },
                 )
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 error = (e as? XtreamException)?.message ?: "Impossibile caricare le serie."
             } finally { seriesLoading = false; seriesProgress = null }
         }
+    }
+
+    /** Dopo un aggiornamento in sottofondo: quanti titoli non c'erano prima, detto una volta. */
+    private fun <T> announceNew(old: Library<T>?, new: Library<T>, id: (T) -> Int, one: String, many: String) {
+        val seen = old?.items?.mapTo(HashSet(), id) ?: return
+        val n = new.items.count { id(it) !in seen }
+        if (n > 0) notice = if (n == 1) "1 $one" else "$n $many"
     }
 
     /**
@@ -592,12 +612,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     private suspend fun <T> loadOrDownload(
         c: XtreamClient, kind: String, catAction: String, action: String,
-        parse: (File) -> List<T>, catOf: (T) -> String?,
+        parse: (File) -> List<T>, catOf: (T) -> String?, fields: Set<String>,
         onProgress: (Pair<Long, Long>) -> Unit, onUpdated: (Library<T>) -> Unit,
     ): Library<T> {
         val key = c.account.key
         val f = file(kind, key)
-        val fresh = f.exists() && System.currentTimeMillis() - f.lastModified() < 12 * 3600_000L
+        val forced = staleKinds.remove(kind)
+        val fresh = !forced && f.exists() && System.currentTimeMillis() - f.lastModified() < 12 * 3600_000L
         suspend fun read() = withContext(Dispatchers.Default) {
             val cats = file("${kind}_cats", key).takeIf { it.exists() }?.let(XtreamClient::parseCategories) ?: emptyList()
             library(cats, parse(f), catOf)
@@ -605,17 +626,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         suspend fun download(progress: Boolean) {
             downloadList(c, catAction, "${kind}_cats")
             downloadList(c, action, kind, 60, if (progress) { read, total -> onProgress(read to total) } else null)
+            withContext(Dispatchers.IO) { XtreamClient.compact(file(kind, key), fields) }
         }
         if (!fresh && f.exists()) {
             val stale = try { read() } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
             if (stale != null) {
                 viewModelScope.launch {
+                    catalogUpdating++
                     try {
                         download(progress = false)
                         onUpdated(read())
                     } catch (e: CancellationException) { throw e } catch (e: Exception) {
                         Log.w("Aggiornamento $kind fallito, resta la cache", e)
-                    }
+                    } finally { catalogUpdating-- }
                 }
                 return stale
             }
@@ -632,7 +655,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (!fresh) throw e
             Log.w("Cache $kind illeggibile, la riscarico", e)
             f.delete()
-            loadOrDownload(c, kind, catAction, action, parse, catOf, onProgress, onUpdated)
+            loadOrDownload(c, kind, catAction, action, parse, catOf, fields, onProgress, onUpdated)
         }
     }
 

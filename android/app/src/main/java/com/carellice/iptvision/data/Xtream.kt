@@ -2,6 +2,7 @@ package com.carellice.iptvision.data
 
 import android.util.Base64
 import android.util.JsonReader
+import android.util.JsonWriter
 import android.util.JsonToken
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -128,6 +129,30 @@ class XtreamClient(val account: XtreamAccount) {
                 }
                 r.endArray()
             }
+        }
+
+        /** I campi letti da [parseMovies] e [parseSeries]: il resto della risposta di Xtream non serve. */
+        val MOVIE_FIELDS = setOf("stream_id", "name", "stream_icon", "category_id", "container_extension", "year", "releasedate", "rating", "rating_5based", "added")
+        val SERIES_FIELDS = setOf("series_id", "name", "cover", "category_id", "year", "releaseDate", "release_date", "rating", "rating_5based", "plot", "genre")
+
+        /**
+         * Riscrive la lista appena scaricata con i soli campi [keep]: il file pesa una frazione
+         * dell'originale e a ogni apertura dell'app si rilegge molto prima.
+         */
+        fun compact(file: File, keep: Set<String>) {
+            val tmp = File(file.path + ".min")
+            JsonWriter(tmp.bufferedWriter()).use { j ->
+                j.beginArray()
+                file.inputStream().buffered().use { s ->
+                    readFlatArray(s) { m ->
+                        j.beginObject()
+                        for ((k, v) in m) if (v != null && k in keep) j.name(k).value(v)
+                        j.endObject()
+                    }
+                }
+                j.endArray()
+            }
+            if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
         }
 
         fun parseCategories(file: File): List<Category> {

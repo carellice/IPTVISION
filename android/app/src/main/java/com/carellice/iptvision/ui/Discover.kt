@@ -79,6 +79,25 @@ import com.carellice.iptvision.data.groupVariants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.Dp
+import com.carellice.iptvision.Library
 
 // "Film e serie" con la chiave TMDB: film e serie in una sola schermata, come le app di streaming.
 // In alto un titolo di tendenza che cambia da solo, poi le righe: continua a guardare, la mia lista,
@@ -99,6 +118,26 @@ private fun Entry<Movie>.title(t: Tmdb.Card? = null) = Title(this, null, t)
 @JvmName("seriesTitle") private fun Entry<Series>.title(t: Tmdb.Card? = null) = Title(null, this, t)
 
 private enum class Filter { All, Movie, Tv }
+
+/** Sul TV: chi riceve il titolo col focus, che va in primo piano in alto. Null altrove. */
+private val LocalSpot = compositionLocalOf<((Title) -> Unit)?> { null }
+
+/**
+ * Sul TV la riga o la locandina col focus si porta sempre allo stesso punto (in alto, a sinistra) invece
+ * di scorrere il minimo indispensabile: lo sguardo resta fermo, come in Netflix o Prime Video.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private fun pinTo(leadPx: Float) = object : BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = offset - leadPx
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TvRow(content: @Composable () -> Unit) {
+    if (LocalSpot.current == null) { content(); return }
+    val lead = with(LocalDensity.current) { (LocalEdge.current + 2.dp).toPx() }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides remember(lead) { pinTo(lead) }, content = content)
+}
 
 /** Dove si era quando si è aperto un titolo o una categoria, per tornare allo stesso punto. */
 private object Saved { var filter = Filter.All; var index = 0; var offset = 0 }
@@ -134,14 +173,17 @@ fun DiscoverSection(vm: AppViewModel) {
 private fun DiscoverHome(vm: AppViewModel) {
     LaunchedEffect(vm.tmdbKey) { vm.ensureTmdb() }
     val wide = LocalWide.current
-    val movies = vm.movies
-    val series = vm.series
-    if (movies == null || series == null) {
-        if (vm.moviesLoading && movies == null) DownloadProgress("Caricamento film…", vm.moviesProgress)
-        else if (vm.seriesLoading && series == null) DownloadProgress("Caricamento serie…", vm.seriesProgress)
-        else Loading("Caricamento film e serie…")
+    val edge = LocalEdge.current
+    // Si mostra appena c'è uno dei due cataloghi: l'altro (e TMDB) arriva dopo, senza bloccare la pagina.
+    if (vm.movies == null && vm.series == null) {
+        Box(Modifier.fillMaxSize()) {
+            DiscoverSkeleton(wide, edge)
+            LoadingBadge(vm, null)
+        }
         return
     }
+    val movies = vm.movies ?: Library(emptyList(), emptyList(), emptyMap())
+    val series = vm.series ?: Library(emptyList(), emptyList(), emptyMap())
     var filter by remember { mutableStateOf(Saved.filter) }
     fun pass(t: Title) = filter == Filter.All || (filter == Filter.Movie) == t.isMovie
     var categories by remember { mutableStateOf(false) }
@@ -192,28 +234,54 @@ private fun DiscoverHome(vm: AppViewModel) {
         if (filter != Filter.Movie) series.categories.forEach { add(Triple(false, it.id, it.name)) }
     }
 
-    // Liste di TMDB ancora in arrivo o da confrontare col catalogo: schermata di caricamento, non una pagina mezza vuota.
-    if (matched == null && vm.tmdbError == null) {
-        Loading("Caricamento film e serie…")
-        return
-    }
+    // Liste di TMDB ancora in arrivo: al loro posto riquadri che pulsano, il resto della pagina è già usabile.
+    val tmdbPending = matched == null && vm.tmdbError == null
     val state = rememberLazyListState(Saved.index, Saved.offset)
     DisposableEffect(Unit) { onDispose { Saved.index = state.firstVisibleItemIndex; Saved.offset = state.firstVisibleItemScrollOffset } }
     val gap = if (wide) 26.dp else 20.dp
 
-    LazyColumn(state = state, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 30.dp)) {
-        item("chips") {
-            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(2.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-                item { Pill("Tutto", filter == Filter.All) { filter = Filter.All; Saved.filter = filter } }
-                item { Pill("Film", filter == Filter.Movie) { filter = Filter.Movie; Saved.filter = filter } }
-                item { Pill("Serie TV", filter == Filter.Tv) { filter = Filter.Tv; Saved.filter = filter } }
-                item { Pill("Categorie", false, Icons.Default.KeyboardArrowDown) { categories = true } }
+    val chips = @Composable { m: Modifier ->
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 2.dp), modifier = m) {
+            item { Pill("Tutto", filter == Filter.All) { filter = Filter.All; Saved.filter = filter } }
+            item { Pill("Film", filter == Filter.Movie) { filter = Filter.Movie; Saved.filter = filter } }
+            item { Pill("Serie TV", filter == Filter.Tv) { filter = Filter.Tv; Saved.filter = filter } }
+            item { Pill("Categorie", false, Icons.Default.KeyboardArrowDown) { categories = true } }
+        }
+    }
+    val chipsTop = if (edge > 0.dp) 12.dp else 8.dp
+    // TV: in alto, fermo, il titolo col focus (immagine, trama); sotto scorrono le righe.
+    val tv = vm.isTv && wide
+    var spot by remember { mutableStateOf<Title?>(null) }
+    val spotFn: ((Title) -> Unit)? = if (tv) { t -> spot = t } else null
+    val density = LocalDensity.current
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val listTop = if (tv) maxHeight * 0.46f else 0.dp
+    if (tv) Spotlight(vm, spot ?: hero.firstOrNull() ?: continueRow.firstOrNull() ?: recent.firstOrNull(), edge, listTop)
+    val pinRows = remember(density) { with(density) { pinTo(44.dp.toPx()) } }
+    @OptIn(ExperimentalFoundationApi::class)
+    CompositionLocalProvider(LocalSpot provides spotFn, LocalBringIntoViewSpec provides (if (tv) pinRows else LocalBringIntoViewSpec.current)) {
+    LazyColumn(state = state, modifier = Modifier.fillMaxSize().padding(top = listTop), contentPadding = PaddingValues(bottom = if (tv) 300.dp else 30.dp)) {
+        // Da bordo a bordo: i filtri stanno sopra l'immagine in alto, come nelle app di streaming.
+        when {
+            tv -> item("chips") { TvRow { chips(Modifier.padding(top = 4.dp, bottom = 4.dp)) } }
+            hero.isNotEmpty() -> item("hero") {
+                Box {
+                    Hero(vm, hero, wide)
+                    chips(Modifier.padding(top = chipsTop))
+                }
             }
+            tmdbPending && vm.hasTmdb -> item("hero") {
+                Box {
+                    HeroSkeleton(wide, edge)
+                    chips(Modifier.padding(top = chipsTop))
+                }
+            }
+            else -> item("chips") { chips(Modifier.padding(top = if (edge > 0.dp) 12.dp else 0.dp, bottom = 12.dp)) }
         }
         vm.tmdbError?.let { e ->
-            item("error") { Text("$e Controlla la chiave in Impostazioni → TMDB.", color = C.Danger, fontSize = 14.sp, modifier = Modifier.padding(start = 2.dp, bottom = 12.dp)) }
+            item("error") { Text("$e Controlla la chiave in Impostazioni → TMDB.", color = C.Danger, fontSize = 14.sp, modifier = Modifier.padding(start = edge + 2.dp, top = 12.dp, end = edge)) }
         }
-        if (hero.isNotEmpty()) item("hero") { Hero(vm, hero, wide) }
 
         continueRow.filter(::pass).takeIf { it.isNotEmpty() }?.let { list ->
             item("continue") {
@@ -229,6 +297,7 @@ private fun DiscoverHome(vm: AppViewModel) {
                 }
             }
         }
+        if (tmdbPending) items(3, key = { "skel$it" }) { RowSkeleton(wide, edge, gap) }
         tmdbRows.forEachIndexed { i, (r, ts) ->
             item(r.id) {
                 DRow(if (r.top) "${r.title} in Italia" else r.title, gap) {
@@ -243,10 +312,10 @@ private fun DiscoverHome(vm: AppViewModel) {
             }
         }
         if (matched != null && tmdbRows.isEmpty() && vm.tmdbError == null) item("none") {
-            Text("Nessun titolo di TMDB trovato nel catalogo: sotto ci sono le categorie della lista.", color = C.Text2, fontSize = 14.sp, modifier = Modifier.padding(top = 20.dp, start = 2.dp))
+            Text("Nessun titolo di TMDB trovato nel catalogo: sotto ci sono le categorie della lista.", color = C.Text2, fontSize = 14.sp, modifier = Modifier.padding(top = 20.dp, start = edge + 2.dp, end = edge))
         }
         item("cats") {
-            Text("Le categorie della lista", color = C.Text, fontSize = if (wide) 24.sp else 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = if (wide) 44.dp else 32.dp, start = 2.dp))
+            Text("Le categorie della lista", color = C.Text, fontSize = if (wide) 24.sp else 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = if (wide) 44.dp else 32.dp, start = edge + 2.dp))
         }
         // Le righe della LazyColumn si compongono solo quando arrivano vicino allo schermo.
         items(providerRows, key = { (m, id, _) -> "c:$m:$id" }) { (isMovie, id, name) ->
@@ -257,6 +326,9 @@ private fun DiscoverHome(vm: AppViewModel) {
                 items(titles, key = { it.key }) { t -> PosterTile(vm, t, null, caption = true) }
             }
         }
+    }
+    }
+    LoadingBadge(vm, if (tmdbPending && vm.hasTmdb) "Preparo le tendenze…" else null)
     }
 
     if (categories) CategoriesDialog(vm, filter) { categories = false }
@@ -286,23 +358,26 @@ private fun Hero(vm: AppViewModel, items: List<Title>, wide: Boolean) {
     val t = items[i % items.size]
     val tm = t.tmdb!!
     @Suppress("UNUSED_VARIABLE") val pv = vm.positionsVersion
-    BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(if (wide) 18.dp else 16.dp)).background(Color.Black)) {
+    val edge = LocalEdge.current
+    val bg = C.Bg
+    BoxWithConstraints(Modifier.fillMaxWidth().then(if (edge == 0.dp) Modifier.clip(RoundedCornerShape(if (wide) 18.dp else 16.dp)) else Modifier).background(Color.Black)) {
         val h = if (wide) (maxWidth * 0.42f).coerceIn(340.dp, 560.dp) else (maxWidth * 1.32f).coerceAtMost(560.dp)
         Box(Modifier.fillMaxWidth().height(h)) {
             AnimatedContent(t, transitionSpec = { fadeIn(tween(900)) togetherWith fadeOut(tween(900)) }, label = "hero") { x ->
                 val p = if (wide) Tmdb.img(x.tmdb?.backdrop, "w1280") else Tmdb.img(x.tmdb?.poster, "w780") ?: Tmdb.img(x.tmdb?.backdrop, "w780")
                 AsyncImage(p, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = if (wide) BiasAlignment(0f, -0.5f) else Alignment.TopCenter)
             }
+            // In fondo l'immagine sfuma nello sfondo della pagina, in alto un velo per i filtri.
             if (wide) {
                 Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Color(0xE0000000), 0.35f to Color(0x8C000000), 0.68f to Color.Transparent)))
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.6f to Color.Transparent, 1f to Color(0xBF000000))))
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color(0x80000000), 0.18f to Color.Transparent, 0.6f to Color.Transparent, 1f to bg)))
             } else {
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.38f to Color.Transparent, 0.62f to Color(0x8C000000), 1f to Color(0xF2000000))))
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color(0x99000000), 0.16f to Color.Transparent, 0.38f to Color.Transparent, 0.62f to Color(0x8C000000), 1f to bg)))
             }
             val listed = if (t.movie != null) vm.inMyList(t.movie.item) else vm.inMyList(t.show!!.item)
             Column(
                 Modifier.align(if (wide) Alignment.BottomStart else Alignment.BottomCenter)
-                    .padding(start = if (wide) 44.dp else 18.dp, end = if (wide) 0.dp else 18.dp, bottom = if (wide) 46.dp else 22.dp)
+                    .padding(start = edge + if (wide) 20.dp else 18.dp, end = if (wide) 0.dp else edge + 18.dp, bottom = if (wide) 46.dp else 22.dp)
                     .then(if (wide) Modifier.fillMaxWidth(0.58f) else Modifier.fillMaxWidth()),
                 horizontalAlignment = if (wide) Alignment.Start else Alignment.CenterHorizontally,
             ) {
@@ -324,7 +399,7 @@ private fun Hero(vm: AppViewModel, items: List<Title>, wide: Boolean) {
                 }
             }
             if (items.size > 1) Row(
-                Modifier.align(if (wide) Alignment.BottomEnd else Alignment.BottomCenter).padding(end = if (wide) 28.dp else 0.dp, bottom = if (wide) 24.dp else 8.dp),
+                Modifier.align(if (wide) Alignment.BottomEnd else Alignment.BottomCenter).padding(end = if (wide) edge + 28.dp else 0.dp, bottom = if (wide) 24.dp else 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 items.indices.forEach { n ->
@@ -357,8 +432,9 @@ private fun HeroButton(text: String?, icon: androidx.compose.ui.graphics.vector.
 @Composable
 private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> Unit)? = null, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
     val wide = LocalWide.current
+    val edge = LocalEdge.current
     Column(Modifier.padding(top = top)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = edge + 2.dp)) {
             Text(title, color = C.Text, fontSize = if (wide) 20.sp else 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             if (onAll != null) Text(
                 "Vedi tutto ›", color = C.Accent2, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
@@ -366,7 +442,7 @@ private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> 
             )
         }
         // Spazio attorno per il riquadro che si ingrandisce quando ha il focus.
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = 2.dp, vertical = 10.dp), content = content)
+        TvRow { LazyRow(horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp), content = content) }
     }
 }
 
@@ -375,7 +451,8 @@ private fun PosterTile(vm: AppViewModel, t: Title, known: Tmdb.Card?, lookup: Bo
     val wide = LocalWide.current
     val tm = rememberTmdb(vm, t.kind, t.name, t.year, known, lookup)
     val p = vm.progressOf(t)
-    Column(Modifier.width(if (wide) 154.dp else 112.dp).tvClickable(shape = RoundedCornerShape(8.dp), focusScale = 1.08f, background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong) { vm.openTitle(t) }) {
+    val spot = LocalSpot.current
+    Column(Modifier.width(if (wide) 154.dp else 112.dp).tvClickable(shape = RoundedCornerShape(8.dp), focusScale = 1.08f, background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong, onFocus = spot?.let { f -> { f(Title(t.movie, t.show, tm ?: t.tmdb)) } }) { vm.openTitle(t) }) {
         Box {
             Artwork(Tmdb.img(tm?.poster) ?: t.poster, t.initials, Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(skinCorners(8.dp)), fontSize = 20)
             if (p > 0f && p < 1f) ProgressLine(p, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(6.dp))
@@ -398,7 +475,7 @@ private fun TopTile(vm: AppViewModel, t: Title, n: Int) {
     val wide = LocalWide.current
     val h = if (wide) 210.dp else 150.dp
     Row(
-        Modifier.height(h).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent) { vm.openTitle(t) }.padding(end = 4.dp),
+        Modifier.height(h).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent, onFocus = LocalSpot.current?.let { f -> { f(t) } }) { vm.openTitle(t) }.padding(end = 4.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
         // Il numero grande col solo contorno, mezzo nascosto dietro la locandina.
@@ -418,7 +495,8 @@ private fun WideTile(vm: AppViewModel, t: Title, known: Tmdb.Card?, onLong: () -
     val wide = LocalWide.current
     val tm = rememberTmdb(vm, t.kind, t.name, t.year, known)
     val p = vm.progressOf(t)
-    Column(Modifier.width(if (wide) 290.dp else 220.dp).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong) { vm.playTitle(t) }) {
+    val spot = LocalSpot.current
+    Column(Modifier.width(if (wide) 290.dp else 220.dp).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong, onFocus = spot?.let { f -> { f(Title(t.movie, t.show, tm ?: t.tmdb)) } }) { vm.playTitle(t) }) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(skinCorners(8.dp))) {
             Artwork(Tmdb.img(tm?.backdrop, "w780") ?: t.poster, t.initials, Modifier.fillMaxSize(), fontSize = 20)
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color(0xB3000000))))
@@ -443,10 +521,11 @@ private fun CategoryGrid(vm: AppViewModel, id: String) {
     val catId = id.drop(2)
     val wide = LocalWide.current
     val lib = if (isMovie) vm.movies else vm.series
-    if (lib == null) { Loading("Caricamento…"); return }
+    if (lib == null) { DownloadProgress(if (isMovie) "Caricamento film…" else "Caricamento serie…", if (isMovie) vm.moviesProgress else vm.seriesProgress); return }
     val name = if (catId == ALL_ID) (if (isMovie) "Tutti i film" else "Tutte le serie") else lib.categories.firstOrNull { it.id == catId }?.name ?: ""
     val section = if (isMovie) Section.Movies else Section.Series
-    Column(Modifier.fillMaxSize()) {
+    val edge = LocalEdge.current
+    Column(Modifier.fillMaxSize().padding(start = edge, end = edge, top = if (edge > 0.dp) 12.dp else 0.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
             if (!vm.isTv) Box(Modifier.tvClickable(shape = CircleShape, background = Color.Transparent) { vm.closeCategory(Section.Discover) }.padding(10.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro", tint = C.Text)
@@ -494,6 +573,117 @@ private fun CategoriesDialog(vm: AppViewModel, filter: Filter, onDismiss: () -> 
                             onDismiss(); vm.openCategory(Section.Discover, "$k:$id")
                         }.padding(horizontal = 20.dp, vertical = 11.dp),
                     )
+                }
+            }
+        }
+    }
+}
+
+// ---------- Caricamento ----------
+
+/** Riquadro che pulsa al posto di un contenuto in arrivo. */
+@Composable
+private fun Modifier.shimmer(): Modifier {
+    val x by rememberInfiniteTransition(label = "shimmer").animateFloat(-1f, 2f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "x")
+    val base = C.Text.copy(alpha = 0.07f)
+    val shine = C.Text.copy(alpha = 0.16f)
+    return drawBehind {
+        val w = size.width.coerceAtLeast(1f)
+        drawRect(Brush.linearGradient(listOf(base, shine, base), start = Offset(w * x - w * 0.6f, 0f), end = Offset(w * x, size.height)))
+    }
+}
+
+@Composable
+private fun HeroSkeleton(wide: Boolean, edge: Dp) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val h = if (wide) (maxWidth * 0.42f).coerceIn(340.dp, 560.dp) else (maxWidth * 1.32f).coerceAtMost(560.dp)
+        Box(Modifier.fillMaxWidth().height(h).then(if (edge == 0.dp) Modifier.clip(RoundedCornerShape(16.dp)) else Modifier).shimmer())
+    }
+}
+
+@Composable
+private fun RowSkeleton(wide: Boolean, edge: Dp, top: Dp) {
+    Column(Modifier.padding(top = top)) {
+        Box(Modifier.padding(start = edge + 2.dp).width(if (wide) 220.dp else 160.dp).height(18.dp).clip(RoundedCornerShape(6.dp)).shimmer())
+        Row(Modifier.padding(start = edge + 2.dp, top = 12.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp)) {
+            repeat(if (wide) 8 else 4) {
+                Box(Modifier.width(if (wide) 154.dp else 112.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(8.dp)).shimmer())
+            }
+        }
+    }
+}
+
+/** La pagina com'è fatta, con i riquadri che pulsano: si capisce subito cosa arriva e dove. */
+@Composable
+private fun DiscoverSkeleton(wide: Boolean, edge: Dp) {
+    Column(Modifier.fillMaxSize().clipToBounds()) {
+        HeroSkeleton(wide, edge)
+        repeat(3) { RowSkeleton(wide, edge, if (wide) 26.dp else 20.dp) }
+    }
+}
+
+private fun pct(p: Pair<Long, Long>?): String {
+    val (read, total) = p ?: return "…"
+    return if (total > 0) " · ${(read * 100 / total).coerceIn(0, 100)}%" else String.format(java.util.Locale.ITALY, " · %.1f MB", read / 1_048_576.0)
+}
+
+/** Cosa si sta caricando, sempre in vista in alto: una linea che scorre sul bordo e un'etichetta. Niente se non carica nulla. */
+@Composable
+private fun BoxScope.LoadingBadge(vm: AppViewModel, extra: String?) {
+    val text = when {
+        vm.moviesLoading && vm.movies == null -> "Carico i film" + pct(vm.moviesProgress)
+        vm.seriesLoading && vm.series == null -> "Carico le serie" + pct(vm.seriesProgress)
+        vm.catalogUpdating > 0 || vm.moviesLoading || vm.seriesLoading -> "Cerco titoli nuovi…"
+        else -> extra
+    }
+    // L'ultima etichetta resta mentre il riquadro sparisce.
+    var shown by remember { mutableStateOf("") }
+    androidx.compose.runtime.SideEffect { if (text != null) shown = text }
+    AnimatedVisibility(text != null, Modifier.align(Alignment.TopCenter), enter = fadeIn(), exit = fadeOut()) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            LinearProgressIndicator(Modifier.fillMaxWidth().height(3.dp), color = C.Accent, trackColor = Color.Transparent)
+            Row(
+                Modifier.padding(top = 10.dp).clip(RoundedCornerShape(50)).background(Color(0xD9000000)).padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                Text(text ?: shown, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            }
+        }
+    }
+}
+
+// ---------- TV: il titolo col focus in primo piano ----------
+
+@Composable
+private fun Spotlight(vm: AppViewModel, t: Title?, edge: Dp, height: Dp) {
+    // Con un attimo di ritardo: scorrendo veloce non si chiede TMDB per ogni locandina.
+    val shown by produceState(t, t) { delay(200); value = t }
+    val bg = C.Bg
+    Box(Modifier.fillMaxWidth().height(height + 40.dp)) {
+        if (shown == null) { Box(Modifier.fillMaxSize().shimmer()); return@Box }
+        val s = shown!!
+        val tm = rememberTmdb(vm, s.kind, s.name, s.year, s.tmdb)
+        val img = Tmdb.img(tm?.backdrop, "w1280")
+        Box(Modifier.align(Alignment.TopEnd).fillMaxWidth(0.72f).fillMaxHeight()) {
+            AnimatedContent(img, transitionSpec = { fadeIn(tween(450)) togetherWith fadeOut(tween(450)) }, label = "spot") { u ->
+                if (u != null) AsyncImage(u, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = BiasAlignment(0f, -0.4f))
+            }
+            Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to bg, 0.35f to bg.copy(alpha = 0.55f), 0.7f to Color.Transparent)))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to bg)))
+        }
+        AnimatedContent(s.key, transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(150)) }, label = "spotText", modifier = Modifier.padding(start = edge + 20.dp, top = 28.dp).fillMaxWidth(0.5f)) { _ ->
+            Column {
+                Text(if (s.isMovie) "FILM" else "SERIE TV", color = C.Accent2, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                Text(
+                    tm?.title?.ifEmpty { null } ?: s.name, color = C.Text, fontSize = 38.sp, lineHeight = 44.sp, fontWeight = FontWeight.ExtraBold,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
+                )
+                val meta = listOfNotNull(tm?.year ?: s.year, tm?.vote?.takeIf { it > 0 }?.let { "★ " + String.format(java.util.Locale.ITALY, "%.1f", it) }).joinToString("  ·  ")
+                if (meta.isNotEmpty()) Text(meta, color = C.Text2, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                tm?.overview?.takeIf { it.isNotEmpty() }?.let {
+                    Text(it, color = C.Text2, fontSize = 15.sp, lineHeight = 22.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
                 }
             }
         }
