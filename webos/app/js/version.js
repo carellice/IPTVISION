@@ -1,2 +1,2 @@
 /* Versione dell'app: la aggiorna release.bat insieme ad appinfo.json. */
-IPTV.VERSION = '1.27.5';
+IPTV.VERSION = '1.27.6';
