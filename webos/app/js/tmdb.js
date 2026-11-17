@@ -119,7 +119,25 @@
 
   function flat(lists) { return [].concat.apply([], lists); }
 
+  /** Le classifiche cambiano una volta al giorno: si scaricano alla prima apertura della giornata, poi si rileggono dal TV. */
   function loadRows(key) {
+    var d = new Date(), day = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    var hash = 0;
+    for (var i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+    try {
+      var c = JSON.parse(localStorage.getItem('tmdbRows') || 'null');
+      if (c && c.day === day && c.key === hash) return Promise.resolve(c.rows);
+    } catch (e) { /* niente di salvato */ }
+    return downloadRows(key).then(function (rows) {
+      // Solo se TMDB ha risposto: righe vuote (rete assente) non devono restare per tutto il giorno.
+      if (rows.some(function (r) { return r.items.length; })) {
+        try { localStorage.setItem('tmdbRows', JSON.stringify({ day: day, key: hash, rows: rows })); } catch (e) { /* spazio esaurito */ }
+      }
+      return rows;
+    });
+  }
+
+  function downloadRows(key) {
     return Promise.all(DEFS.map(function (d) {
       return Promise.all(d.sources.map(function (s) {
         var trending = s.path.indexOf('trending') === 0;

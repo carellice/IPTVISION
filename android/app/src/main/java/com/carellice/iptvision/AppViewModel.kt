@@ -123,7 +123,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
 
     // ---------- TMDB ----------
-    var tmdbKey by mutableStateOf(settings.tmdbKey); private set
+    /** La chiave scelta da chi usa l'app, altrimenti quella integrata nella build. */
+    var tmdbKey by mutableStateOf(settings.tmdbKey.ifEmpty { BuildConfig.TMDB_KEY }); private set
+    /** C'è una chiave messa a mano (non quella integrata). */
+    val ownTmdb get() = settings.tmdbKey.isNotEmpty()
+    val builtinTmdb get() = BuildConfig.TMDB_KEY.isNotEmpty()
     val hasTmdb get() = tmdbKey.isNotEmpty()
     var tmdbRows by mutableStateOf<List<Tmdb.Row>?>(null); private set
     var tmdbError by mutableStateOf<String?>(null); private set
@@ -131,9 +135,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Con il server di casa la chiave è dell'account: la ricevono tutti i dispositivi collegati. */
     fun setTmdb(key: String, fromServer: Boolean = false) {
-        tmdbKey = key.trim()
-        if (!fromServer) queueServerOp(JSONObject().put("op", "tmdbKey").put("key", tmdbKey), now = true)
-        settings.tmdbKey = tmdbKey
+        val own = key.trim()
+        if (fromServer && own == settings.tmdbKey) return
+        tmdbKey = own.ifEmpty { BuildConfig.TMDB_KEY }
+        // Al server va solo la chiave messa a mano: quella integrata resta nell'app.
+        if (!fromServer) queueServerOp(JSONObject().put("op", "tmdbKey").put("key", own), now = true)
+        settings.tmdbKey = own
         Tmdb.clearCache()
         tmdbRows = null
         tmdbJob?.cancel(); tmdbJob = null
@@ -922,7 +929,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         positions.replaceWith(o)
         positionsVersion++
         // Chiave TMDB dell'account: se il server non l'ha mai avuta, diventa quella di questo dispositivo.
-        if (o.has("tmdbKey")) o.optString("tmdbKey").let { if (it != tmdbKey) setTmdb(it, fromServer = true) }
+        if (o.has("tmdbKey")) o.optString("tmdbKey").let { if (it != settings.tmdbKey) setTmdb(it, fromServer = true) }
         else if (hasTmdb) queueServerOp(JSONObject().put("op", "tmdbKey").put("key", tmdbKey), now = true)
     }
 

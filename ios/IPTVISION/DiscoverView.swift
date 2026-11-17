@@ -33,13 +33,16 @@ struct DiscoverView: View {
 
     var body: some View {
         Group {
-            if let movies = model.movies, let series = model.series {
-                content(movies, series)
+            // Si mostra appena c'è uno dei due cataloghi: l'altro (e TMDB) arriva dopo, senza bloccare la pagina.
+            if model.movies != nil || model.series != nil {
+                content(model.movies ?? Library(categories: [], items: [], byCategory: [:]),
+                        model.series ?? Library(categories: [], items: [], byCategory: [:]))
             } else {
-                LoadingView(text: "Carico film e serie…")
+                ScrollView { VStack(alignment: .leading, spacing: 22) { ForEach(0..<3, id: \.self) { _ in SkeletonRow() } }.padding(.vertical) }
             }
         }
         .navigationTitle("Film e serie")
+        .overlay(alignment: .topTrailing) { LoadingBadge(extra: matched == nil && model.tmdbError == nil ? "Preparo le tendenze…" : nil) }
         .navigationDestination(for: TitleEntry<Movie>.self) { MovieDetail(entry: $0) }
         .navigationDestination(for: TitleEntry<Series>.self) { SeriesDetail(entry: $0) }
         .navigationDestination(for: DiscoverCategory.self) { c in
@@ -55,7 +58,8 @@ struct DiscoverView: View {
 
     /// Le liste di TMDB diventano titoli del catalogo, ognuno una volta per riga (fuori dal thread principale).
     private func match() async {
-        guard let rows = model.tmdbRows, let movies = model.movies?.items, let series = model.series?.items else { matched = nil; return }
+        guard let rows = model.tmdbRows, model.movies != nil || model.series != nil else { matched = nil; return }
+        let movies = model.movies?.items ?? [], series = model.series?.items ?? []
         matched = await Task.detached(priority: .userInitiated) { () -> [(row: Tmdb.Row, titles: [DiscoverTitle])] in
             func byKey<T>(_ entries: [TitleEntry<T>], _ name: (T) -> String) -> [String: TitleEntry<T>] {
                 var m: [String: TitleEntry<T>] = [:]
@@ -138,8 +142,9 @@ struct DiscoverView: View {
                 if !hero.isEmpty {
                     Hero(items: hero).padding(.horizontal)
                 } else if matched == nil && model.tmdbError == nil {
-                    RoundedRectangle(cornerRadius: 16).fill(Theme.card).frame(height: 460).padding(.horizontal)
+                    RoundedRectangle(cornerRadius: 16).fill(Theme.card).frame(height: 460).padding(.horizontal).modifier(Pulse())
                 }
+                if matched == nil && model.tmdbError == nil { ForEach(0..<2, id: \.self) { _ in SkeletonRow() } }
                 if !cont.isEmpty {
                     TitleRow(title: "Continua a guardare") { ForEach(cont) { WideTile(title: $0) } }
                 }
@@ -275,21 +280,111 @@ private struct Hero: View {
 private struct TitleRow<Content: View>: View {
     let title: String
     var all: DiscoverCategory?
+    var captions = false
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(title).font(.headline.weight(.bold)).lineLimit(1)
-                if let all {
-                    NavigationLink(value: all) { Text("Vedi tutto ›").font(.footnote.weight(.semibold)).foregroundStyle(Theme.accent2) }
-                }
-            }
-            .padding(.horizontal)
+            Text(title).font(.headline.weight(.bold)).lineLimit(1).padding(.horizontal)
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .top, spacing: 8) { content() }.padding(.horizontal)
+                LazyHStack(alignment: .top, spacing: 8) {
+                    content()
+                    // In fondo alla riga, grande come una locandina: apre tutti i titoli della categoria.
+                    if let all {
+                        NavigationLink(value: all) { SeeAllTile(captions: captions) }.buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
             }
         }
+    }
+}
+
+private struct SeeAllTile: View {
+    let captions: Bool
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 10) {
+                Image(systemName: "arrow.right").font(.title3.weight(.semibold))
+                    .frame(width: 38, height: 38).overlay(Circle().stroke(.secondary, lineWidth: 2))
+                Text("Guarda tutto").font(.footnote.weight(.bold))
+            }
+            .frame(width: 112, height: 168)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.corner(8)))
+            if captions { Color.clear.frame(width: 112, height: 38) }
+        }
+    }
+}
+
+/// Un riquadro che pulsa al posto di un contenuto in arrivo.
+private struct Pulse: ViewModifier {
+    @State private var dim = false
+    func body(content: Content) -> some View {
+        content.opacity(dim ? 0.45 : 1)
+            .onAppear { withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { dim = true } }
+    }
+}
+
+private struct SkeletonRow: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            RoundedRectangle(cornerRadius: 6).fill(Theme.card).frame(width: 160, height: 18)
+            HStack(spacing: 8) { ForEach(0..<4, id: \.self) { _ in RoundedRectangle(cornerRadius: 8).fill(Theme.card).frame(width: 112, height: 168) } }
+        }
+        .padding(.horizontal)
+        .modifier(Pulse())
+    }
+}
+
+/// Cosa si sta caricando, sempre in vista in alto a destra.
+struct LoadingBadge: View {
+    @EnvironmentObject var model: AppModel
+    var extra: String?
+    var body: some View {
+        let text: String? = model.moviesLoading && model.movies == nil ? "Carico i film…"
+            : model.seriesLoading && model.series == nil ? "Carico le serie…"
+            : model.catalogUpdating > 0 ? "Cerco titoli nuovi…"
+            : model.tmdbLoading ? extra : nil
+        if let text {
+            HStack(spacing: 8) { ProgressView().tint(.white).controlSize(.small); Text(text) }
+                .font(.footnote.weight(.semibold)).foregroundStyle(.white)
+                .padding(.horizontal, 12).padding(.vertical, 7).background(.black.opacity(0.85), in: Capsule())
+                .padding(.trailing, 12).padding(.top, 4)
+        }
+    }
+}
+
+/// Con la chiave TMDB: film e serie aggiunti con +, in una pagina tutta loro e nell'ordine in cui li hai aggiunti.
+struct MyListView: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        let _ = model.positionsVersion
+        let mm: [DiscoverTitle] = model.movieEntries(myListId).map { DiscoverTitle(movie: $0) }
+        let ms: [DiscoverTitle] = model.seriesEntries(myListId).map { DiscoverTitle(show: $0) }
+        let list = mm + ms
+        Group {
+            if model.movies == nil && model.series == nil {
+                LoadingView(text: "Caricamento della tua lista…")
+            } else if list.isEmpty {
+                VStack(spacing: 8) {
+                    Text("La lista è vuota").font(.headline)
+                    Text("Aggiungi film e serie con + dalla loro scheda.").font(.subheadline).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 8, alignment: .top)], spacing: 14) {
+                        ForEach(list) { PosterTile(title: $0, lookup: true, caption: true) }
+                    }
+                    .padding()
+                }
+            }
+        }
+        .navigationTitle("La mia lista")
+        .navigationDestination(for: TitleEntry<Movie>.self) { MovieDetail(entry: $0) }
+        .navigationDestination(for: TitleEntry<Series>.self) { SeriesDetail(entry: $0) }
+        .task { await model.ensureMovies(); await model.ensureSeries() }
     }
 }
 
@@ -393,7 +488,7 @@ private struct CategoryTitles: View {
             ? model.movieEntries(category.id).prefix(30).map { DiscoverTitle(movie: $0) }
             : model.seriesEntries(category.id).prefix(30).map { DiscoverTitle(show: $0) }
         if !titles.isEmpty {
-            TitleRow(title: name, all: category) { ForEach(titles) { PosterTile(title: $0, caption: true) } }
+            TitleRow(title: name, all: category, captions: true) { ForEach(titles) { PosterTile(title: $0, caption: true) } }
         }
     }
 }

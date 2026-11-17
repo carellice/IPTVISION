@@ -156,9 +156,31 @@ public sealed partial class MainViewModel
     /// <summary>La chiave TMDB in uso (per i riquadri che chiedono la propria scheda).</summary>
     internal static string? TmdbKeyNow { get; private set; }
 
-    public bool HasTmdb => !string.IsNullOrEmpty(_settings.TmdbKey);
-    /// <summary>Con la chiave TMDB le schede Film e Serie diventano una sola, "Film e serie".</summary>
-    public int ModeTabColumns => HasTmdb ? 2 : 3;
+    /// <summary>La chiave integrata nella build (da tmdb.key), usata quando non se ne mette una a mano.</summary>
+    private static readonly string BuiltinTmdb = System.Reflection.Assembly.GetExecutingAssembly()
+        .GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false).OfType<System.Reflection.AssemblyMetadataAttribute>()
+        .FirstOrDefault(a => a.Key == "TmdbKey")?.Value ?? "";
+
+    /// <summary>La chiave messa a mano, altrimenti quella integrata.</summary>
+    private string? TmdbKey => _settings.TmdbKey ?? (BuiltinTmdb.Length > 0 ? BuiltinTmdb : null);
+    public bool HasTmdb => !string.IsNullOrEmpty(TmdbKey);
+    public bool HasOwnTmdb => !string.IsNullOrEmpty(_settings.TmdbKey);
+    /// <summary>Con la chiave TMDB le schede Film e Serie diventano due: "Film e serie" e "La mia lista".</summary>
+    public int ModeTabColumns => HasTmdb ? 3 : 3;
+
+    /// <summary>Cosa si sta caricando, in alto a destra in "Film e serie" (null: niente).</summary>
+    [ObservableProperty] private string? _discoverBusy;
+
+    /// <summary>"La mia lista" aperta: la schermata mostra solo i titoli aggiunti con +.</summary>
+    private bool _myListOpen;
+    /// <summary>Le righe vanno rifatte (catalogo, TMDB, filtro o posizioni cambiati); se no si riapre la pagina dov'era.</summary>
+    private bool _discoverStale = true;
+
+    public bool IsMyListMode
+    {
+        get => Mode != LibraryMode.Live && _myListOpen;
+        set { if (value) OpenMyList(); }
+    }
 
     /// <summary>La schermata "Film e serie" copre tutta la finestra (il video è una finestra nativa: sotto non si vede).</summary>
     [ObservableProperty] private bool _showDiscover;
@@ -173,7 +195,7 @@ public sealed partial class MainViewModel
     /// <summary>La scheda "Film e serie" del pannello: accesa fuori dalla TV in diretta.</summary>
     public bool IsDiscoverMode
     {
-        get => Mode != LibraryMode.Live;
+        get => Mode != LibraryMode.Live && !_myListOpen;
         set { if (value) OpenDiscover(); }
     }
 
@@ -214,6 +236,7 @@ public sealed partial class MainViewModel
     /// <summary>Con il server di casa la chiave è dell'account: la ricevono tutti i dispositivi collegati.</summary>
     private void SetTmdbKey(string key)
     {
+        // Al server va solo la chiave messa a mano: quella integrata resta nell'app.
         ApplyTmdbKey(key);
         QueueServerOp(new System.Text.Json.Nodes.JsonObject { ["op"] = "tmdbKey", ["key"] = _settings.TmdbKey ?? "" }, now: true);
     }
@@ -221,7 +244,8 @@ public sealed partial class MainViewModel
     private void ApplyTmdbKey(string key)
     {
         _settings.TmdbKey = key.Length == 0 ? null : key;
-        TmdbKeyNow = _settings.TmdbKey;
+        TmdbKeyNow = TmdbKey;
+        _discoverStale = true;
         ScheduleSave();
         Tmdb.ClearCache();
         _tmdbRows = null;
@@ -230,26 +254,48 @@ public sealed partial class MainViewModel
         DiscoverItems = [];
         ShowDiscover = false;
         OnPropertyChanged(nameof(HasTmdb));
+        OnPropertyChanged(nameof(HasOwnTmdb));
         OnPropertyChanged(nameof(ModeTabColumns));
     }
 
     private void InitDiscover()
     {
-        TmdbKeyNow = _settings.TmdbKey;
+        TmdbKeyNow = TmdbKey;
         _heroTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(9) };
         _heroTimer.Tick += (_, _) => { if (Hero.Items.Count > 1) SetHero((Hero.Index + 1) % Hero.Items.Count); };
     }
 
     [RelayCommand]
-    public void OpenDiscover()
+    public void OpenDiscover() => ShowDiscoverPage(myList: false);
+
+    [RelayCommand]
+    public void OpenMyList() => ShowDiscoverPage(myList: true);
+
+    private void ShowDiscoverPage(bool myList)
     {
         if (!HasTmdb) { Mode = LibraryMode.Movies; return; }
+        if (_myListOpen != myList) { _myListOpen = myList; _discoverStale = true; }
         if (Mode == LibraryMode.Live) Mode = LibraryMode.Movies;
         IsSettingsOpen = false;
         ShowDiscover = true;
         OnPropertyChanged(nameof(IsDiscoverMode));
+        OnPropertyChanged(nameof(IsMyListMode));
         _ = LoadDiscoverAsync();
     }
+
+    /// <summary>Catalogo, TMDB o posizioni cambiati: la pagina si rifà alla prossima apertura (o subito, se è aperta).</summary>
+    private void DiscoverChanged()
+    {
+        _discoverStale = true;
+        if (ShowDiscover) BuildDiscover();
+    }
+
+    /// <summary>Il testo del riquadro in alto a destra: cosa si sta caricando.</summary>
+    private void UpdateDiscoverBusy() => DiscoverBusy =
+        IsLibraryLoading && _movies.Count == 0 ? "Carico i film…"
+        : _series.Count == 0 && _seriesTask is { IsCompleted: false } ? "Carico le serie…"
+        : IsRefreshing ? "Cerco titoli nuovi…"
+        : Hero.IsLoading ? "Preparo le tendenze…" : null;
 
     [RelayCommand]
     private void CloseDiscover() => ShowDiscover = false;
@@ -259,6 +305,7 @@ public sealed partial class MainViewModel
     private void DiscoverToLive()
     {
         ShowDiscover = false;
+        _myListOpen = false;
         Mode = LibraryMode.Live;
     }
 
@@ -266,6 +313,7 @@ public sealed partial class MainViewModel
     private void SetDiscoverFilter(string? f)
     {
         _discoverFilter = f ?? "all";
+        _discoverStale = true;
         OnPropertyChanged(nameof(IsDiscoverAll));
         OnPropertyChanged(nameof(IsDiscoverMovies));
         OnPropertyChanged(nameof(IsDiscoverSeries));
@@ -274,13 +322,23 @@ public sealed partial class MainViewModel
 
     private async Task LoadDiscoverAsync()
     {
-        var key = _settings.TmdbKey;
+        var key = TmdbKey;
         if (key == null) return;
-        await Task.WhenAll(EnsureMoviesAsync(), EnsureSeriesAsync());
-        BuildDiscover();
+        // La pagina si mostra appena c'è uno dei due cataloghi: l'altro (e TMDB) arriva dopo, senza bloccarla.
+        // Già fatta e niente di cambiato: resta com'era, allo stesso punto (anche tornando da "Guarda tutto").
+        var movies = EnsureMoviesAsync();
+        var series = EnsureSeriesAsync();
+        UpdateDiscoverBusy();
+        if (_discoverStale || DiscoverItems.Count == 0) BuildDiscover();
+        await Task.WhenAny(movies, series);
+        if (_discoverStale) BuildDiscover();
+        await Task.WhenAll(movies, series);
+        if (_discoverStale) BuildDiscover();
+        UpdateDiscoverBusy();
         if (_tmdbRows != null) return;
         Hero.Error = null;
         Hero.IsLoading = true;
+        UpdateDiscoverBusy();
         _tmdbTask ??= Task.Run(async () =>
         {
             try { await Tmdb.Check(key); }
@@ -288,9 +346,10 @@ public sealed partial class MainViewModel
             var rows = await Tmdb.LoadRows(key);
             await App.Current.Dispatcher.InvokeAsync(() =>
             {
-                if (_settings.TmdbKey != key) return;
+                if (TmdbKey != key) return;
                 _tmdbRows = rows;
                 Hero.IsLoading = false;
+                UpdateDiscoverBusy();
                 BuildDiscover();
             });
         });
@@ -300,6 +359,7 @@ public sealed partial class MainViewModel
     /// <summary>Le liste di TMDB diventano righe di titoli del catalogo, più le righe del catalogo stesso.</summary>
     private void BuildDiscover()
     {
+        _discoverStale = false;
         bool Pass(ArtworkItem i) => _discoverFilter == "all" || (_discoverFilter == "tv") == i is Series;
 
         // Il catalogo ritrovabile per titolo, ogni titolo con tutte le sue versioni.
@@ -355,6 +415,16 @@ public sealed partial class MainViewModel
         var mine = _movies.Cast<ArtworkItem>().Concat(_series).Where(i => _positions.InMyList(i is Movie m ? m.Key : ((Series)i).Key) && Pass(i))
             .OrderByDescending(i => _positions.MyListAddedAt(i is Movie m ? m.Key : ((Series)i).Key))
             .Select(i => Tile(i)).ToList();
+        if (_myListOpen)
+        {
+            // "La mia lista": una pagina tutta sua, i titoli a righe di otto nell'ordine in cui li hai aggiunti.
+            var page = new List<object> { new DiscoverHeading($"La mia lista · {(mine.Count == 1 ? "1 titolo" : $"{mine.Count} titoli")}") };
+            if (mine.Count == 0) page.Add(new DiscoverHeading("La lista è vuota: aggiungi film e serie con + dalla loro scheda."));
+            for (var n = 0; n < mine.Count; n += 8) page.Add(new DiscoverRow("", mine.Skip(n).Take(8).ToList()));
+            Hero.Items = [];
+            DiscoverItems = page;
+            return;
+        }
         if (mine.Count > 0) items.Add(new DiscoverRow("La mia lista", mine));
 
         var shown = rows.Where(x => x.Tiles.Count >= (x.Row.Top ? 5 : 4)).ToList();
@@ -438,6 +508,7 @@ public sealed partial class MainViewModel
     private void DiscoverSeeAll(DiscoverRow? r)
     {
         if (r?.All is not { } a) return;
+        // Tornando a "Film e serie" la pagina è ancora allo stesso punto: le righe non si rifanno.
         OpenDiscoverCategory(a.Mode, a.Id);
     }
 

@@ -187,7 +187,23 @@ function interleave<T>(lists: T[][]): T[] {
   return out
 }
 
+const ROWS = 'iptvision.tmdbRows'
+const keyHash = (k: string) => [...k].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7)
+
+/** The charts change once a day: downloaded at the first open of the day, then read from the browser. */
 export async function loadRows(): Promise<TmdbRow[]> {
+  const day = new Date().toLocaleDateString('sv')
+  try {
+    const c = JSON.parse(localStorage.getItem(ROWS) ?? 'null') as { day: string; key: number; rows: TmdbRow[] } | null
+    if (c && c.day === day && c.key === keyHash(key)) return c.rows
+  } catch { /* nothing saved */ }
+  const rows = await downloadRows()
+  // Only when TMDB answered: empty rows (no network) must not stay all day.
+  if (rows.some((r) => r.items.length > 0)) try { localStorage.setItem(ROWS, JSON.stringify({ day, key: keyHash(key), rows })) } catch { /* full */ }
+  return rows
+}
+
+function downloadRows(): Promise<TmdbRow[]> {
   return Promise.all(rowDefs.map(async (d) => {
     const answers = await Promise.all(d.sources.map(([type, path, params]) => get<Page>(path, params)
       // trending/all mixes both: the kind comes with each result.

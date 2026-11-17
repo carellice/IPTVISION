@@ -17,7 +17,12 @@ import { Poster } from './Browse.tsx'
 type Filter = 'all' | Kind
 
 /** What the screen had when a category or a title was opened, to come back to the same place. */
-const saved = { filter: 'all' as Filter, scroll: 0 }
+const saved = { filter: 'all' as Filter, scroll: 0, rows: new Map<string, number>() }
+
+let lastRows: { key: string; rows: TmdbRow[] | null } = { key: '', rows: null }
+
+/** Opened from the menu, the page starts again from the top. */
+export function resetDiscoverScroll() { saved.scroll = 0; saved.rows.clear() }
 
 const keyOf = (t: Title) => t.entry.item.key
 const nameOf = (t: Title) => t.entry.item.name
@@ -43,7 +48,8 @@ function DiscoverHome() {
   const wide = useWide()
   const [filter, setFilterState] = useState<Filter>(saved.filter)
   const setFilter = (f: Filter) => { saved.filter = f; setFilterState(f) }
-  const [rows, setRows] = useState<TmdbRow[] | null>(null)
+  // The rows already loaded with this key: coming back to the page they are there at once.
+  const [rows, setRows] = useState<TmdbRow[] | null>(lastRows.key === tmdbKey() ? lastRows.rows : null)
   const [error, setError] = useState<string | null>(null)
   const [categories, setCategories] = useState(false)
   const [remove, setRemove] = useState<{ t: Title; from: 'continue' | 'list' } | null>(null)
@@ -53,13 +59,14 @@ function DiscoverHome() {
     let alive = true
     setError(null)
     checkKey(k).catch((e: Error) => { if (alive) setError(e.message) })
-    loadRows().then((r) => { if (alive) setRows(r) })
+    loadRows().then((r) => { lastRows = { key: k, rows: r }; if (alive) setRows(r) })
     return () => { alive = false }
   }, [k])
 
+  // Shown as soon as one of the two catalogs is there: the other one (and TMDB) come later, without blocking the page.
   const movies = app.movies
   const series = app.series
-  const index = useMemo(() => (movies && series ? indexCatalog(movies.items, series.items) : null), [movies, series])
+  const index = useMemo(() => (movies || series ? indexCatalog(movies?.items ?? [], series?.items ?? []) : null), [movies, series])
 
   // The TMDB lists turned into titles of the catalog, each title once per row.
   const matched = useMemo(() => {
@@ -86,14 +93,14 @@ function DiscoverHome() {
   const pass = (t: Title) => filter === 'all' || t.kind === filter
 
   const continueRow = useMemo<Title[]>(() => {
-    if (!movies || !series) return []
+    if (!movies && !series) return []
     const ms = moviesFor(CONTINUE_ID).map((e) => ({ t: { kind: 'movie', entry: e, tmdb: null } as Title, u: Math.max(...e.variants.map((m) => app.pos.positions[m.key]?.u ?? 0)) }))
     const ss = seriesFor(CONTINUE_ID).map((e) => ({ t: { kind: 'tv', entry: e, tmdb: null } as Title, u: lastEpisode(e.item.seriesId)?.u ?? 0 }))
     return [...ms, ...ss].sort((a, b) => b.u - a.u).map((x) => x.t)
   }, [movies, series, app.positionsVersion])
 
   const listRow = useMemo<Title[]>(() => {
-    if (!movies || !series) return []
+    if (!movies && !series) return []
     const ms = moviesFor(MYLIST_ID).map((e): Title => ({ kind: 'movie', entry: e, tmdb: null }))
     const ss = seriesFor(MYLIST_ID).map((e): Title => ({ kind: 'tv', entry: e, tmdb: null }))
     return [...ms, ...ss].sort((a, b) => (app.myList[keyOf(b)] ?? 0) - (app.myList[keyOf(a)] ?? 0))
@@ -106,21 +113,28 @@ function DiscoverHome() {
   const hero = useMemo(() => (matched?.find((r) => r.id === 'trend')?.titles ?? []).filter((t) => pass(t) && t.tmdb?.backdrop).slice(0, 6), [matched, filter])
 
   const scroller = useRef<HTMLDivElement>(null)
-  const ready = movies != null && series != null && matched != null
-  useEffect(() => { if (ready && scroller.current) scroller.current.scrollTop = saved.scroll }, [ready])
+  // Back to where it was, once the page is as long as before (catalog and TMDB rows there).
+  const restored = useRef(false)
+  const ready = (movies != null || series != null) && (matched != null || error != null)
+  useEffect(() => {
+    if (restored.current || !ready || !scroller.current) return
+    scroller.current.scrollTop = saved.scroll
+    restored.current = true
+  }, [ready])
 
-  if (!movies || !series) return <Loading text="Caricamento film e serie…" />
-  // TMDB lists still loading or being matched to the catalog: a loading screen, not a half-empty page.
-  if (matched == null && !error) return <Loading text="Caricamento film e serie…" />
+  if (!movies && !series) return <><DiscoverSkeleton wide={wide} /><LoadingBadge /></>
+  // TMDB lists still on their way: pulsing tiles in their place, the rest of the page is already usable.
+  const tmdbPending = matched == null && !error
 
   const providerRows = [
-    ...(filter !== 'tv' ? movies.categories.map((c) => ({ kind: 'movie' as Kind, id: c.id, name: c.name })) : []),
-    ...(filter !== 'movie' ? series.categories.map((c) => ({ kind: 'tv' as Kind, id: c.id, name: c.name })) : []),
+    ...(filter !== 'tv' && movies ? movies.categories.map((c) => ({ kind: 'movie' as Kind, id: c.id, name: c.name })) : []),
+    ...(filter !== 'movie' && series ? series.categories.map((c) => ({ kind: 'tv' as Kind, id: c.id, name: c.name })) : []),
   ]
   const tmdbRows = (matched ?? []).map((r) => ({ ...r, titles: r.titles.filter(pass) })).filter((r) => r.titles.length >= (r.top ? 5 : 4))
 
   return (
-    <div ref={scroller} className="scroll" style={{ flex: 1, paddingBottom: 30 }} onScroll={(e) => { saved.scroll = e.currentTarget.scrollTop }}>
+    <div ref={scroller} className="scroll" style={{ flex: 1, paddingBottom: 30, position: 'relative' }} onScroll={(e) => { saved.scroll = e.currentTarget.scrollTop }}>
+      <LoadingBadge extra={tmdbPending ? 'Preparo le tendenze…' : null} />
       <div className="hscroll" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '2px 2px 14px', overflowX: 'auto', flexShrink: 0 }}>
         <Pill text="Tutto" selected={filter === 'all'} onClick={() => setFilter('all')} />
         <Pill text="Film" selected={filter === 'movie'} onClick={() => setFilter('movie')} />
@@ -129,7 +143,7 @@ function DiscoverHome() {
       </div>
 
       {error && <div style={{ color: 'var(--danger)', fontSize: 14, padding: '0 2px 12px' }}>{error} Controlla la chiave in Impostazioni → TMDB.</div>}
-      {hero.length > 0 && <Hero items={hero} wide={wide} />}
+      {hero.length > 0 ? <Hero items={hero} wide={wide} /> : tmdbPending && <div className="skeleton" style={{ borderRadius: wide ? 18 : 16, height: wide ? 'clamp(340px, 42vw, 560px)' : 'min(132vw, 560px)' }} />}
 
       {continueRow.filter(pass).length > 0 && (
         <Row title="Continua a guardare">
@@ -141,6 +155,7 @@ function DiscoverHome() {
           {listRow.filter(pass).map((t) => <PosterTile key={keyOf(t)} t={t} known={known.get(keyOf(t))} lookup onLong={() => setRemove({ t, from: 'list' })} />)}
         </Row>
       )}
+      {tmdbPending && [0, 1, 2].map((n) => <RowSkeleton key={n} wide={wide} />)}
       {tmdbRows.map((r, i) => (
         <div key={r.id}>
           <Row title={r.top ? `${r.title} in Italia` : r.title}>
@@ -246,21 +261,23 @@ function HeroButton({ text, icon, primary, title, onClick }: { text?: string; ic
 
 // --- rows ------------------------------------------------------------------------------------------------
 
-function Row({ title, onAll, children }: { title: string; onAll?: () => void; children: ReactNode }) {
+function Row({ title, onAll, captions = false, children }: { title: string; onAll?: () => void; captions?: boolean; children: ReactNode }) {
   const wide = useWide()
   const ref = useRef<HTMLDivElement>(null)
+  // Coming back from "Guarda tutto" the row is scrolled as it was left.
+  useEffect(() => { const x = saved.rows.get(title); if (x && ref.current) ref.current.scrollTo({ left: x, behavior: 'instant' }) }, [title])
   const scroll = (d: number) => ref.current?.scrollBy({ left: d * ref.current.clientWidth * 0.85, behavior: 'smooth' })
   return (
     <section className="drow" style={{ marginTop: wide ? 26 : 20 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, padding: '0 2px 2px' }}>
         <div className="ellipsis" style={{ color: 'var(--text)', fontSize: wide ? 20 : 17, fontWeight: 700 }}>{title}</div>
-        {onAll && (
-          <div role="button" tabIndex={0} onClick={onAll} onKeyDown={(e) => { if (e.key === 'Enter') onAll() }}
-            className="drow-all" style={{ color: 'var(--accent2)', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Vedi tutto ›</div>
-        )}
       </div>
       <div style={{ position: 'relative' }}>
-        <div ref={ref} className="hscroll" style={{ display: 'flex', gap: wide ? 10 : 8, overflowX: 'auto', overflowY: 'hidden', padding: '10px 2px 12px' }}>{children}</div>
+        <div ref={ref} className="hscroll" style={{ display: 'flex', gap: wide ? 10 : 8, overflowX: 'auto', overflowY: 'hidden', padding: '10px 2px 12px' }}
+          onScroll={(e) => { saved.rows.set(title, e.currentTarget.scrollLeft) }}>
+          {children}
+          {onAll && <SeeAllTile captions={captions} onClick={onAll} />}
+        </div>
         {wide && (['left', 'right'] as const).map((side) => (
           <div key={side} className="drow-arrow" role="button" onClick={() => scroll(side === 'left' ? -1 : 1)}
             style={{
@@ -291,6 +308,22 @@ function PosterTile({ t, known, lookup = false, caption = false, onLong }: { t: 
         {t.kind === 'tv' && !caption && <KindBadge />}
       </div>
       {caption && <div className="clamp2" style={{ marginTop: 6, color: 'var(--text2)', fontSize: 12, lineHeight: '16px' }}>{nameOf(t)}</div>}
+    </Clickable>
+  )
+}
+
+/** At the end of the row, as big as a poster: opens every title of the category. */
+function SeeAllTile({ captions, onClick }: { captions: boolean; onClick: () => void }) {
+  const wide = useWide()
+  return (
+    <Clickable onClick={onClick} title="Guarda tutto" background="transparent" radius={8} className="dtile" style={{ flexShrink: 0, width: wide ? 154 : 112 }}>
+      <div style={{ width: '100%', aspectRatio: '2 / 3', borderRadius: 8, background: 'var(--surface)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+        <div style={{ width: wide ? 46 : 38, height: wide ? 46 : 38, borderRadius: '50%', border: '2px solid var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="arrow_forward" size={wide ? 24 : 20} color="var(--text)" />
+        </div>
+        <div style={{ color: 'var(--text)', fontSize: wide ? 15 : 13, fontWeight: 700 }}>Guarda tutto</div>
+      </div>
+      {captions && <div style={{ height: 38 }} />}
     </Clickable>
   )
 }
@@ -357,7 +390,7 @@ function CategoryRow({ kind, catId, name }: { kind: Kind; catId: string; name: s
   return (
     <div ref={ref} style={{ minHeight: seen ? undefined : wide ? 300 : 230 }}>
       {titles.length > 0 && (
-        <Row title={`${name}${kind === 'tv' ? ' · Serie' : ''}`} onAll={() => openCategory('Discover', `${kind === 'movie' ? 'm' : 's'}:${catId}`)}>
+        <Row title={`${name}${kind === 'tv' ? ' · Serie' : ''}`} captions onAll={() => openCategory('Discover', `${kind === 'movie' ? 'm' : 's'}:${catId}`)}>
           {titles.map((t) => <PosterTile key={keyOf(t)} t={t} caption />)}
         </Row>
       )}
@@ -425,5 +458,75 @@ function CategoriesDialog({ open, filter, onDismiss }: { open: boolean; filter: 
         ))}
       </div>
     </Dialog>
+  )
+}
+
+// --- loading ---------------------------------------------------------------------------------------------
+
+function RowSkeleton({ wide }: { wide: boolean }) {
+  return (
+    <div style={{ marginTop: wide ? 26 : 20 }}>
+      <div className="skeleton" style={{ width: wide ? 220 : 160, height: 18, borderRadius: 6, margin: '0 2px' }} />
+      <div style={{ display: 'flex', gap: wide ? 10 : 8, padding: '12px 2px 10px', overflow: 'hidden' }}>
+        {Array.from({ length: wide ? 8 : 4 }, (_, i) => <div key={i} className="skeleton" style={{ flexShrink: 0, width: wide ? 154 : 112, aspectRatio: '2 / 3', borderRadius: 8 }} />)}
+      </div>
+    </div>
+  )
+}
+
+/** The page as it will be, with pulsing tiles: it is clear at once what is coming and where. */
+function DiscoverSkeleton({ wide }: { wide: boolean }) {
+  return (
+    <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div className="skeleton" style={{ borderRadius: wide ? 18 : 16, height: wide ? 'clamp(340px, 42vw, 560px)' : 'min(132vw, 560px)' }} />
+      {[0, 1, 2].map((n) => <RowSkeleton key={n} wide={wide} />)}
+    </div>
+  )
+}
+
+/** What is loading, always in sight at the top right. Nothing when nothing loads. */
+function LoadingBadge({ extra = null }: { extra?: string | null }) {
+  useApp()
+  const text = app.moviesLoading && !app.movies ? 'Carico i film…'
+    : app.seriesLoading && !app.series ? 'Carico le serie…'
+      : app.catalogUpdating > 0 || app.moviesLoading || app.seriesLoading ? 'Cerco titoli nuovi…'
+        : extra
+  if (!text) return null
+  return (
+    <div style={{ position: 'sticky', top: 0, height: 0, zIndex: 20, display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ marginTop: 6, marginRight: 8, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 999, background: 'rgba(0,0,0,.85)', color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', height: 'fit-content' }}>
+        <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,.3)', borderTopColor: '#fff', animation: 'spin .8s linear infinite' }} />
+        {text}
+      </div>
+    </div>
+  )
+}
+
+// --- my list -------------------------------------------------------------------------------------------------
+
+/** With a TMDB key: films and series added with +, in a page of their own, in the order they were added. */
+export function MyListSection() {
+  useApp()
+  const wide = useWide()
+  const [remove, setRemove] = useState<Title | null>(null)
+  const list = useMemo<Title[]>(() => {
+    if (!app.movies && !app.series) return []
+    const ms = moviesFor(MYLIST_ID).map((e): Title => ({ kind: 'movie', entry: e, tmdb: null }))
+    const ss = seriesFor(MYLIST_ID).map((e): Title => ({ kind: 'tv', entry: e, tmdb: null }))
+    return [...ms, ...ss].sort((a, b) => (app.myList[keyOf(b)] ?? 0) - (app.myList[keyOf(a)] ?? 0))
+  }, [app.movies, app.series, app.positionsVersion])
+  if (!app.movies && !app.series) return <Loading text="Caricamento della tua lista…" />
+  return (
+    <div className="scroll" style={{ flex: 1, paddingBottom: 30 }}>
+      <div style={{ color: 'var(--text)', fontSize: wide ? 28 : 22, fontWeight: 800, padding: '0 2px' }}>La mia lista</div>
+      <div style={{ color: 'var(--text2)', fontSize: 14, padding: '2px 2px 8px' }}>{list.length === 1 ? '1 titolo' : `${list.length} titoli`}</div>
+      {list.length === 0 ? <Empty text="La lista è vuota: aggiungi film e serie con + dalla loro scheda." /> : (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, ${wide ? 154 : 112}px)`, gap: wide ? '18px 10px' : '14px 8px', padding: '10px 2px' }}>
+          {list.map((t) => <PosterTile key={keyOf(t)} t={t} lookup caption onLong={() => setRemove(t)} />)}
+        </div>
+      )}
+      <AlertDialog open={remove != null} title="Rimuovere dalla mia lista?" text={remove ? nameOf(remove) : undefined} confirm="Rimuovi" confirmColor="var(--danger)"
+        onDismiss={() => setRemove(null)} onConfirm={() => { const t = remove; setRemove(null); if (t) toggleMyList(t.entry.item) }} />
+    </div>
   )
 }

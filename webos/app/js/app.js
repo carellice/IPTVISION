@@ -10,14 +10,17 @@
     { id: 'Movies', title: 'Film', icon: '🎬' },
     { id: 'Series', title: 'Serie TV', icon: '🎞' },
     { id: 'Discover', title: 'Film e serie', icon: '🎬' },
+    { id: 'MyList', title: 'La mia lista', icon: '🔖' },
     { id: 'Search', title: 'Cerca', icon: '🔍' },
     { id: 'Settings', title: 'Impostazioni', icon: '⚙' },
   ];
   /** Le sezioni del menu: con la chiave TMDB film e serie sono una sola, "Film e serie". */
   function sections() {
-    var tmdb = !!S.get('tmdbKey');
-    return SECTIONS.filter(function (s) { return tmdb ? s.id !== 'Movies' && s.id !== 'Series' : s.id !== 'Discover'; });
+    var tmdb = !!tmdbKey();
+    return SECTIONS.filter(function (s) { return tmdb ? s.id !== 'Movies' && s.id !== 'Series' : s.id !== 'Discover' && s.id !== 'MyList'; });
   }
+  /** La chiave messa a mano, altrimenti quella integrata nel pacchetto (js/tmdbkey.js, creato dalla release). */
+  function tmdbKey() { return S.get('tmdbKey') || IPTV.TMDB_KEY || ''; }
   var SORTS = {
     Default: 'Predefinito', Number: 'Numero', NameAsc: 'Nome (A-Z)', NameDesc: 'Nome (Z-A)',
     Recent: 'Aggiunti di recente', Year: 'Anno (più recenti)', Rating: 'Voto',
@@ -67,22 +70,44 @@
   // Dopo quanto le liste salvate sul TV si riscaricano dal server ("Aggiorna liste" lo fa subito).
   var MAX_AGE = { live: 6 * 3600000, movies: 24 * 3600000, series: 24 * 3600000 };
 
-  /** Categorie e contenuti di una sezione: dalla copia sul TV se è recente, altrimenti dal server. */
-  function loadList(kind, download) {
-    var client = A.client, a = client.account;
-    var key = kind + '|' + a.server + '|' + a.username;
-    return IPTV.Cache.get(key).then(function (c) {
-      if (c && c.items && c.items.length && Date.now() - c.at < MAX_AGE[kind]) return c;
+  function cacheKey(kind) { var a = A.client.account; return kind + '|' + a.server + '|' + a.username; }
+
+  /**
+   * Categorie e contenuti di una sezione: la copia sul TV si mostra subito, anche se vecchia. Se è scaduta
+   * (o con "Aggiorna liste", force) quella nuova arriva in sottofondo e passa a onFresh: si aspetta il
+   * download solo la prima volta.
+   */
+  function loadList(kind, download, onFresh, force) {
+    var client = A.client, key = cacheKey(kind);
+    function fetchNew() {
       return download().then(function (r) {
         var v = { at: Date.now(), cats: r[0], items: r[1] };
         // Si salva qualche secondo dopo, quando l'elenco è già a schermo.
         setTimeout(function () { if (A.client === client) IPTV.Cache.put(key, v); }, 5000);
         return v;
       });
+    }
+    return IPTV.Cache.get(key).then(function (c) {
+      if (!(c && c.items && c.items.length)) return fetchNew();
+      if (force || Date.now() - c.at >= MAX_AGE[kind]) {
+        A.updating = (A.updating || 0) + 1;
+        badge();
+        fetchNew().then(function (v) { if (A.client === client && onFresh) onFresh(v); }, function () { /* resta la copia salvata */ })
+          .then(function () { A.updating--; badge(); });
+      }
+      return c;
     });
   }
 
-  function openAccount(account, autoPlay) {
+  /** Dopo un aggiornamento: ridisegna la schermata (in Cerca solo i risultati, per non togliere la tastiera). */
+  function repaint() {
+    if (A.screen !== 'home') return;
+    if (A.section === 'Search') { if (A.rerunSearch) A.rerunSearch(); }
+    else render(true);
+  }
+
+  /** refresh: "Aggiorna liste", le liste restano a schermo e quelle nuove arrivano in sottofondo. */
+  function openAccount(account, autoPlay, refresh) {
     A.client = new X.Client(account);
     // La scadenza della lista in uso, aggiornata a ogni apertura (non serve per partire).
     var active = S.activeList();
@@ -92,19 +117,27 @@
         if (active.expiresAt !== exp) { active.expiresAt = exp; S.saveList(active); }
       }).catch(function () { /* la vedrà il caricamento delle liste */ });
     }
-    A.live = A.movies = A.series = null;
     A.loading = {};
-    A.screen = 'home';
-    A.section = 'Live';
-    render();
-    A.loading.live = true;
+    if (!refresh) {
+      A.live = A.movies = A.series = null;
+      A.screen = 'home';
+      A.section = 'Live';
+      render();
+    }
+    A.loading.live = !A.live;
     var client = A.client;
-    loadList('live', function () { return Promise.all([client.categories('get_live_categories'), client.channels()]); }).then(function (c) {
+    loadList('live', function () { return Promise.all([client.categories('get_live_categories'), client.channels()]); }, function (v) {
+      A.live = library(v.cats, v.items);
+      repaint();
+    }, refresh).then(function (c) {
       if (A.client !== client) return;
       A.live = library(c.cats, c.items);
       A.loading.live = false;
-      if (A.screen === 'home') render();
+      if (A.screen === 'home') render(!!refresh);
       if (autoPlay) autoPlayLast();
+      // Film e serie già sul TV: si leggono subito, così la sezione è pronta quando la apri.
+      if (refresh) { if (A.movies) ensure('movies', true); if (A.series) ensure('series', true); return; }
+      ['movies', 'series'].forEach(function (k) { IPTV.Cache.get(cacheKey(k)).then(function (x) { if (x && A.client === client) ensure(k); }); });
     }).catch(function (e) {
       A.loading.live = false;
       A.error = e.message || 'Impossibile caricare i canali.';
@@ -112,23 +145,46 @@
     });
   }
 
-  function ensure(kind) {
-    if (A[kind] || A.loading[kind] || !A.client) return;
-    A.loading[kind] = true;
+  function ensure(kind, force) {
+    if ((A[kind] && !force) || A.loading[kind] || !A.client) return;
+    A.loading[kind] = !A[kind];
+    badge();
     var cats = kind === 'movies' ? 'get_vod_categories' : 'get_series_categories';
     var client = A.client;
-    loadList(kind, function () { return Promise.all([client.categories(cats), kind === 'movies' ? client.movies() : client.series()]); }).then(function (c) {
+    var idOf = function (it) { return kind === 'movies' ? it.streamId : it.seriesId; };
+    loadList(kind, function () { return Promise.all([client.categories(cats), kind === 'movies' ? client.movies() : client.series()]); }, function (v) {
+      // Solo le novità si annunciano: la lista a schermo diventa quella nuova senza ricominciare da capo.
+      var old = {};
+      (A[kind] ? A[kind].raw.items : []).forEach(function (it) { old[idOf(it)] = true; });
+      var n = v.items.filter(function (it) { return !old[idOf(it)]; }).length;
+      A[kind] = library(v.cats, v.items);
+      if (n) u.toast(kind === 'movies' ? (n === 1 ? '1 film nuovo' : n + ' film nuovi') : (n === 1 ? '1 serie nuova' : n + ' serie nuove'));
+      repaint();
+    }, force).then(function (c) {
       if (A.client !== client) return;
-      A[kind] = library(c.cats, c.items);
+      if (!A[kind] || !force) A[kind] = library(c.cats, c.items);
       A.loading[kind] = false;
-      if (A.screen !== 'home') return;
-      // In Cerca si aggiornano solo i risultati: ridisegnare tutto toglierebbe la tastiera a chi scrive.
-      if (A.section === 'Search') { if (A.rerunSearch) A.rerunSearch(); }
-      else render(true);
+      badge();
+      repaint();
     }).catch(function (e) {
       A.loading[kind] = false;
+      badge();
       u.toast(e.message || 'Impossibile caricare il catalogo.');
     });
+  }
+
+  /** Cosa si sta caricando, in alto a destra in "Film e serie" e "La mia lista". */
+  function badge() {
+    var el = document.getElementById('loadbadge');
+    if (!el) { el = h('div', { id: 'loadbadge' }); document.body.appendChild(el); }
+    var here = A.screen === 'home' && (A.section === 'Discover' || A.section === 'MyList');
+    var t = !here ? null
+      : A.loading.movies && !A.movies ? 'Carico i film…'
+        : A.loading.series && !A.series ? 'Carico le serie…'
+          : A.updating > 0 ? 'Cerco titoli nuovi…'
+            : A.tmdbLoading && A.section === 'Discover' ? 'Preparo le tendenze…' : null;
+    el.className = t ? 'on' : '';
+    el.textContent = t || '';
   }
 
   function yearOf(it) { return parseInt(it.year, 10) || 0; }
@@ -267,6 +323,11 @@
       return true;
     }
     if (A.screen === 'home' && A.openCat[A.section]) { A.openCat[A.section] = null; render(); return true; }
+    // "Film e serie" e "La mia lista": Indietro riapre il menu a sinistra; un altro Indietro torna alla TV in diretta.
+    if (A.screen === 'home' && (A.section === 'Discover' || A.section === 'MyList')) {
+      var cur = Nav.current();
+      if (!(cur && cur.classList.contains('nav-item'))) { Nav.focus(root.querySelector('.rail .nav-item.active')); return true; }
+    }
     if (A.screen === 'home' && A.section !== 'Live') { A.section = 'Live'; render(); return true; }
     return false;
   }
@@ -289,6 +350,7 @@
     if (!target && prevKey) target = root.querySelector('[data-key="' + prevKey + '"]');
     if (target && !document.body.contains(target)) target = target.dataset && target.dataset.key ? root.querySelector('[data-key="' + target.dataset.key + '"]') : null;
     if (A.screen !== 'player') Nav.setScope(root, target);
+    badge();
   }
 
   function expiryOf(ui) {
@@ -474,11 +536,12 @@
     var activeItem = null;
     sections().forEach(function (s) {
       var el = V.focusable(h('div', { class: 'nav-item' + (A.section === s.id ? ' active' : ''), data: { key: 'nav-' + s.id } }, [h('span', { class: 'ni', text: s.icon }), '  ', h('span', { class: 'nt', text: s.title })]), function () {
-        // OK sulla voce di menu: si entra nel contenuto (sotto il pivot nello stile Modern UI).
-        Nav.move(metro() ? 'down' : 'right');
+        // OK sulla voce di menu: si entra nel contenuto dal suo primo elemento, in cima (sotto il pivot nello stile Modern UI).
+        var first = root.querySelector('.content .f');
+        if (first) Nav.focus(first); else Nav.move(metro() ? 'down' : 'right');
       }, function () {
         // Col telecomando basta spostarsi sulla voce per aprire la sezione.
-        if (A.section !== s.id) { A.section = s.id; render(false, root.querySelector('[data-key="nav-' + s.id + '"]')); }
+        if (A.section !== s.id) { A.section = s.id; A.discoverFrom = null; render(false, root.querySelector('[data-key="nav-' + s.id + '"]')); }
       });
       if (A.section === s.id) activeItem = el;
       rail.appendChild(el);
@@ -502,6 +565,9 @@
       var dopen = A.openCat.Discover;
       if (dopen) renderLibrary(content, dopen.charAt(0) === 'm' ? 'Movies' : 'Series', dopen.slice(2));
       else renderDiscover(content);
+    } else if (A.section === 'MyList') {
+      ensure('movies'); ensure('series');
+      renderMyList(content);
     } else {
       if (A.section === 'Movies') ensure('movies');
       if (A.section === 'Series') ensure('series');
@@ -838,7 +904,7 @@
     box.appendChild(V.focusable(h('div', { class: 'btn', text: '↻  Aggiorna liste' }), function () {
       A.epg = {};
       u.toast('Aggiorno le liste…');
-      IPTV.Cache.clear().then(function () { openAccount(S.account(), false); });
+      openAccount(S.account(), false, true);
     }));
     box.appendChild(h('div', { class: 'group-title', text: 'Versione' }));
     box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Installata' }), IPTV.VERSION]));
@@ -854,6 +920,7 @@
   function tmdbSettings(box) {
     box.appendChild(h('div', { class: 'group-title', text: 'TMDB' }));
     box.appendChild(h('div', { class: 'dim', style: 'margin:0.3rem 0 0.6rem', text: 'Con una chiave di themoviedb.org (la "Chiave API" o il "Token di accesso in lettura" che trovi nel tuo profilo TMDB, alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi. Con il server di casa vale per tutti i dispositivi collegati.' }));
+    if (!S.get('tmdbKey') && IPTV.TMDB_KEY) box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Chiave' }), 'Integrata nell\'app (puoi usare la tua)']));
     if (S.get('tmdbKey')) {
       box.appendChild(h('div', { class: 'info-line' }, [h('b', { text: 'Chiave' }), 'Inserita']));
       box.appendChild(V.focusable(h('div', { class: 'btn', data: { key: 'tmdb-remove' }, text: 'Rimuovi chiave' }), function () { setTmdbKey(''); }));
@@ -881,8 +948,8 @@
     A.tmdbRows = null; A.tmdbError = null; A.tmdbLoading = false;
     A.openCat.Discover = null;
     if (fromServer) {
-      if (!S.get('tmdbKey') && A.section === 'Discover') A.section = 'Live';
-      if (S.get('tmdbKey') && (A.section === 'Movies' || A.section === 'Series')) A.section = 'Discover';
+      if (!tmdbKey() && (A.section === 'Discover' || A.section === 'MyList')) A.section = 'Live';
+      if (tmdbKey() && (A.section === 'Movies' || A.section === 'Series')) A.section = 'Discover';
       return; // ridisegna Server.onState
     }
     render(false, root.querySelector('[data-key="nav-Settings"]'));
@@ -891,17 +958,17 @@
 
   // ---------- Film e serie (TMDB) ----------
 
-  var heroTimer = null;
   var discoverFilter = 'all';
 
   function loadTmdb() {
-    var key = S.get('tmdbKey');
+    var key = tmdbKey();
     if (!key || A.tmdbRows || A.tmdbLoading) return;
     A.tmdbLoading = true;
     IPTV.Tmdb.check(key).catch(function (e) { A.tmdbError = e.message; });
     IPTV.Tmdb.loadRows(key).then(function (rows) {
       A.tmdbLoading = false;
-      if (S.get('tmdbKey') !== key) return;
+      badge();
+      if (tmdbKey() !== key) return;
       A.tmdbRows = rows;
       A.tmdbMatched = null;
       if (A.screen === 'home' && A.section === 'Discover' && !A.openCat.Discover) render(true);
@@ -912,9 +979,9 @@
 
   /** Le liste di TMDB diventano titoli del catalogo ({ entry, tmdb }), ognuno una volta per riga. */
   function matchedRows() {
-    if (!A.tmdbRows || !A.movies || !A.series) return null;
+    if (!A.tmdbRows || (!A.movies && !A.series)) return null;
     if (A.tmdbMatched && A.tmdbMatched.movies === A.movies && A.tmdbMatched.series === A.series) return A.tmdbMatched.rows;
-    var idx = IPTV.Tmdb.index(A.movies.items, A.series.items);
+    var idx = IPTV.Tmdb.index(A.movies ? A.movies.items : [], A.series ? A.series.items : []);
     var rows = A.tmdbRows.map(function (r) {
       var seen = {}, titles = [];
       r.items.forEach(function (c) {
@@ -941,9 +1008,10 @@
   }
 
   function renderDiscover(content) {
-    clearInterval(heroTimer);
-    if (!A.movies || !A.series) { content.appendChild(h('div', { class: 'empty', text: 'Caricamento film e serie…' })); return; }
+    // Si mostra appena c'è uno dei due cataloghi: l'altro (e TMDB) arriva dopo. Prima, la pagina com'è fatta coi riquadri che pulsano.
+    if (!A.movies && !A.series) { content.appendChild(h('div', { class: 'scroll' }, h('div', { class: 'discover' }, [skelRow(), skelRow(), skelRow()]))); return; }
     loadTmdb();
+    var M = A.movies || { cats: [], items: [] }, SR = A.series || { cats: [], items: [] };
     var pass = function (t) { return discoverFilter === 'all' || (discoverFilter === 'movie') === (t.entry.item.kind === 'movie'); };
     var rows = matchedRows();
     var known = {};
@@ -955,11 +1023,9 @@
       .sort(function (a, b) { return b.u - a.u; }).map(function (x) { return x.t; }).filter(pass);
     var mine = moviesFor(MINE).concat(seriesFor(MINE)).map(wrap).filter(pass)
       .sort(function (a, b) { return Pos.myListAddedAt(itemKey(b.entry.item)) - Pos.myListAddedAt(itemKey(a.entry.item)); });
-    var recent = u.groupVariants(A.movies.items.slice().sort(function (a, b) { return (b.added || 0) - (a.added || 0); }).slice(0, 80), function (m) { return m.name; }).slice(0, 30).map(wrap);
+    var recent = u.groupVariants(M.items.slice().sort(function (a, b) { return (b.added || 0) - (a.added || 0); }).slice(0, 80), function (m) { return m.name; }).slice(0, 30).map(wrap);
     var tmdbRows = (rows || []).map(function (r) { return { id: r.id, title: r.title, top: r.top, titles: r.titles.filter(pass) }; })
       .filter(function (r) { return r.titles.length >= (r.top ? 5 : 4); });
-    var trend = (rows || []).filter(function (r) { return r.id === 'trend'; })[0];
-    var hero = trend ? trend.titles.filter(function (t) { return pass(t) && t.tmdb.backdrop; }).slice(0, 6) : [];
 
     var box = h('div', { class: 'discover' });
     content.appendChild(h('div', { class: 'scroll' }, box));
@@ -974,8 +1040,8 @@
     chips.appendChild(V.focusable(h('div', { class: 'chip', data: { key: 'df-cats' }, text: 'Categorie ▾' }), showDiscoverCategories));
     box.appendChild(chips);
     if (A.tmdbError) box.appendChild(h('div', { style: 'color:var(--live);margin:0.4rem 0 0.8rem', text: A.tmdbError + ' Controlla la chiave in Impostazioni → TMDB.' }));
-    if (hero.length) box.appendChild(heroBox(hero));
-    else if (!rows && !A.tmdbError) box.appendChild(h('div', { class: 'hero' }));
+    // Sul TV niente carosello in cima: la pagina parte dai filtri e dalle righe.
+    if (!rows && !A.tmdbError && tmdbKey()) { box.appendChild(skelRow()); box.appendChild(skelRow()); }
 
     // Le righe si disegnano a blocchi: le successive quando il focus si avvicina alla fine.
     var all = [];
@@ -987,8 +1053,8 @@
     });
     if (rows && !tmdbRows.length && !A.tmdbError) all.push({ note: 'Nessun titolo di TMDB trovato nel catalogo: sotto ci sono le categorie della lista.' });
     all.push({ heading: 'Le categorie della lista' });
-    if (discoverFilter !== 'tv') A.movies.cats.forEach(function (c) { all.push({ title: c.name, cat: 'm:' + c.id }); });
-    if (discoverFilter !== 'movie') A.series.cats.forEach(function (c) { all.push({ title: c.name + ' · Serie', cat: 's:' + c.id }); });
+    if (discoverFilter !== 'tv') M.cats.forEach(function (c) { all.push({ title: c.name, cat: 'm:' + c.id }); });
+    if (discoverFilter !== 'movie') SR.cats.forEach(function (c) { all.push({ title: c.name + ' · Serie', cat: 's:' + c.id }); });
 
     var shown = 0;
     function more() {
@@ -1012,21 +1078,54 @@
         el.onFocus = function () { if (i >= shown - 2) more(); if (prev) prev(); };
         tiles.appendChild(el);
       });
-      var head = [h('span', { text: r.title })];
       var allId = r.all || r.cat;
-      if (allId) head.push(V.focusable(h('span', { class: 'see-all', text: 'Vedi tutto ›' }), function () { A.openCat.Discover = allId; render(); }));
-      return h('div', { class: 'drow' }, [h('div', { class: 'drow-title' }, head), h('div', { class: 'hscroll' }, tiles)]);
+      if (allId) {
+        // In fondo alla riga, grande come una locandina: apre tutti i titoli della categoria.
+        var see = V.focusable(h('div', { class: 'dtile seeall', data: { key: 'all-' + allId } }, [
+          h('div', { class: 'art' }, h('div', { class: 'sa' }, [h('i', { text: '→' }), h('b', { text: 'Guarda tutto' })])),
+          r.cat ? h('div', { class: 'cap' }) : null,
+        ]), function () { A.discoverFrom = allId; A.openCat.Discover = allId; render(); });
+        see.onFocus = function () { if (i >= shown - 2) more(); };
+        tiles.appendChild(see);
+      }
+      return h('div', { class: 'drow' }, [h('div', { class: 'drow-title' }, [h('span', { text: r.title })]), h('div', { class: 'hscroll' }, tiles)]);
     }
     more();
+    // Tornando da "Guarda tutto": la riga si disegna e il focus torna sulla sua card.
+    if (A.discoverFrom) {
+      var sel = '[data-key="all-' + A.discoverFrom + '"]';
+      while (!box.querySelector(sel) && shown < all.length) more();
+      focusAfterRender = box.querySelector(sel);
+      A.discoverFrom = null;
+    }
+  }
+
+  function skelRow() {
+    var tiles = [];
+    for (var n = 0; n < 7; n++) tiles.push(h('i', { class: 'skel skel-tile' }));
+    return h('div', { class: 'drow' }, [h('div', { class: 'skel skel-title' }), h('div', { class: 'hscroll' }, tiles)]);
+  }
+
+  /** Con la chiave TMDB: film e serie aggiunti con +, in una pagina tutta loro e nell'ordine in cui li hai aggiunti. */
+  function renderMyList(content) {
+    if (!A.movies && !A.series) { content.appendChild(h('div', { class: 'empty', text: 'Caricamento della tua lista…' })); return; }
+    var list = moviesFor(MINE).concat(seriesFor(MINE)).map(function (e) { return { entry: e, tmdb: null }; })
+      .sort(function (a, b) { return Pos.myListAddedAt(itemKey(b.entry.item)) - Pos.myListAddedAt(itemKey(a.entry.item)); });
+    content.appendChild(h('div', { class: 'page-title', text: 'La mia lista' }));
+    content.appendChild(h('div', { class: 'dim', style: 'margin-bottom:0.6rem', text: list.length === 1 ? '1 titolo' : list.length + ' titoli' }));
+    if (!list.length) { content.appendChild(h('div', { class: 'empty', text: 'La lista è vuota: aggiungi film e serie con + dalla loro scheda.' })); return; }
+    var grid = h('div', { class: 'mygrid' });
+    list.forEach(function (t) { grid.appendChild(posterTile(t, true, true)); });
+    content.appendChild(h('div', { class: 'scroll' }, grid));
   }
 
   function posterUrl(t) { return IPTV.Tmdb.img(t.tmdb && t.tmdb.poster) || t.entry.item.poster || t.entry.item.cover; }
 
   /** La scheda TMDB del titolo quando manca (la mia lista, aggiunti di recente, continua a guardare). */
   function withTmdb(t, cb) {
-    if (t.tmdb || !S.get('tmdbKey')) return;
+    if (t.tmdb || !tmdbKey()) return;
     var it = t.entry.item;
-    IPTV.Tmdb.lookup(S.get('tmdbKey'), it.kind === 'movie' ? 'movie' : 'tv', it.name, it.year).then(function (c) { if (c) { t.tmdb = c; cb(c); } });
+    IPTV.Tmdb.lookup(tmdbKey(), it.kind === 'movie' ? 'movie' : 'tv', it.name, it.year).then(function (c) { if (c) { t.tmdb = c; cb(c); } });
   }
 
   /** Cambia l'immagine di un riquadro (si carica quando arriva vicino allo schermo, vedi util.js). */
@@ -1073,36 +1172,6 @@
     return el;
   }
 
-  /** In alto: un titolo di tendenza a tutta larghezza che cambia da solo ogni 9 secondi. */
-  function heroBox(items) {
-    var i = 0;
-    var bg = h('div', { class: 'hero-bg' });
-    var kicker = h('div', { class: 'kicker' }), title = h('div', { class: 'h-title' }), meta = h('div', { class: 'h-meta' }), plot = h('div', { class: 'h-plot' });
-    var play = V.focusable(h('div', { class: 'btn primary', data: { key: 'hero-play' } }), function () { playTitle(items[i]); });
-    var info = V.focusable(h('div', { class: 'btn', data: { key: 'hero-info' }, text: 'ⓘ  Altre info' }), function () { openTitle(items[i]); });
-    var mine = V.focusable(h('div', { class: 'btn', data: { key: 'hero-mine' } }), function () { toggleMyList(items[i].entry.item); paint(); });
-    var dots = h('div', { class: 'dots' });
-    function paint() {
-      var t = items[i], c = t.tmdb, it = t.entry.item;
-      bg.style.backgroundImage = 'url("' + IPTV.Tmdb.img(c.backdrop, 'w1280') + '")';
-      kicker.textContent = 'N. ' + (i + 1) + ' DI TENDENZA';
-      title.textContent = c.title || it.name;
-      meta.textContent = u.joinMeta(it.kind === 'movie' ? 'Film' : 'Serie TV', c.year, c.vote ? '★ ' + c.vote.toFixed(1) : null);
-      plot.textContent = c.overview || '';
-      play.textContent = it.kind === 'movie' ? '▶  Riproduci' : '▶  Episodi';
-      mine.textContent = inMyList(it) ? '✓  Nella mia lista' : '+  La mia lista';
-      dots.innerHTML = '';
-      items.forEach(function (_, n) { dots.appendChild(h('i', { class: n === i ? 'on' : '' })); });
-    }
-    paint();
-    if (items.length > 1) heroTimer = setInterval(function () {
-      if (!document.body.contains(bg) || A.screen !== 'home') { clearInterval(heroTimer); return; }
-      i = (i + 1) % items.length;
-      paint();
-    }, 9000);
-    return h('div', { class: 'hero' }, [bg, h('div', { class: 'hero-shade' }), h('div', { class: 'hero-text' }, [kicker, title, meta, plot, h('div', { style: 'margin-top:1.2rem' }, [play, info, mine])]), dots]);
-  }
-
   function showDiscoverCategories() {
     var box = h('div', { class: 'dialog' }, [h('h3', { text: 'Categorie' })]);
     var list = h('div', { class: 'scroll', style: 'max-height:30rem' });
@@ -1112,8 +1181,8 @@
         list.appendChild(V.focusable(h('div', { class: 'opt', text: c.name }), function () { closeModal(); A.openCat.Discover = prefix + ':' + c.id; render(); }));
       });
     }
-    if (discoverFilter !== 'tv') add('m', 'Film', 'Tutti i film', A.movies.cats);
-    if (discoverFilter !== 'movie') add('s', 'Serie TV', 'Tutte le serie', A.series.cats);
+    if (discoverFilter !== 'tv') add('m', 'Film', 'Tutti i film', A.movies ? A.movies.cats : []);
+    if (discoverFilter !== 'movie') add('s', 'Serie TV', 'Tutte le serie', A.series ? A.series.cats : []);
     box.appendChild(list);
     openModal(box);
   }
@@ -1172,7 +1241,7 @@
 
   /** Con la chiave TMDB: la scheda del titolo, chiesta una volta (poi si ridisegna la schermata). */
   function detailTmdb(d, kind, name, year, screen) {
-    var key = S.get('tmdbKey');
+    var key = tmdbKey();
     if (!key) return null;
     if (d.tm === undefined) {
       d.tm = null;

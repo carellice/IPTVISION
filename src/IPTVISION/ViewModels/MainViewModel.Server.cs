@@ -131,7 +131,7 @@ public sealed partial class MainViewModel
         {
             if (key != (_settings.TmdbKey ?? "")) ApplyTmdbKey(key);
         }
-        else if (HasTmdb) QueueServerOp(new JsonObject { ["op"] = "tmdbKey", ["key"] = _settings.TmdbKey }, now: true);
+        else if (HasOwnTmdb) QueueServerOp(new JsonObject { ["op"] = "tmdbKey", ["key"] = _settings.TmdbKey }, now: true);
     }
 
     /// <summary>

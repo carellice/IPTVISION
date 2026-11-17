@@ -31,7 +31,7 @@ export type Playing =
 export type VariantChoice = { kind: 'Films'; title: string; items: Movie[] } | { kind: 'Shows'; title: string; items: Series[] }
 
 /** With a TMDB key films and series become one screen, "Film e serie". */
-export const sectionList = (): Section[] => (hasTmdb() ? ['Live', 'Discover', 'Search', 'Settings'] : ['Live', 'Movies', 'Series', 'Search', 'Settings'])
+export const sectionList = (): Section[] => (hasTmdb() ? ['Live', 'Discover', 'MyList', 'Search', 'Settings'] : ['Live', 'Movies', 'Series', 'Search', 'Settings'])
 
 // --- per device settings (SharedPreferences "settings" of the phone) ---------------------------------
 
@@ -112,6 +112,8 @@ export const app = {
   series: null as Library<Series> | null,
   moviesLoading: false,
   seriesLoading: false,
+  /** Films or series refreshing in the background: the saved list stays on screen. */
+  catalogUpdating: 0,
 
   epg: {} as Record<string, Programme[]>,
   shortEpg: {} as Record<number, Programme[]>,
@@ -233,7 +235,7 @@ export function setSection(s: Section) {
   app.section = s
   if (s === 'Movies') ensureMovies()
   if (s === 'Series') ensureSeries()
-  if (s === 'Discover') { ensureMovies(); ensureSeries() }
+  if (s === 'Discover' || s === 'MyList') { ensureMovies(); ensureSeries() }
   emit()
 }
 
@@ -247,7 +249,7 @@ function applyTmdb(key: string) {
   setTmdbKey(key)
   app.open = { ...app.open, Discover: null }
   if (hasTmdb() && (app.section === 'Movies' || app.section === 'Series')) setSection('Discover')
-  else if (!hasTmdb() && app.section === 'Discover') setSection('Movies')
+  else if (!hasTmdb() && (app.section === 'Discover' || app.section === 'MyList')) setSection('Movies')
   else emit()
 }
 
@@ -422,6 +424,9 @@ async function openAccount(autoPlay: boolean) {
     if (autoPlay) autoPlayLast()
     loadEpg(false)
   }
+  // Films and series already saved: read now, so their section is ready when opened.
+  cacheGet(cacheKey('movies')).then((c) => { if (c) ensureMovies() })
+  cacheGet(cacheKey('series')).then((c) => { if (c) ensureSeries() })
   app.status = cached ? null : 'Caricamento canali…'
   emit()
   try {
@@ -443,8 +448,9 @@ async function openAccount(autoPlay: boolean) {
 }
 
 export function refreshAll() {
-  app.rawMovies = app.rawSeries = null
-  app.movies = app.series = null
+  // Films and series stay on screen: the new lists come in the background and the news are announced.
+  const m = app.movies != null || app.section === 'Movies' || app.section === 'Discover' || app.section === 'MyList'
+  const s = app.series != null || app.section === 'Series' || app.section === 'Discover' || app.section === 'MyList'
   ;(async () => {
     try {
       const fresh = await api<CompactLive>('/api/lists/live?force=1')
@@ -454,10 +460,9 @@ export function refreshAll() {
       emit()
     } catch (e) { toast((e as Error).message, true) }
     loadEpg(true)
-    if (app.section === 'Movies') ensureMovies(true)
-    if (app.section === 'Series') ensureSeries(true)
-    if (app.section === 'Discover') { ensureMovies(true); ensureSeries(true) }
   })()
+  if (m) ensureMovies(true)
+  if (s) ensureSeries(true)
   emit()
 }
 
@@ -475,49 +480,54 @@ async function loadEpg(force: boolean) {
   } catch { /* no guide: the lists work without it */ }
 }
 
-export function ensureMovies(force = false) {
-  if (!app.xtream || (app.movies && !force) || app.moviesLoading) return
-  app.moviesLoading = true
+/**
+ * Films and series: the browser's copy shows at once, even when old; when it has more than 12 hours (or on
+ * "Aggiorna") the server's comes in the background and only the new titles are announced. The wait with
+ * the loading screen is only the very first time.
+ */
+function loadCatalog<C, T>(
+  kind: 'movies' | 'series', force: boolean, convert: (c: C) => Raw<T>, current: () => Raw<T> | null, set: (r: Raw<T>) => void,
+  id: (t: T) => number, one: string, many: string, loadingFlag: 'moviesLoading' | 'seriesLoading', failed: string,
+) {
+  app[loadingFlag] = true
   emit()
   ;(async () => {
     try {
-      const cached = force ? null : await cacheGet<CompactMovies & { at: number }>(cacheKey('movies'))
-      // Films and series: from the browser's copy if it has less than 12 hours, else from the server.
-      const fresh = cached && Date.now() - cached.at < 12 * 3600_000 ? cached
-        : await api<CompactMovies>(`/api/lists/movies${force ? '?force=1' : ''}`).then((r) => { cachePut(cacheKey('movies'), { ...r, at: Date.now() }); return r })
-          .catch((e) => { if (cached) return cached; throw e })
-      app.rawMovies = toMovies(fresh)
-      rebuildLibraries()
+      const cached = await cacheGet<C & { at: number }>(cacheKey(kind))
+      if (cached && !current()) { set(convert(cached)); rebuildLibraries(); emit() }
+      if (cached && !force && Date.now() - cached.at < 12 * 3600_000) return
+      const load = () => api<C>(`/api/lists/${kind}${force ? '?force=1' : ''}`).then((r) => { cachePut(cacheKey(kind), { ...r, at: Date.now() }); return r })
+      if (!current()) { set(convert(await load())); rebuildLibraries(); return }
+      app.catalogUpdating++
+      emit()
+      load().then((r) => {
+        const seen = new Set(current()?.items.map(id))
+        const fresh = convert(r)
+        const n = fresh.items.filter((t) => !seen.has(id(t))).length
+        set(fresh)
+        rebuildLibraries()
+        if (n > 0) toast(n === 1 ? `1 ${one}` : `${n} ${many}`)
+      }).catch(() => { /* the saved list stays */ }).finally(() => { app.catalogUpdating--; emit() })
     } catch (e) {
-      app.error = (e as Error).message || 'Impossibile caricare i film.'
+      app.error = (e as Error).message || failed
       toast(app.error, true)
     } finally {
-      app.moviesLoading = false
+      app[loadingFlag] = false
       emit()
     }
   })()
 }
 
+export function ensureMovies(force = false) {
+  if (!app.xtream || (app.movies && !force) || app.moviesLoading) return
+  loadCatalog<CompactMovies, Movie>('movies', force, toMovies, () => app.rawMovies, (r) => { app.rawMovies = r }, (m) => m.streamId,
+    'film nuovo', 'film nuovi', 'moviesLoading', 'Impossibile caricare i film.')
+}
+
 export function ensureSeries(force = false) {
   if (!app.xtream || (app.series && !force) || app.seriesLoading) return
-  app.seriesLoading = true
-  emit()
-  ;(async () => {
-    try {
-      const cached = force ? null : await cacheGet<CompactSeries & { at: number }>(cacheKey('series'))
-      const fresh = cached && Date.now() - cached.at < 12 * 3600_000 ? cached
-        : await api<CompactSeries>(`/api/lists/series${force ? '?force=1' : ''}`).then((r) => { cachePut(cacheKey('series'), { ...r, at: Date.now() }); return r })
-          .catch((e) => { if (cached) return cached; throw e })
-      app.rawSeries = toSeries(fresh)
-      rebuildLibraries()
-    } catch (e) {
-      app.error = (e as Error).message || 'Impossibile caricare le serie.'
-      toast(app.error, true)
-    } finally {
-      app.seriesLoading = false
-      emit()
-    }
-  })()
+  loadCatalog<CompactSeries, Series>('series', force, toSeries, () => app.rawSeries, (r) => { app.rawSeries = r }, (s) => s.seriesId,
+    'serie nuova', 'serie nuove', 'seriesLoading', 'Impossibile caricare le serie.')
 }
 
 export function setHideAdult(value: boolean) {

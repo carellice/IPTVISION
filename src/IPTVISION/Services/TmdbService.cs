@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.IO;
 using System.Text.RegularExpressions;
 using IPTVISION.Models;
 
@@ -153,7 +154,28 @@ public static partial class Tmdb
         return out_;
     }
 
+    private sealed record SavedRows(string Day, int Key, List<Row> Rows);
+
+    /// <summary>Le classifiche cambiano una volta al giorno: si scaricano alla prima apertura della giornata, poi si rileggono dal disco.</summary>
     public static async Task<List<Row>> LoadRows(string key)
+    {
+        var file = Path.Combine(AppPaths.Cache, "tmdb_rows.json");
+        var day = DateTime.Now.ToString("yyyy-MM-dd");
+        var hash = key.Aggregate(7, (h, c) => unchecked(h * 31 + c));
+        try
+        {
+            if (File.Exists(file) && JsonSerializer.Deserialize<SavedRows>(await File.ReadAllTextAsync(file)) is { } s && s.Day == day && s.Key == hash) return s.Rows;
+        }
+        catch (Exception ex) { Log.Write("Righe TMDB salvate illeggibili", ex); }
+        var rows = await DownloadRows(key);
+        // Solo se TMDB ha risposto: righe vuote (rete assente) non devono restare per tutto il giorno.
+        if (rows.Any(r => r.Items.Count > 0))
+            try { AppPaths.WriteAllTextAtomic(file, JsonSerializer.Serialize(new SavedRows(day, hash, rows))); }
+            catch (Exception ex) { Log.Write("Righe TMDB non salvate", ex); }
+        return rows;
+    }
+
+    private static async Task<List<Row>> DownloadRows(string key)
     {
         var rows = await Task.WhenAll(Defs.Select(async d =>
         {

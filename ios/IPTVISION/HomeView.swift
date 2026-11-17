@@ -4,7 +4,16 @@ struct HomeView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        if Theme.metro { PivotHome() } else { tabs }
+        Group { if Theme.metro { PivotHome() } else { tabs } }
+            // Messaggi brevi (es. "12 film nuovi"): in alto, spariscono da soli.
+            .overlay(alignment: .top) {
+                if let n = model.notice {
+                    Text(n).font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                        .padding(.horizontal, 16).padding(.vertical, 10).background(.black.opacity(0.85), in: Capsule())
+                        .padding(.top, 8)
+                        .task(id: n) { try? await Task.sleep(nanoseconds: 2_500_000_000); model.notice = nil }
+                }
+            }
     }
 
     private var tabs: some View {
@@ -27,6 +36,7 @@ struct SectionPage: View {
         case .movies: MovieCategories()
         case .series: SeriesCategories()
         case .discover: DiscoverView()
+        case .mylist: MyListView()
         case .search: SearchView()
         case .settings: SettingsView()
         }
@@ -75,6 +85,7 @@ extension AppSection {
         case .live: "tv"
         case .series: "serie"
         case .discover: "film e serie"
+        case .mylist: "la mia lista"
         default: title.lowercased()
         }
     }

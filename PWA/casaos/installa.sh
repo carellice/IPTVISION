@@ -280,6 +280,8 @@ services:
     environment:
       TZ: \${TZ}
       INVITE_CODE: \${INVITE_CODE}
+      # Chiave TMDB per tutti gli account che non ne hanno una: aggiungi TMDB_KEY=... al file .env
+      TMDB_KEY: \${TMDB_KEY:-}
     x-casaos:
       ports:
         - container: "8080"

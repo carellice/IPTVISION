@@ -30,6 +30,11 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
+  <!-- Chiave TMDB integrata: sta in tmdb.key nella cartella del progetto, escluso da git. Senza il file l'app chiede la sua. -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\..\tmdb.key')">
+    <AssemblyMetadata Include="TmdbKey" Value="$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\..\tmdb.key').Trim())" />
+  </ItemGroup>
+
   <ItemGroup>
     <Resource Include="Assets\logo.png" />
     <Resource Include="Assets\skeuo\*.png" />

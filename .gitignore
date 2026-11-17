@@ -3,3 +3,9 @@ obj/
 dist/
 .vs/
 *.user
+
+# Chiave TMDB integrata nelle build: resta fuori da git
+tmdb.key
+
+# Chiave TMDB del pacchetto TV: la crea la release da tmdb.key
+webos/app/js/tmdbkey.js

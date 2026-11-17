@@ -201,6 +201,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             ListInfo = $"Aggiornata {FormatAge(cache.SavedAt)}";
             AutoPlay();
             _ = LoadEpgAsync(force: false);
+            PrewarmCatalog();
             await RefreshAsync(userInitiated: false);
         }
         else
@@ -420,6 +421,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsMoviesMode));
         OnPropertyChanged(nameof(IsSeriesMode));
         OnPropertyChanged(nameof(IsDiscoverMode));
+        OnPropertyChanged(nameof(IsMyListMode));
         OnPropertyChanged(nameof(FooterInfo));
         LoadBrowsePrefs();
         RebuildCategories();

@@ -20,6 +20,9 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Chiave TMDB integrata: la mette la build (segreto TMDB_KEY), non è nel repository. -->
+	<key>TMDBKey</key>
+	<string>$(TMDB_KEY)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- I pannelli IPTV e il server di casa parlano quasi sempre in http semplice. -->

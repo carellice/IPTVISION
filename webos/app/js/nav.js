@@ -60,6 +60,11 @@
     }
     current = el;
     el.classList.add('focused');
+    // Il menu a sinistra si apre solo quando ha il focus: altrimenti è una colonna di icone.
+    var rail = closestClass(el, 'rail');
+    Array.prototype.forEach.call(document.querySelectorAll('.rail'), function (r) {
+      if (r === rail) r.classList.add('open'); else r.classList.remove('open');
+    });
     reveal(el);
     if (!silent && typeof el.onFocus === 'function') el.onFocus();
   }
@@ -90,6 +95,14 @@
     });
     // Entrando in un gruppo (il menu laterale, data-enter) si va sulla sua voce attiva, non sulla più vicina:
     // dal contenuto si finiva su un'altra sezione, che si apriva da sola.
+    // Righe di "Film e serie": arrivando con ▲ ▼ da un'altra riga si parte sempre dal primo titolo.
+    if (best && (dir === 'up' || dir === 'down')) {
+      var row = closestClass(best, 'hscroll');
+      if (row && row !== closestClass(current, 'hscroll')) {
+        var first = row.querySelector('.f');
+        if (first && list.indexOf(first) >= 0) { row.scrollLeft = 0; best = first; }
+      }
+    }
     var group = best && closestGroup(best);
     if (group && group !== closestGroup(current)) {
       var active = group.querySelector('.' + group.getAttribute('data-enter'));
@@ -97,6 +110,14 @@
     }
     if (best) { focus(best); return true; }
     return false;
+  }
+
+  function closestClass(el, name) {
+    while (el && el !== document.body) {
+      if (el.classList && el.classList.contains(name)) return el;
+      el = el.parentNode;
+    }
+    return null;
   }
 
   function closestGroup(el) {

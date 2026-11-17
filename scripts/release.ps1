@@ -173,6 +173,14 @@ try {
     $apkMb = '{0:N1}' -f ((Get-Item $apk).Length / 1MB)
     Write-Host "APK: $apk ($apkMb MB)"
 
+    # ---------- Chiave TMDB integrata ----------
+    # Sta in tmdb.key (escluso da git): Android e Windows la leggono da soli, le app TV da js/tmdbkey.js.
+    $TmdbKeyFile = Join-Path $Root 'tmdb.key'
+    $tmdbJs = Join-Path $WebosDir 'app\js\tmdbkey.js'
+    $tmdbKey = if (Test-Path $TmdbKeyFile) { ([IO.File]::ReadAllText($TmdbKeyFile)).Trim() } else { '' }
+    if (-not $tmdbKey) { Write-Host 'Attenzione: tmdb.key non trovato, le app non avranno la chiave TMDB integrata' -ForegroundColor Yellow }
+    [IO.File]::WriteAllText($tmdbJs, "IPTV.TMDB_KEY = '$tmdbKey';`n", $Utf8)
+
     # ---------- TV LG (webOS) ----------
     Step 'Pacchetto per TV LG (webOS)'
     Push-Location $WebosDir

@@ -19,6 +19,9 @@ val appVersionCode: Int = appVersion.split('.').map { it.toInt() }.let { (a, b, 
 val releaseKey = rootProject.file("keystore.properties").takeIf { it.exists() }
     ?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
 
+// Chiave TMDB integrata: sta in tmdb.key nella cartella del progetto, escluso da git. Senza il file l'app chiede la sua.
+val tmdbKey: String = rootProject.file("../tmdb.key").takeIf { it.exists() }?.readText()?.trim() ?: ""
+
 android {
     namespace = "com.carellice.iptvision"
     compileSdk = 36
@@ -29,6 +32,7 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersion
+        buildConfigField("String", "TMDB_KEY", "\"$tmdbKey\"")
     }
 
     signingConfigs {

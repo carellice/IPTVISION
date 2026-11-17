@@ -4,9 +4,9 @@ import Foundation
 /// Il catalogo resta quello del provider: TMDB sceglie e veste solo i titoli che ci sono.
 /// Stessa logica di PWA/web/src/lib/tmdb.ts.
 enum Tmdb {
-    enum Kind: Hashable { case movie, tv }
+    enum Kind: String, Hashable, Codable { case movie, tv }
 
-    struct Card: Hashable {
+    struct Card: Hashable, Codable {
         let id: Int
         let kind: Kind
         let title: String
@@ -18,7 +18,7 @@ enum Tmdb {
         let keys: [String]
     }
 
-    struct Row: Identifiable {
+    struct Row: Identifiable, Codable {
         let id: String
         let title: String
         let items: [Card]
@@ -168,7 +168,25 @@ enum Tmdb {
         return out
     }
 
+    private struct SavedRows: Codable { let day: String; let key: Int; let rows: [Row] }
+
+    /// Le classifiche cambiano una volta al giorno: si scaricano alla prima apertura della giornata, poi si rileggono dal file.
     static func loadRows(_ key: String) async -> [Row] {
+        let file = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("tmdb_rows.json")
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        let day = f.string(from: Date())
+        let hash = key.unicodeScalars.reduce(7) { ($0 &* 31) &+ Int($1.value) }
+        if let data = try? Data(contentsOf: file), let s = try? JSONDecoder().decode(SavedRows.self, from: data), s.day == day, s.key == hash { return s.rows }
+        let rows = await downloadRows(key)
+        // Solo se TMDB ha risposto: righe vuote (rete assente) non devono restare per tutto il giorno.
+        if rows.contains(where: { !$0.items.isEmpty }), let data = try? JSONEncoder().encode(SavedRows(day: day, key: hash, rows: rows)) {
+            try? data.write(to: file, options: .atomic)
+        }
+        return rows
+    }
+
+    private static func downloadRows(_ key: String) async -> [Row] {
         await withTaskGroup(of: (Int, Row).self) { group in
             for (n, d) in defs.enumerated() {
                 group.addTask {

@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case live, movies, series, discover, search, settings
+    case live, movies, series, discover, mylist, search, settings
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -10,6 +10,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .movies: "Film"
         case .series: "Serie TV"
         case .discover: "Film e serie"
+        case .mylist: "La mia lista"
         case .search: "Cerca"
         case .settings: "Impostazioni"
         }
@@ -20,6 +21,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .movies: "film"
         case .series: "square.stack"
         case .discover: "film.stack"
+        case .mylist: "bookmark"
         case .search: "magnifyingglass"
         case .settings: "gearshape"
         }
@@ -91,6 +93,10 @@ final class AppModel: ObservableObject {
     @Published var liveLoading = false
     @Published var moviesLoading = false
     @Published var seriesLoading = false
+    /// Film o serie che si aggiornano in sottofondo: la lista salvata resta a schermo.
+    @Published var catalogUpdating = 0
+    /// Messaggio breve da mostrare una volta (es. "12 film nuovi").
+    @Published var notice: String?
 
     @Published var favorites = AppSettings.favorites
     @Published var lists = AppSettings.lists
@@ -136,7 +142,7 @@ final class AppModel: ObservableObject {
         positions = PositionStore(url: docs.appendingPathComponent("positions.json"))
         cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         positions.onChange = { [weak self] op in self?.queueServerOp(op) }
-        if account != nil { Task { await loadLive(refresh: false) } }
+        if account != nil { Task { await loadLive(refresh: false) }; prewarmCatalog() }
         Task { [weak self] in
             // Server di casa: ogni 30 secondi le modifiche fatte qui partono e quelle degli altri dispositivi arrivano.
             while !Task.isCancelled {
@@ -149,21 +155,29 @@ final class AppModel: ObservableObject {
 
     // MARK: - TMDB
 
-    @Published var tmdbKey = AppSettings.tmdbKey
+    /// La chiave integrata nella build (segreto TMDB_KEY), usata quando non se ne mette una a mano.
+    static let builtinTmdb = (Bundle.main.object(forInfoDictionaryKey: "TMDBKey") as? String ?? "").trimmingCharacters(in: .whitespaces)
+    /// La chiave in uso: quella messa a mano, altrimenti quella integrata.
+    @Published var tmdbKey = AppSettings.tmdbKey.isEmpty ? AppModel.builtinTmdb : AppSettings.tmdbKey
     @Published var tmdbRows: [Tmdb.Row]?
     @Published var tmdbError: String?
-    private var tmdbLoading = false
+    @Published var tmdbLoading = false
+    /// C'è una chiave messa a mano (non quella integrata).
+    var ownTmdb: Bool { !AppSettings.tmdbKey.isEmpty }
 
-    /// Le sezioni: con la chiave TMDB film e serie sono una sola, "Film e serie".
+    /// Le sezioni: con la chiave TMDB film e serie sono una sola, "Film e serie", più "La mia lista".
     var sections: [AppSection] {
-        tmdbKey.isEmpty ? [.live, .movies, .series, .search, .settings] : [.live, .discover, .search, .settings]
+        tmdbKey.isEmpty ? [.live, .movies, .series, .search, .settings] : [.live, .discover, .mylist, .search, .settings]
     }
 
     /// Con il server di casa la chiave è dell'account: la ricevono tutti i dispositivi collegati.
     func setTmdbKey(_ key: String, fromServer: Bool = false) {
-        tmdbKey = key.trimmingCharacters(in: .whitespaces)
-        if !fromServer { queueServerOp(["op": "tmdbKey", "key": tmdbKey], now: true) }
-        AppSettings.tmdbKey = tmdbKey
+        let own = key.trimmingCharacters(in: .whitespaces)
+        if fromServer && own == AppSettings.tmdbKey { return }
+        tmdbKey = own.isEmpty ? AppModel.builtinTmdb : own
+        // Al server va solo la chiave messa a mano: quella integrata resta nell'app.
+        if !fromServer { queueServerOp(["op": "tmdbKey", "key": own], now: true) }
+        AppSettings.tmdbKey = own
         tmdbRows = nil
         tmdbError = nil
         Task { await Tmdb.clearCache() }
@@ -173,6 +187,7 @@ final class AppModel: ObservableObject {
     func loadTmdb() async {
         let key = tmdbKey
         guard !key.isEmpty, tmdbRows == nil, !tmdbLoading else { return }
+        // Le classifiche cambiano una volta al giorno: rilette dal file se sono di oggi.
         tmdbLoading = true
         defer { tmdbLoading = false }
         tmdbError = nil
@@ -399,8 +414,8 @@ final class AppModel: ObservableObject {
         positionsVersion += 1
         if let h = o["hideAdult"] as? Bool, h != hideAdult { hideAdult = h }
         // Chiave TMDB dell'account: se il server non l'ha mai avuta, diventa quella di questo dispositivo.
-        if let k = o["tmdbKey"] as? String { if k != tmdbKey { setTmdbKey(k, fromServer: true) } }
-        else if !tmdbKey.isEmpty { queueServerOp(["op": "tmdbKey", "key": tmdbKey], now: true) }
+        if let k = o["tmdbKey"] as? String { if k != AppSettings.tmdbKey { setTmdbKey(k, fromServer: true) } }
+        else if ownTmdb { queueServerOp(["op": "tmdbKey", "key": AppSettings.tmdbKey], now: true) }
     }
 
     // MARK: - Liste
@@ -442,28 +457,73 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Il file c'è ma ha più di 12 ore.
+    private func isOld(_ kind: String) -> Bool {
+        let date = (try? file(kind).resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        return date.map { Date().timeIntervalSince($0) >= 12 * 3600 } ?? true
+    }
+
+    /**
+     Film e serie: la copia salvata si mostra subito, anche se vecchia. Se è scaduta (o con "Aggiorna") quella
+     nuova si scarica mentre la lista resta a schermo e si annunciano solo i titoli nuovi: si aspetta il download
+     solo la prima volta.
+     */
     func ensureMovies(refresh: Bool = false) async {
         guard (movies == nil || refresh), !moviesLoading else { return }
         moviesLoading = true
         defer { moviesLoading = false }
+        let (cf, sf) = (file("vod_cats"), file("vod"))
+        let read = { () async throws -> ([Category], [Movie]) in
+            try await Task.detached { (try XtreamClient.parseCategories(cf), try XtreamClient.parseMovies(sf)) }.value
+        }
         do {
-            try await fetch([("get_vod_categories", "vod_cats"), ("get_vod_streams", "vod")], refresh: refresh)
-            let (cf, sf) = (file("vod_cats"), file("vod"))
-            let (cats, items) = try await Task.detached { (try XtreamClient.parseCategories(cf), try XtreamClient.parseMovies(sf)) }.value
+            if movies == nil, FileManager.default.fileExists(atPath: sf.path), let saved = try? await read() {
+                movies = library(saved.0, saved.1) { $0.categoryId }
+            }
+            guard refresh || movies == nil || isOld("vod") else { return }
+            let old = movies.map { Set($0.items.map(\.streamId)) }
+            if old != nil { catalogUpdating += 1 }
+            defer { if old != nil { catalogUpdating -= 1 } }
+            try await fetch([("get_vod_categories", "vod_cats"), ("get_vod_streams", "vod")], refresh: true)
+            let (cats, items) = try await read()
+            if let old {
+                let n = Set(items.map(\.streamId)).subtracting(old).count
+                if n > 0 { notice = n == 1 ? "1 film nuovo" : "\(n) film nuovi" }
+            }
             movies = library(cats, items) { $0.categoryId }
-        } catch { self.error = error.localizedDescription }
+        } catch { if movies == nil { self.error = error.localizedDescription } }
     }
 
     func ensureSeries(refresh: Bool = false) async {
         guard (series == nil || refresh), !seriesLoading else { return }
         seriesLoading = true
         defer { seriesLoading = false }
+        let (cf, sf) = (file("series_cats"), file("series"))
+        let read = { () async throws -> ([Category], [Series]) in
+            try await Task.detached { (try XtreamClient.parseCategories(cf), try XtreamClient.parseSeries(sf)) }.value
+        }
         do {
-            try await fetch([("get_series_categories", "series_cats"), ("get_series", "series")], refresh: refresh)
-            let (cf, sf) = (file("series_cats"), file("series"))
-            let (cats, items) = try await Task.detached { (try XtreamClient.parseCategories(cf), try XtreamClient.parseSeries(sf)) }.value
+            if series == nil, FileManager.default.fileExists(atPath: sf.path), let saved = try? await read() {
+                series = library(saved.0, saved.1) { $0.categoryId }
+            }
+            guard refresh || series == nil || isOld("series") else { return }
+            let old = series.map { Set($0.items.map(\.seriesId)) }
+            if old != nil { catalogUpdating += 1 }
+            defer { if old != nil { catalogUpdating -= 1 } }
+            try await fetch([("get_series_categories", "series_cats"), ("get_series", "series")], refresh: true)
+            let (cats, items) = try await read()
+            if let old {
+                let n = Set(items.map(\.seriesId)).subtracting(old).count
+                if n > 0 { notice = n == 1 ? "1 serie nuova" : "\(n) serie nuove" }
+            }
             series = library(cats, items) { $0.categoryId }
-        } catch { self.error = error.localizedDescription }
+        } catch { if series == nil { self.error = error.localizedDescription } }
+    }
+
+    /// Film e serie già scaricati: si leggono subito in sottofondo, così la sezione è pronta quando la apri.
+    func prewarmCatalog() {
+        if FileManager.default.fileExists(atPath: file("vod").path) { Task { await ensureMovies() } }
+        if FileManager.default.fileExists(atPath: file("series").path) { Task { await ensureSeries() } }
     }
 
     func refreshAll() async {

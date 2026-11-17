@@ -146,7 +146,10 @@ struct TmdbSection: View {
 
     var body: some View {
         Section {
-            if model.tmdbKey.isEmpty {
+            if !model.ownTmdb && !AppModel.builtinTmdb.isEmpty {
+                LabeledContent("Chiave", value: "Integrata nell'app")
+            }
+            if !model.ownTmdb {
                 SecureField("Chiave API o token TMDB", text: $value)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                 if let error { Text(error).foregroundStyle(.red).font(.footnote) }

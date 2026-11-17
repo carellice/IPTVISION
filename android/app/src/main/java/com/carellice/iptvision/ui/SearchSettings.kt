@@ -286,7 +286,8 @@ private fun TmdbGroup(vm: AppViewModel) {
             "alla voce API) film e serie diventano una sola schermata, con copertine, tendenze e generi. Con il server di casa vale per tutti i dispositivi collegati.",
         color = C.Text3, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp),
     )
-    if (vm.hasTmdb) {
+    if (!vm.ownTmdb && vm.builtinTmdb) Info("Chiave", "Integrata nell'app (puoi usare la tua)")
+    if (vm.ownTmdb) {
         Info("Chiave", "Inserita")
         ActionButton("Rimuovi chiave", Icons.Default.Delete, modifier = Modifier.padding(vertical = 6.dp)) { vm.setTmdb("") }
         return

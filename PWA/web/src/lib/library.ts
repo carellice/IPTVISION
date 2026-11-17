@@ -4,10 +4,10 @@ import { type Entry, groupVariants, initials, joinMeta, normalize, stars } from 
 // The catalog as in AppViewModel: libraries per section, the lists of a category with their sort,
 // and the search over channels, films, series and categories.
 
-export type Section = 'Live' | 'Movies' | 'Series' | 'Discover' | 'Search' | 'Settings'
+export type Section = 'Live' | 'Movies' | 'Series' | 'Discover' | 'MyList' | 'Search' | 'Settings'
 
 export const sectionTitle: Record<Section, string> = {
-  Live: 'TV in diretta', Movies: 'Film', Series: 'Serie TV', Discover: 'Film e serie', Search: 'Cerca', Settings: 'Impostazioni',
+  Live: 'TV in diretta', Movies: 'Film', Series: 'Serie TV', Discover: 'Film e serie', MyList: 'La mia lista', Search: 'Cerca', Settings: 'Impostazioni',
 }
 
 export type ListSort = 'Default' | 'Number' | 'NameAsc' | 'NameDesc' | 'Recent' | 'Year' | 'Rating'

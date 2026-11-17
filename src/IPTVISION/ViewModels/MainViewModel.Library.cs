@@ -1,4 +1,4 @@
-using System.Windows.Threading;
+﻿using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IPTVISION.Models;
@@ -112,18 +112,26 @@ public sealed partial class MainViewModel
         var client = _client;
         IsRefreshing = true;
         IsLibraryLoading = _movies.Count == 0;
+        UpdateDiscoverBusy();
         try
         {
             var cache = await Task.Run(() => CacheService.LoadLibrary<VodData>("vod", client.Account.Key));
-            if (cache != null && _movies.Count == 0) PopulateMovies(cache.Categories, cache.Items);
+            if (cache != null && _movies.Count == 0) { PopulateMovies(cache.Categories, cache.Items); DiscoverChanged(); }
             if (cache != null && !force && DateTimeOffset.Now - cache.SavedAt < LibraryMaxAge) return;
+            IsLibraryLoading = _movies.Count == 0;
+            UpdateDiscoverBusy();
 
             var cats = await client.GetVodCategoriesAsync(CancellationToken.None);
             var items = await client.GetVodStreamsAsync(CancellationToken.None);
             if (client != _client) return;
             _ = Task.Run(() => CacheService.SaveLibrary("vod", client.Account.Key, new LibraryCache<VodData> { SavedAt = DateTimeOffset.Now, Categories = cats, Items = items }));
+            // Solo le novità si annunciano.
+            var oldIds = _movies.Select(m => m.StreamId).ToHashSet();
+            var news = oldIds.Count == 0 ? 0 : items.Select(i => i.StreamId).Distinct().Count(id => !oldIds.Contains(id));
             PopulateMovies(cats, items);
-            if (force) ShowToast($"Film aggiornati · {items.Count}");
+            DiscoverChanged();
+            if (news > 0) ShowToast(news == 1 ? "1 film nuovo" : $"{news} film nuovi");
+            else if (force) ShowToast("Film aggiornati: nessun titolo nuovo");
         }
         catch (XtreamException ex)
         {
@@ -134,6 +142,7 @@ public sealed partial class MainViewModel
         {
             IsLibraryLoading = false;
             IsRefreshing = false;
+            UpdateDiscoverBusy();
         }
     }
 
@@ -146,16 +155,21 @@ public sealed partial class MainViewModel
         try
         {
             var cache = await Task.Run(() => CacheService.LoadLibrary<SeriesData>("series", client.Account.Key));
-            if (cache != null && _series.Count == 0) PopulateSeries(cache.Categories, cache.Items);
+            if (cache != null && _series.Count == 0) { PopulateSeries(cache.Categories, cache.Items); DiscoverChanged(); }
             if (cache != null && !force && DateTimeOffset.Now - cache.SavedAt < LibraryMaxAge) return;
+            UpdateDiscoverBusy();
 
             var cats = await client.GetSeriesCategoriesAsync(CancellationToken.None);
             var items = await client.GetSeriesAsync(CancellationToken.None);
             if (client != _client) return;
             _ = Task.Run(() => CacheService.SaveLibrary("series", client.Account.Key, new LibraryCache<SeriesData> { SavedAt = DateTimeOffset.Now, Categories = cats, Items = items }));
             if (force) _seriesInfo.Clear();
+            var oldIds = _series.Select(s => s.SeriesId).ToHashSet();
+            var news = oldIds.Count == 0 ? 0 : items.Select(i => i.SeriesId).Distinct().Count(id => !oldIds.Contains(id));
             PopulateSeries(cats, items);
-            if (force) ShowToast($"Serie aggiornate · {items.Count}");
+            DiscoverChanged();
+            if (news > 0) ShowToast(news == 1 ? "1 serie nuova" : $"{news} serie nuove");
+            else if (force) ShowToast("Serie aggiornate: nessun titolo nuovo");
         }
         catch (XtreamException ex)
         {
@@ -166,7 +180,17 @@ public sealed partial class MainViewModel
         {
             IsLibraryLoading = false;
             IsRefreshing = false;
+            UpdateDiscoverBusy();
         }
+    }
+
+    /// <summary>Film e serie già scaricati: si leggono subito in sottofondo, così la sezione è pronta quando la apri.</summary>
+    private void PrewarmCatalog()
+    {
+        if (_client == null) return;
+        var key = _client.Account.Key;
+        if (System.IO.File.Exists(System.IO.Path.Combine(AppPaths.Cache, $"vod_{key}.json"))) _ = EnsureMoviesAsync();
+        if (System.IO.File.Exists(System.IO.Path.Combine(AppPaths.Cache, $"series_{key}.json"))) _ = EnsureSeriesAsync();
     }
 
     private void PopulateMovies(List<Category> cats, List<VodData> items)

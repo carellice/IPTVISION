@@ -174,10 +174,11 @@ function firstChar(file: string): string {
  */
 export function listFile(a: XtreamAccount, action: ListAction, force = false): Promise<string> {
   const file = join(cacheDir(a), `${action}.json`)
-  const fresh = existsSync(file) && Date.now() - statSync(file).mtimeMs < LIST_ACTIONS[action]
+  const exists = existsSync(file)
+  const fresh = exists && Date.now() - statSync(file).mtimeMs < LIST_ACTIONS[action]
   if (fresh && !force) return Promise.resolve(file)
   const known = downloading.get(file)
-  if (known) return known
+  if (known) return exists && !force ? Promise.resolve(file) : known
   const timeout = action === 'get_vod_streams' || action === 'get_series' ? 180 : action === 'get_live_streams' ? 90 : 30
   const job = withRetry(async () => {
     const r = await providerFetch(apiUrl(a, action), timeout)
@@ -195,6 +196,8 @@ export function listFile(a: XtreamAccount, action: ListAction, force = false): P
     throw e
   }).finally(() => downloading.delete(file))
   downloading.set(file, job)
+  // An old copy answers at once: the new one downloads in the background for the next request.
+  if (exists && !force) { job.catch(() => {}); return Promise.resolve(file) }
   return job
 }
 

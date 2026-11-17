@@ -8,10 +8,13 @@ import { NetworkStatus } from '../components/network.tsx'
 import { useSkin } from '../lib/skin.ts'
 import { LiveSection, MoviesSection, SeriesSection } from './Browse.tsx'
 import { SearchSection } from './Search.tsx'
-import { DiscoverSection } from './Discover.tsx'
+import { DiscoverSection, MyListSection, resetDiscoverScroll } from './Discover.tsx'
 import { SettingsSection } from './Settings.tsx'
 
-const icons: Record<Section, IconName> = { Live: 'tv', Movies: 'movie', Series: 'view_module', Discover: 'theaters', Search: 'search', Settings: 'settings' }
+/** From the menu "Film e serie" starts again from the top. */
+const pick = (s: Section) => { if (s === 'Discover') resetDiscoverScroll(); setSection(s) }
+
+const icons: Record<Section, IconName> = { Live: 'tv', Movies: 'movie', Series: 'view_module', Discover: 'theaters', MyList: 'bookmark', Search: 'search', Settings: 'settings' }
 
 /** HomeScreen.kt: bottom bar on the phone, side menu with the clock from 720 px. */
 export function Home() {
@@ -49,6 +52,7 @@ function Content() {
         {app.section === 'Movies' && <MoviesSection />}
         {app.section === 'Series' && <SeriesSection />}
         {app.section === 'Discover' && <DiscoverSection />}
+        {app.section === 'MyList' && <MyListSection />}
         {app.section === 'Search' && <SearchSection />}
         {app.section === 'Settings' && <SettingsSection />}
       </div>
@@ -56,7 +60,7 @@ function Content() {
   )
 }
 
-const pivotLabel: Record<Section, string> = { Live: 'tv', Movies: 'film', Series: 'serie', Discover: 'film e serie', Search: 'cerca', Settings: 'impostazioni' }
+const pivotLabel: Record<Section, string> = { Live: 'tv', Movies: 'film', Series: 'serie', Discover: 'film e serie', MyList: 'la mia lista', Search: 'cerca', Settings: 'impostazioni' }
 
 /**
  * Modern UI (Windows Phone pivot): app name in small caps, the sections as big lowercase headers
@@ -68,7 +72,7 @@ function Pivot({ wide }: { wide: boolean }) {
   const i = sections.indexOf(app.section)
   const ordered = [...sections.slice(i), ...sections.slice(0, i)]
   const [dir, setDir] = useState(1)
-  const go = (s: Section) => { setDir(sections.indexOf(s) >= i ? 1 : -1); setSection(s) }
+  const go = (s: Section) => { setDir(sections.indexOf(s) >= i ? 1 : -1); pick(s) }
   const step = (d: number) => { setDir(d); setSection(sections[(i + d + sections.length) % sections.length]) }
   const x0 = useRef<number | null>(null)
   const pad = wide ? 24 : 12
@@ -131,10 +135,10 @@ function NavBar({ metro }: { metro: boolean }) {
         {sectionList().map((s) => {
           const selected = app.section === s
           // Short labels: "Film e serie" would wrap on two lines.
-          const label = s === 'Live' ? 'TV' : s === 'Settings' ? 'Altro' : s === 'Discover' ? 'Film/serie' : sectionTitle[s]
+          const label = s === 'Live' ? 'TV' : s === 'Settings' ? 'Altro' : s === 'Discover' ? 'Film/serie' : s === 'MyList' ? 'Lista' : sectionTitle[s]
           return (
-            <div key={s} role="tab" aria-selected={selected} tabIndex={0} onClick={() => setSection(s)}
-              onKeyDown={(e) => { if (e.key === 'Enter') setSection(s) }}
+            <div key={s} role="tab" aria-selected={selected} tabIndex={0} onClick={() => pick(s)}
+              onKeyDown={(e) => { if (e.key === 'Enter') pick(s) }}
               style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer' }}>
               <div style={{ position: 'relative', width: 64, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <motion.div initial={false} animate={{ opacity: selected && !metro ? 1 : 0, scaleX: selected ? 1 : 0.5 }} transition={tween(100)}
@@ -160,7 +164,7 @@ function SideNav() {
       {sectionList().map((s) => {
         const selected = app.section === s
         return (
-          <Clickable key={s} onClick={() => setSection(s)} background={selected ? 'var(--accentSoft)' : 'transparent'}
+          <Clickable key={s} onClick={() => pick(s)} background={selected ? 'var(--accentSoft)' : 'transparent'}
             style={{ display: 'flex', alignItems: 'center', padding: '12px 14px' }}>
             <Icon name={icons[s]} size={22} color={selected ? 'var(--accent)' : 'var(--text2)'} />
             <div style={{ marginLeft: 12, color: selected ? 'var(--text)' : 'var(--text2)', fontWeight: selected ? 600 : 400 }}>{sectionTitle[s]}</div>

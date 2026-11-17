@@ -311,6 +311,14 @@
                                     <TextBlock Text="Film e serie" VerticalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
+                            <!-- "La mia lista": i titoli aggiunti con +, in una pagina tutta loro. -->
+                            <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsMyListMode}" Command="{Binding OpenMyListCommand}"
+                                         ToolTip="La mia lista" Visibility="{Binding HasTmdb, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8A4;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
+                                    <TextBlock Text="Lista" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
                             <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsMoviesMode}" ToolTip="Film (Ctrl+2)"
                                          Visibility="{Binding HasTmdb, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
                                 <StackPanel Orientation="Horizontal">
@@ -1730,6 +1738,13 @@
                     </Button>
                 </Grid>
 
+                <!-- Cosa si sta caricando, sempre in vista in alto a destra. -->
+                <Border Grid.Row="1" Panel.ZIndex="5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,28,0"
+                        Background="#D9000000" CornerRadius="16" Padding="14,7" IsHitTestVisible="False"
+                        Visibility="{Binding DiscoverBusy, Converter={StaticResource NullToVis}}">
+                    <TextBlock Text="{Binding DiscoverBusy}" Foreground="White" FontSize="13" FontWeight="SemiBold" />
+                </Border>
+
                 <!-- Le righe: virtualizzate, si costruiscono solo quelle in vista. -->
                 <ItemsControl x:Name="DiscoverList" Grid.Row="1" ItemsSource="{Binding DiscoverItems}" Focusable="False"
                               VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel" VirtualizingPanel.VirtualizationMode="Recycling"
@@ -1858,17 +1873,30 @@
                             <StackPanel Margin="0,22,0,0">
                                 <StackPanel Orientation="Horizontal" Margin="30,0,28,0">
                                     <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
-                                    <Button Style="{StaticResource SeeAll}" Visibility="{Binding HasAll, Converter={StaticResource BoolToVis}}"
-                                            Command="{Binding DataContext.DiscoverSeeAllCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
                                 </StackPanel>
                                 <Grid Background="Transparent">
                                     <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
                                                   CanContentScroll="False" Focusable="False" Padding="26,12,26,14">
                                         <Grid>
-                                            <ItemsControl ItemsSource="{Binding Tiles}" ItemTemplate="{StaticResource PosterTileTemplate}" Focusable="False"
-                                                          Visibility="{Binding IsPoster, Converter={StaticResource BoolToVis}}">
-                                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                            </ItemsControl>
+                                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsPoster, Converter={StaticResource BoolToVis}}">
+                                                <ItemsControl ItemsSource="{Binding Tiles}" ItemTemplate="{StaticResource PosterTileTemplate}" Focusable="False">
+                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                                </ItemsControl>
+                                                <!-- "Guarda tutto" in fondo alla riga, grande come una locandina: apre tutta la categoria. -->
+                                                <Button Style="{StaticResource DiscoverTile}" ToolTip="Guarda tutto" VerticalAlignment="Top"
+                                                        Visibility="{Binding HasAll, Converter={StaticResource BoolToVis}}"
+                                                        Command="{Binding DataContext.DiscoverSeeAllCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                                                    <Grid Width="154" Height="231">
+                                                        <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource SurfaceBrush}" />
+                                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <Border Width="46" Height="46" CornerRadius="23" BorderThickness="2" BorderBrush="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center">
+                                                                <TextBlock Text="&#xE72A;" Style="{StaticResource Icon}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Border>
+                                                            <TextBlock Text="Guarda tutto" FontSize="15" FontWeight="Bold" Margin="0,10,0,0" HorizontalAlignment="Center" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+                                            </StackPanel>
                                             <ItemsControl ItemsSource="{Binding Tiles}" ItemTemplate="{StaticResource TopTileTemplate}" Focusable="False"
                                                           Visibility="{Binding IsTop, Converter={StaticResource BoolToVis}}">
                                                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
