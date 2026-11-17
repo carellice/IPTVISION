@@ -1,10 +1,9 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { groupVariants } from '../../../shared/text.ts'
-import { AlertDialog, Artwork, Clickable, Dialog, Empty, Icon, type IconName, Loading, Pill, ProgressLine, useWide } from '../components/ui.tsx'
+import { AlertDialog, Artwork, Clickable, Dialog, Empty, Icon, Loading, Pill, ProgressLine, useWide } from '../components/ui.tsx'
 import { VirtualGrid } from '../components/virtual.tsx'
 import {
-  app, closeCategory, entryProgress, inMyList, lastEpisode, moviesFor, openCategory, openMovieEntry, openSeriesEntry, playMovie,
+  app, closeCategory, entryProgress, lastEpisode, moviesFor, openCategory, openMovieEntry, openSeriesEntry, playMovie,
   removeMovieFromContinue, removeSeriesFromContinue, seriesFor, toggleMyList, useApp,
 } from '../lib/app.ts'
 import { ALL_ID, CONTINUE_ID, MYLIST_ID } from '../lib/library.ts'
@@ -12,7 +11,7 @@ import { type Kind, type Title, type Tmdb, type TmdbRow, checkKey, findInCatalog
 import { Poster } from './Browse.tsx'
 
 // "Film e serie" with a TMDB key: one screen for films and series, like the streaming apps.
-// A rotating hero, then rows: continue watching, my list, trends, genres, and the provider's categories.
+// Rows: continue watching, my list, trends, genres, and the provider's categories.
 
 type Filter = 'all' | Kind
 
@@ -110,8 +109,6 @@ function DiscoverHome() {
     ? groupVariants([...movies.items].sort((a, b) => b.added - a.added).slice(0, 80), (m) => m.name).slice(0, 30).map((e) => ({ kind: 'movie', entry: e, tmdb: null }))
     : [], [movies])
 
-  const hero = useMemo(() => (matched?.find((r) => r.id === 'trend')?.titles ?? []).filter((t) => pass(t) && t.tmdb?.backdrop).slice(0, 6), [matched, filter])
-
   const scroller = useRef<HTMLDivElement>(null)
   // Back to where it was, once the page is as long as before (catalog and TMDB rows there).
   const restored = useRef(false)
@@ -143,8 +140,6 @@ function DiscoverHome() {
       </div>
 
       {error && <div style={{ color: 'var(--danger)', fontSize: 14, padding: '0 2px 12px' }}>{error} Controlla la chiave in Impostazioni → TMDB.</div>}
-      {hero.length > 0 ? <Hero items={hero} wide={wide} /> : tmdbPending && <div className="skeleton" style={{ borderRadius: wide ? 18 : 16, height: wide ? 'clamp(340px, 42vw, 560px)' : 'min(132vw, 560px)' }} />}
-
       {continueRow.filter(pass).length > 0 && (
         <Row title="Continua a guardare">
           {continueRow.filter(pass).map((t) => <WideTile key={keyOf(t)} t={t} known={known.get(keyOf(t))} onLong={() => setRemove({ t, from: 'continue' })} />)}
@@ -189,73 +184,6 @@ function DiscoverHome() {
           else removeSeriesFromContinue(r.t.entry)
         }} />
     </div>
-  )
-}
-
-// --- hero ----------------------------------------------------------------------------------------------
-
-function Hero({ items, wide }: { items: Title[]; wide: boolean }) {
-  const [i, setI] = useState(0)
-  useEffect(() => {
-    if (items.length < 2) return
-    const timer = setInterval(() => setI((x) => (x + 1) % items.length), 9000)
-    return () => clearInterval(timer)
-  }, [items.length, i])
-  const t = items[i % items.length]
-  const tm = t.tmdb!
-  const meta = [t.kind === 'movie' ? 'Film' : 'Serie TV', tm.year, tm.vote ? `★ ${tm.vote.toFixed(1)}` : null].filter(Boolean).join('  ·  ')
-  const picture = wide ? img(tm.backdrop, 'w1280') : img(tm.poster, 'w780') ?? img(tm.backdrop, 'w780')
-  const listed = inMyList(t.entry.item)
-  return (
-    <div style={{ position: 'relative', borderRadius: wide ? 18 : 16, overflow: 'hidden', height: wide ? 'clamp(340px, 42vw, 560px)' : 'min(132vw, 560px)', background: '#000' }}>
-      <AnimatePresence initial={false}>
-        <motion.img key={tm.id} src={picture ?? undefined} alt="" draggable={false}
-          initial={{ opacity: 0, scale: 1.05 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.9, ease: 'easeOut' }}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: wide ? 'center 25%' : 'center top' }} />
-      </AnimatePresence>
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: wide
-          ? 'linear-gradient(90deg, rgba(0,0,0,.88) 0%, rgba(0,0,0,.55) 35%, rgba(0,0,0,0) 68%), linear-gradient(0deg, rgba(0,0,0,.75) 0%, rgba(0,0,0,0) 40%)'
-          : 'linear-gradient(0deg, rgba(0,0,0,.95) 0%, rgba(0,0,0,.55) 38%, rgba(0,0,0,0) 62%)',
-      }} />
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={tm.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.35 }}
-          style={{
-            position: 'absolute', left: wide ? 44 : 18, right: wide ? '42%' : 18, bottom: wide ? 46 : 22,
-            display: 'flex', flexDirection: 'column', alignItems: wide ? 'flex-start' : 'center', textAlign: wide ? 'left' : 'center', color: '#fff',
-          }}>
-          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2, color: 'var(--accent2)', textTransform: 'uppercase' }}>N. {i + 1} di tendenza</div>
-          <div className="clamp2" style={{ fontSize: wide ? 46 : 32, lineHeight: wide ? '52px' : '38px', fontWeight: 800, letterSpacing: -0.5, margin: '6px 0 8px', textShadow: '0 2px 16px rgba(0,0,0,.5)' }}>{tm.title || nameOf(t)}</div>
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,.8)', fontWeight: 500 }}>{meta}</div>
-          {wide && tm.overview && <div className="clamp3" style={{ fontSize: 15, lineHeight: '22px', color: 'rgba(255,255,255,.88)', marginTop: 12, maxWidth: 560 }}>{tm.overview}</div>}
-          <div style={{ display: 'flex', gap: 10, marginTop: wide ? 20 : 16, justifyContent: wide ? 'flex-start' : 'center' }}>
-            <HeroButton text={t.kind === 'movie' ? 'Riproduci' : 'Episodi'} icon="play_arrow" primary onClick={() => playTitle(t)} />
-            <HeroButton text="Altre info" icon="info_outline" onClick={() => openTitle(t)} />
-            <HeroButton icon={listed ? 'check' : 'add'} title={listed ? 'Nella mia lista' : 'La mia lista'} onClick={() => toggleMyList(t.entry.item)} />
-          </div>
-        </motion.div>
-      </AnimatePresence>
-      {items.length > 1 && (
-        <div style={{ position: 'absolute', right: wide ? 28 : 0, left: wide ? undefined : 0, bottom: wide ? 24 : 8, display: 'flex', gap: 6, justifyContent: 'center' }}>
-          {items.map((x, n) => (
-            <div key={keyOf(x)} onClick={() => setI(n)}
-              style={{ width: n === i ? 22 : 7, height: 7, borderRadius: 4, cursor: 'pointer', background: n === i ? '#fff' : 'rgba(255,255,255,.4)', transition: 'width 300ms, background 300ms' }} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function HeroButton({ text, icon, primary, title, onClick }: { text?: string; icon: IconName; primary?: boolean; title?: string; onClick: () => void }) {
-  return (
-    <Clickable onClick={onClick} title={title ?? text} radius={text ? 8 : '50%'}
-      background={primary ? '#fff' : 'rgba(110,110,115,.55)'}
-      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: text ? '9px 20px 9px 14px' : 9, backdropFilter: 'blur(8px)', border: text ? undefined : '1.5px solid rgba(255,255,255,.6)' }}>
-      <Icon name={icon} size={24} color={primary ? '#000' : '#fff'} />
-      {text && <div style={{ color: primary ? '#000' : '#fff', fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap' }}>{text}</div>}
-    </Clickable>
   )
 }
 
@@ -478,7 +406,6 @@ function RowSkeleton({ wide }: { wide: boolean }) {
 function DiscoverSkeleton({ wide }: { wide: boolean }) {
   return (
     <div style={{ flex: 1, overflow: 'hidden' }}>
-      <div className="skeleton" style={{ borderRadius: wide ? 18 : 16, height: wide ? 'clamp(340px, 42vw, 560px)' : 'min(132vw, 560px)' }} />
       {[0, 1, 2].map((n) => <RowSkeleton key={n} wide={wide} />)}
     </div>
   )

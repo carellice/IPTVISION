@@ -113,42 +113,15 @@ public sealed class DiscoverRow(string title, IReadOnlyList<DiscoverTile> tiles)
 /// <summary>Il titolo "Le categorie della lista" tra le righe.</summary>
 public sealed class DiscoverHeading(string text) { public string Text { get; } = text; }
 
-/// <summary>Un pallino sotto l'immagine grande: uno per titolo, acceso quello mostrato.</summary>
-public sealed record HeroDot(int Index, bool IsCurrent);
-
-/// <summary>In alto: i filtri e il titolo di tendenza che cambia da solo.</summary>
+/// <summary>In alto: l'errore di TMDB e lo stato di caricamento delle tendenze.</summary>
 public sealed partial class DiscoverHero : ObservableObject
 {
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Tile), nameof(Kicker), nameof(Meta), nameof(Overview), nameof(PlayText), nameof(HasTile))]
-    private int _index;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Tile), nameof(Kicker), nameof(Meta), nameof(Overview), nameof(PlayText), nameof(HasTile))]
-    private IReadOnlyList<DiscoverTile> _items = [];
-
-    [ObservableProperty] private ImageSource? _picture;
-    [ObservableProperty] private bool _inMyList;
     [ObservableProperty] private string? _error;
     [ObservableProperty] private bool _isLoading = true;
-
-    public DiscoverTile? Tile => Items.Count == 0 ? null : Items[Index % Items.Count];
-    public bool HasTile => Tile != null;
-    public string Kicker => $"N. {Index + 1} DI TENDENZA";
-    public string? Meta => Tile?.Card is { } c
-        ? TextHelpers.JoinMeta(Tile.IsSeries ? "Serie TV" : "Film", c.Year, c.Vote > 0 ? $"★ {c.Vote.ToString("0.0", System.Globalization.CultureInfo.GetCultureInfo("it-IT"))}" : null)
-        : null;
-    public string? Overview => Tile?.Card?.Overview is { Length: > 0 } o ? o : null;
-    public string PlayText => Tile?.IsSeries == true ? "Episodi" : "Riproduci";
-    public IReadOnlyList<HeroDot> Dots => Enumerable.Range(0, Items.Count).Select(n => new HeroDot(n, n == Index)).ToList();
-
-    partial void OnItemsChanged(IReadOnlyList<DiscoverTile> value) => OnPropertyChanged(nameof(Dots));
-    partial void OnIndexChanged(int value) => OnPropertyChanged(nameof(Dots));
 }
 
 public sealed partial class MainViewModel
 {
-    private DispatcherTimer? _heroTimer;
     private List<Tmdb.Row>? _tmdbRows;
     private Task? _tmdbTask;
     private string _discoverFilter = "all";
@@ -206,7 +179,6 @@ public sealed partial class MainViewModel
     {
         OnPropertyChanged(nameof(ShowVideo));
         NotifyVariantChooser();
-        if (value) _heroTimer?.Start(); else _heroTimer?.Stop();
     }
 
     public string TmdbKeyInput { get; set; } = "";
@@ -250,7 +222,6 @@ public sealed partial class MainViewModel
         Tmdb.ClearCache();
         _tmdbRows = null;
         _tmdbTask = null;
-        Hero.Items = [];
         DiscoverItems = [];
         ShowDiscover = false;
         OnPropertyChanged(nameof(HasTmdb));
@@ -261,8 +232,6 @@ public sealed partial class MainViewModel
     private void InitDiscover()
     {
         TmdbKeyNow = TmdbKey;
-        _heroTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(9) };
-        _heroTimer.Tick += (_, _) => { if (Hero.Items.Count > 1) SetHero((Hero.Index + 1) % Hero.Items.Count); };
     }
 
     [RelayCommand]
@@ -421,7 +390,6 @@ public sealed partial class MainViewModel
             var page = new List<object> { new DiscoverHeading($"La mia lista · {(mine.Count == 1 ? "1 titolo" : $"{mine.Count} titoli")}") };
             if (mine.Count == 0) page.Add(new DiscoverHeading("La lista è vuota: aggiungi film e serie con + dalla loro scheda."));
             for (var n = 0; n < mine.Count; n += 8) page.Add(new DiscoverRow("", mine.Skip(n).Take(8).ToList()));
-            Hero.Items = [];
             DiscoverItems = page;
             return;
         }
@@ -455,23 +423,9 @@ public sealed partial class MainViewModel
                 if (list.Count > 0) items.Add(new DiscoverRow(c.Name + " · Serie", list) { All = (LibraryMode.Series, c.Id) });
             }
 
-        Hero.Items = (shown.FirstOrDefault(x => x.Row.Id == "trend").Tiles ?? []).Where(t => t.Card?.Backdrop != null).Take(6).ToList();
-        SetHero(0);
         DiscoverItems = items;
         OnPropertyChanged(nameof(DiscoverMovieCategories));
         OnPropertyChanged(nameof(DiscoverSeriesCategories));
-    }
-
-    [RelayCommand]
-    private void SetHero(int i)
-    {
-        Hero.Index = i;
-        var t = Hero.Tile;
-        Hero.InMyList = t != null && InMyList(t.Item);
-        Hero.Picture = null;
-        if (t?.Card?.Backdrop is { } b) LogoService.Instance.Request(Tmdb.Img(b, "w1280"), img => { if (Hero.Tile == t) Hero.Picture = img; }, 1280);
-        _heroTimer?.Stop();
-        if (ShowDiscover) _heroTimer?.Start();
     }
 
     /// <summary>Apre il titolo: i film partono (o si sceglie la versione), le serie mostrano gli episodi nel pannello.</summary>
@@ -491,17 +445,6 @@ public sealed partial class MainViewModel
             if (Mode != LibraryMode.Series) Mode = LibraryMode.Series;
             OpenSeriesItem(s);
         }
-    }
-
-    [RelayCommand]
-    private void PlayHero() => OpenDiscoverTile(Hero.Tile);
-
-    [RelayCommand]
-    private void ToggleHeroMyList()
-    {
-        if (Hero.Tile is not { } t) return;
-        ToggleMyList(t.Item);
-        Hero.InMyList = InMyList(t.Item);
     }
 
     [RelayCommand]

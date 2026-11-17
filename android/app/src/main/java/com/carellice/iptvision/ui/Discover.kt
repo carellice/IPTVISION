@@ -1,16 +1,12 @@
 package com.carellice.iptvision.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -36,9 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -47,13 +40,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -67,7 +58,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import coil.compose.AsyncImage
 import com.carellice.iptvision.ALL_ID
 import com.carellice.iptvision.AppViewModel
 import com.carellice.iptvision.CONTINUE_ID
@@ -218,7 +208,7 @@ private fun DiscoverHome(vm: AppViewModel) {
     // Si mostra appena c'è uno dei due cataloghi: l'altro (e TMDB) arriva dopo, senza bloccare la pagina.
     if (vm.movies == null && vm.series == null) {
         Box(Modifier.fillMaxSize()) {
-            DiscoverSkeleton(wide, edge, hero = !(vm.isTv && wide))
+            DiscoverSkeleton(wide, edge)
             LoadingBadge(vm, null)
         }
         return
@@ -268,9 +258,6 @@ private fun DiscoverHome(vm: AppViewModel) {
     val recent = remember(movies) {
         groupVariants(movies.items.sortedByDescending { it.added }.take(80)) { it.variantKey }.take(30).map { it.title() }
     }
-    val hero = remember(matched, filter) {
-        matched?.firstOrNull { it.first.id == "trend" }?.second.orEmpty().filter { pass(it) && it.tmdb?.backdrop != null }.take(6)
-    }
     val tmdbRows = remember(matched, filter) {
         matched.orEmpty().map { (r, ts) -> r to ts.filter(::pass) }.filter { (r, ts) -> ts.size >= if (r.top) 5 else 4 }
     }
@@ -298,7 +285,6 @@ private fun DiscoverHome(vm: AppViewModel) {
             item { Pill("Categorie", false, Icons.Default.KeyboardArrowDown) { categories = true } }
         }
     }
-    val chipsTop = if (edge > 0.dp) 12.dp else 8.dp
     val tv = vm.isTv && wide
     val density = LocalDensity.current
 
@@ -307,22 +293,7 @@ private fun DiscoverHome(vm: AppViewModel) {
     @OptIn(ExperimentalFoundationApi::class)
     CompositionLocalProvider(LocalTvPin provides tv, LocalBringIntoViewSpec provides (if (tv) pinRows else LocalBringIntoViewSpec.current)) {
     LazyColumn(state = state, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = if (tv) 300.dp else 30.dp)) {
-        // Da bordo a bordo: i filtri stanno sopra l'immagine in alto, come nelle app di streaming.
-        when {
-            hero.isNotEmpty() && !tv -> item("hero") {
-                Box {
-                    Hero(vm, hero, wide)
-                    chips(Modifier.padding(top = chipsTop))
-                }
-            }
-            tmdbPending && vm.hasTmdb && !tv -> item("hero") {
-                Box {
-                    HeroSkeleton(wide, edge)
-                    chips(Modifier.padding(top = chipsTop))
-                }
-            }
-            else -> item("chips") { chips(Modifier.padding(top = if (edge > 0.dp) 12.dp else 0.dp, bottom = 12.dp)) }
-        }
+        item("chips") { chips(Modifier.padding(top = if (edge > 0.dp) 12.dp else 0.dp, bottom = 12.dp)) }
         vm.tmdbError?.let { e ->
             item("error") { Text("$e Controlla la chiave in Impostazioni → TMDB.", color = C.Danger, fontSize = 14.sp, modifier = Modifier.padding(start = edge + 2.dp, top = 12.dp, end = edge)) }
         }
@@ -386,88 +357,6 @@ private fun DiscoverHome(vm: AppViewModel) {
                 else -> vm.removeSeriesFromContinue(t.show!!)
             }
         }
-    }
-}
-
-// ---------- In alto ----------
-
-@Composable
-private fun Hero(vm: AppViewModel, items: List<Title>, wide: Boolean) {
-    var i by remember(items) { mutableIntStateOf(0) }
-    LaunchedEffect(items, i) {
-        if (items.size < 2) return@LaunchedEffect
-        delay(9_000)
-        i = (i + 1) % items.size
-    }
-    val t = items[i % items.size]
-    val tm = t.tmdb!!
-    @Suppress("UNUSED_VARIABLE") val pv = vm.positionsVersion
-    val edge = LocalEdge.current
-    val bg = C.Bg
-    BoxWithConstraints(Modifier.fillMaxWidth().then(if (edge == 0.dp) Modifier.clip(RoundedCornerShape(if (wide) 18.dp else 16.dp)) else Modifier).background(Color.Black)) {
-        val h = if (wide) (maxWidth * 0.42f).coerceIn(340.dp, 560.dp) else (maxWidth * 1.32f).coerceAtMost(560.dp)
-        Box(Modifier.fillMaxWidth().height(h)) {
-            AnimatedContent(t, transitionSpec = { fadeIn(tween(900)) togetherWith fadeOut(tween(900)) }, label = "hero") { x ->
-                val p = if (wide) Tmdb.img(x.tmdb?.backdrop, "w1280") else Tmdb.img(x.tmdb?.poster, "w780") ?: Tmdb.img(x.tmdb?.backdrop, "w780")
-                AsyncImage(p, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = if (wide) BiasAlignment(0f, -0.5f) else Alignment.TopCenter)
-            }
-            // In fondo l'immagine sfuma nello sfondo della pagina, in alto un velo per i filtri.
-            if (wide) {
-                Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Color(0xE0000000), 0.35f to Color(0x8C000000), 0.68f to Color.Transparent)))
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color(0x80000000), 0.18f to Color.Transparent, 0.6f to Color.Transparent, 1f to bg)))
-            } else {
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color(0x99000000), 0.16f to Color.Transparent, 0.38f to Color.Transparent, 0.62f to Color(0x8C000000), 1f to bg)))
-            }
-            val listed = if (t.movie != null) vm.inMyList(t.movie.item) else vm.inMyList(t.show!!.item)
-            Column(
-                Modifier.align(if (wide) Alignment.BottomStart else Alignment.BottomCenter)
-                    .padding(start = edge + if (wide) 20.dp else 18.dp, end = if (wide) 0.dp else edge + 18.dp, bottom = if (wide) 46.dp else 22.dp)
-                    .then(if (wide) Modifier.fillMaxWidth(0.58f) else Modifier.fillMaxWidth()),
-                horizontalAlignment = if (wide) Alignment.Start else Alignment.CenterHorizontally,
-            ) {
-                Text("N. ${i + 1} DI TENDENZA", color = C.Accent2, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
-                Text(
-                    tm.title.ifEmpty { t.name }, color = Color.White, fontSize = if (wide) 46.sp else 32.sp, lineHeight = if (wide) 52.sp else 38.sp,
-                    fontWeight = FontWeight.ExtraBold, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = if (wide) TextAlign.Start else TextAlign.Center,
-                    modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
-                )
-                val meta = listOfNotNull(if (t.isMovie) "Film" else "Serie TV", tm.year, if (tm.vote > 0) "★ " + String.format(java.util.Locale.ITALY, "%.1f", tm.vote) else null).joinToString("  ·  ")
-                Text(meta, color = Color(0xCCFFFFFF), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                if (wide && tm.overview.isNotEmpty()) Text(tm.overview, color = Color(0xE0FFFFFF), fontSize = 15.sp, lineHeight = 22.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp).widthIn(max = 560.dp))
-                Row(Modifier.padding(top = if (wide) 20.dp else 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    HeroButton(if (t.isMovie) "Riproduci" else "Episodi", Icons.Default.PlayArrow, primary = true) { vm.playTitle(t) }
-                    HeroButton("Altre info", Icons.Default.Info) { vm.openTitle(t) }
-                    HeroButton(null, if (listed) Icons.Default.Check else Icons.Default.Add) {
-                        if (t.movie != null) vm.toggleMyList(t.movie.item) else vm.toggleMyList(t.show!!.item)
-                    }
-                }
-            }
-            if (items.size > 1) Row(
-                Modifier.align(if (wide) Alignment.BottomEnd else Alignment.BottomCenter).padding(end = if (wide) edge + 28.dp else 0.dp, bottom = if (wide) 24.dp else 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                items.indices.forEach { n ->
-                    val w by animateDpAsState(if (n == i) 22.dp else 7.dp, tween(300), label = "dot")
-                    Box(Modifier.width(w).height(7.dp).clip(RoundedCornerShape(4.dp)).background(if (n == i) Color.White else Color(0x66FFFFFF)))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HeroButton(text: String?, icon: androidx.compose.ui.graphics.vector.ImageVector, primary: Boolean = false, onClick: () -> Unit) {
-    val shape = if (text != null) RoundedCornerShape(8.dp) else CircleShape
-    Row(
-        Modifier
-            .tvClickable(shape = shape, background = if (primary) Color.White else Color(0x8C6E6E73), focusedBackground = if (primary) Color(0xFFDDDDDD) else Color(0xB36E6E73), onClick = onClick)
-            .then(if (text == null) Modifier.border(1.5.dp, Color(0x99FFFFFF), shape) else Modifier)
-            .padding(if (text != null) PaddingValues(start = 14.dp, end = 20.dp, top = 9.dp, bottom = 9.dp) else PaddingValues(9.dp)),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(icon, null, tint = if (primary) Color.Black else Color.White, modifier = Modifier.size(24.dp))
-        if (text != null) Text(text, color = if (primary) Color.Black else Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
     }
 }
 
@@ -709,14 +598,6 @@ private fun Modifier.shimmer(): Modifier {
 }
 
 @Composable
-private fun HeroSkeleton(wide: Boolean, edge: Dp) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val h = if (wide) (maxWidth * 0.42f).coerceIn(340.dp, 560.dp) else (maxWidth * 1.32f).coerceAtMost(560.dp)
-        Box(Modifier.fillMaxWidth().height(h).then(if (edge == 0.dp) Modifier.clip(RoundedCornerShape(16.dp)) else Modifier).shimmer())
-    }
-}
-
-@Composable
 private fun RowSkeleton(wide: Boolean, edge: Dp, top: Dp) {
     Column(Modifier.padding(top = top)) {
         Box(Modifier.padding(start = edge + 2.dp).width(if (wide) 220.dp else 160.dp).height(18.dp).clip(RoundedCornerShape(6.dp)).shimmer())
@@ -730,9 +611,8 @@ private fun RowSkeleton(wide: Boolean, edge: Dp, top: Dp) {
 
 /** La pagina com'è fatta, con i riquadri che pulsano: si capisce subito cosa arriva e dove. */
 @Composable
-private fun DiscoverSkeleton(wide: Boolean, edge: Dp, hero: Boolean) {
+private fun DiscoverSkeleton(wide: Boolean, edge: Dp) {
     Column(Modifier.fillMaxSize().clipToBounds()) {
-        if (hero) HeroSkeleton(wide, edge)
         repeat(3) { RowSkeleton(wide, edge, if (wide) 26.dp else 20.dp) }
     }
 }

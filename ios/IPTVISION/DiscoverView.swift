@@ -90,7 +90,6 @@ struct DiscoverView: View {
         var cont: [DiscoverTitle] = []
         var mine: [DiscoverTitle] = []
         var rows: [(row: Tmdb.Row, titles: [DiscoverTitle])] = []
-        var hero: [DiscoverTitle] = []
         var recent: [DiscoverTitle] = []
     }
 
@@ -105,8 +104,6 @@ struct DiscoverView: View {
         let ms: [DiscoverTitle] = model.seriesEntries(myListId).map { DiscoverTitle(show: $0, card: known[$0.item.key]) }
         r.mine = (mm + ms).filter(pass)
         r.rows = (matched ?? []).map { (row: $0.row, titles: $0.titles.filter(pass)) }.filter { $0.titles.count >= ($0.row.top ? 5 : 4) }
-        let trend: [DiscoverTitle] = matched?.first(where: { $0.row.id == "trend" })?.titles ?? []
-        r.hero = Array(trend.filter { pass($0) && $0.card?.backdrop != nil }.prefix(6))
         let newest = Array(movies.items.sorted { $0.added > $1.added }.prefix(80))
         r.recent = groupVariants(newest) { $0.variantKey }.prefix(30).map { DiscoverTitle(movie: $0, card: known[$0.item.key]) }
         return r
@@ -116,7 +113,7 @@ struct DiscoverView: View {
     private func content(_ movies: Library<Movie>, _ series: Library<Series>) -> some View {
         let _ = model.positionsVersion
         let d = buildRows(movies)
-        let cont = d.cont, mine = d.mine, rows = d.rows, hero = d.hero, recent = d.recent
+        let cont = d.cont, mine = d.mine, rows = d.rows, recent = d.recent
 
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 22) {
@@ -138,11 +135,6 @@ struct DiscoverView: View {
                 }
                 if let e = model.tmdbError {
                     Text("\(e) Controlla la chiave in Impostazioni → TMDB.").font(.subheadline).foregroundStyle(.red).padding(.horizontal)
-                }
-                if !hero.isEmpty {
-                    Hero(items: hero).padding(.horizontal)
-                } else if matched == nil && model.tmdbError == nil {
-                    RoundedRectangle(cornerRadius: 16).fill(Theme.card).frame(height: 460).padding(.horizontal).modifier(Pulse())
                 }
                 if matched == nil && model.tmdbError == nil { ForEach(0..<2, id: \.self) { _ in SkeletonRow() } }
                 if !cont.isEmpty {
@@ -211,67 +203,6 @@ private struct TitleLink<Label: View>: View {
     var body: some View {
         if let m = title.movie { NavigationLink(value: m, label: label).buttonStyle(.plain) }
         else if let s = title.show { NavigationLink(value: s, label: label).buttonStyle(.plain) }
-    }
-}
-
-// MARK: - In alto
-
-private struct Hero: View {
-    @EnvironmentObject var model: AppModel
-    let items: [DiscoverTitle]
-    @State private var index = 0
-
-    var body: some View {
-        let t = items[index % items.count]
-        let card = t.card
-        let listed = t.movie.map { model.inMyList($0.item) } ?? t.show.map { model.inMyList($0.item) } ?? false
-        ZStack(alignment: .bottom) {
-            RemoteImage(url: Tmdb.img(card?.poster, "w780") ?? Tmdb.img(card?.backdrop, "w780"), placeholder: TextHelpers.initials(t.name))
-                .frame(maxWidth: .infinity).frame(height: 460).clipped()
-                .id(t.id)
-                .transition(.opacity)
-            LinearGradient(stops: [.init(color: .clear, location: 0.38), .init(color: .black.opacity(0.55), location: 0.62), .init(color: .black.opacity(0.95), location: 1)],
-                           startPoint: .top, endPoint: .bottom)
-            VStack(spacing: 8) {
-                Text("N. \(index % items.count + 1) DI TENDENZA").font(.caption.weight(.heavy)).kerning(2).foregroundStyle(Theme.accent2)
-                Text(card?.title.isEmpty == false ? card!.title : t.name).font(.system(size: 30, weight: .heavy)).multilineTextAlignment(.center).lineLimit(2)
-                Text(TextHelpers.joinMeta(t.isMovie ? "Film" : "Serie TV", card?.year, (card?.vote ?? 0) > 0 ? String(format: "★ %.1f", card!.vote) : nil))
-                    .font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.8))
-                HStack(spacing: 10) {
-                    TitleLink(title: t) {
-                        Label(t.isMovie ? "Riproduci" : "Episodi", systemImage: "play.fill").font(.body.weight(.bold))
-                            .padding(.horizontal, 18).padding(.vertical, 10).foregroundStyle(.black).background(.white, in: RoundedRectangle(cornerRadius: 8))
-                    }
-                    Button {
-                        if let m = t.movie { model.toggleMyList(m.item) } else if let s = t.show { model.toggleMyList(s.item) }
-                    } label: {
-                        Image(systemName: listed ? "checkmark" : "plus").font(.body.weight(.bold)).frame(width: 42, height: 42)
-                            .background(.ultraThinMaterial, in: Circle()).overlay(Circle().stroke(.white.opacity(0.6), lineWidth: 1.5))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 8)
-                if items.count > 1 {
-                    HStack(spacing: 6) {
-                        ForEach(items.indices, id: \.self) { n in
-                            Capsule().fill(n == index % items.count ? Color.white : Color.white.opacity(0.4))
-                                .frame(width: n == index % items.count ? 22 : 7, height: 7)
-                                .onTapGesture { withAnimation { index = n } }
-                        }
-                    }
-                    .padding(.top, 6)
-                }
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 18).padding(.bottom, 16)
-        }
-        .frame(height: 460)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.corner(16)))
-        .task(id: index) {
-            // Ogni 9 secondi il titolo successivo.
-            try? await Task.sleep(nanoseconds: 9_000_000_000)
-            if !Task.isCancelled && items.count > 1 { withAnimation(.easeInOut(duration: 0.8)) { index = (index + 1) % items.count } }
-        }
     }
 }
 
