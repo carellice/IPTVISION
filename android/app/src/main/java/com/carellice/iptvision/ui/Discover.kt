@@ -138,14 +138,16 @@ private fun pinTo(leadPx: Float) = object : BringIntoViewSpec {
     // supera il punto, poi torna indietro (il "rimbalzo").
     @Deprecated("") override val scrollAnimationSpec: androidx.compose.animation.core.AnimationSpec<Float> =
         tween(180, easing = androidx.compose.animation.core.CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f))
-    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = offset - leadPx
+    // Al pixel intero e senza correzioni sotto il pixel: gli arrotondamenti non spostano la riga.
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) =
+        (offset - leadPx).let { if (kotlin.math.abs(it) < 1.5f) 0f else it }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TvRow(content: @Composable () -> Unit) {
     if (!LocalTvPin.current) { content(); return }
-    val lead = with(LocalDensity.current) { (LocalEdge.current + 2.dp).toPx() }
+    val lead = with(LocalDensity.current) { (LocalEdge.current + 2.dp).roundToPx().toFloat() }
     CompositionLocalProvider(LocalBringIntoViewSpec provides remember(lead) { pinTo(lead) }, content = content)
 }
 
@@ -291,7 +293,7 @@ private fun DiscoverHome(vm: AppViewModel) {
     val density = LocalDensity.current
 
     Box(Modifier.fillMaxSize()) {
-    val pinRows = remember(density) { with(density) { pinTo(44.dp.toPx()) } }
+    val pinRows = remember(density) { with(density) { pinTo(44.dp.roundToPx().toFloat()) } }
     @OptIn(ExperimentalFoundationApi::class)
     CompositionLocalProvider(LocalTvPin provides tv, LocalBringIntoViewSpec provides (if (tv) pinRows else LocalBringIntoViewSpec.current)) {
     LazyColumn(state = state, modifier = Modifier.fillMaxSize(), overscrollEffect = if (tv) null else androidx.compose.foundation.rememberOverscrollEffect(), contentPadding = PaddingValues(bottom = if (tv) 300.dp else 30.dp)) {
@@ -317,7 +319,7 @@ private fun DiscoverHome(vm: AppViewModel) {
         if (tmdbPending) items(3, key = { "skel$it" }) { RowSkeleton(wide, edge, gap) }
         tmdbRows.forEachIndexed { i, (r, ts) ->
             item(r.id) {
-                DRow(if (r.top) "${r.title} in Italia" else r.title, gap) {
+                DRow(if (r.top) "${r.title} in Italia" else r.title, gap, id = "t:${r.id}") {
                     if (r.top) itemsIndexed(ts.take(10), key = { _, t -> t.key }) { n, t -> TopTile(vm, t, n + 1) }
                     else items(ts.take(40), key = { it.key }) { t -> PosterTile(vm, t, t.tmdb) }
                 }
@@ -339,7 +341,7 @@ private fun DiscoverHome(vm: AppViewModel) {
             val titles = remember(id, isMovie, movies, series, vm.positionsVersion) {
                 if (isMovie) vm.moviesFor(id).take(30).map { it.title() } else vm.seriesFor(id).take(30).map { it.title() }
             }
-            if (titles.isNotEmpty()) DRow(if (isMovie) name else "$name · Serie", gap, onAll = { vm.openCategory(Section.Discover, "${if (isMovie) "m" else "s"}:$id") }, captions = true) {
+            if (titles.isNotEmpty()) DRow(if (isMovie) name else "$name · Serie", gap, id = "c:$isMovie:$id", onAll = { vm.openCategory(Section.Discover, "${if (isMovie) "m" else "s"}:$id") }, captions = true) {
                 items(titles, key = { it.key }) { t -> PosterTile(vm, t, null, caption = true) }
             }
         }
@@ -365,7 +367,7 @@ private fun DiscoverHome(vm: AppViewModel) {
 // ---------- Le righe ----------
 
 @Composable
-private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> Unit)? = null, captions: Boolean = false, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, id: String = title, onAll: (() -> Unit)? = null, captions: Boolean = false, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
     val wide = LocalWide.current
     val edge = LocalEdge.current
     Column(Modifier.padding(top = top)) {
@@ -373,24 +375,26 @@ private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> 
             Text(title, color = C.Text, fontSize = if (wide) 20.sp else 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         }
         val tv = LocalTvPin.current
-        val st = rememberLazyListState(Saved.rows[title]?.first ?: 0, Saved.rows[title]?.second ?: 0)
-        DisposableEffect(title) { onDispose { Saved.rows[title] = st.firstVisibleItemIndex to st.firstVisibleItemScrollOffset } }
+        val st = rememberLazyListState(Saved.rows[id]?.first ?: 0, Saved.rows[id]?.second ?: 0)
+        DisposableEffect(id) { onDispose { Saved.rows[id] = st.firstVisibleItemIndex to st.firstVisibleItemScrollOffset } }
         // Un FocusRequester per riquadro (per posizione nella riga), per scegliere dove entra il focus.
         val reqs = remember { HashMap<Int, FocusRequester>() }
         // TV: arrivando con ▲ ▼ da un'altra riga il focus va sul riquadro fermo a sinistra (il primo, se la riga
         // non è scorsa) e la riga resta com'è: nessuno scorrimento di lato mentre ci si sposta in verticale.
         @OptIn(ExperimentalComposeUiApi::class)
+        // Ogni riga ha un id suo (non il nome): le categorie della lista che si chiamano come una riga TMDB
+        // ("Animazione", "Horror"…) non ereditano più scorrimento e focus dell'altra riga.
         val enter = if (!tv) Modifier else Modifier.focusProperties {
             onEnter = {
                 if (requestedFocusDirection == FocusDirection.Up || requestedFocusDirection == FocusDirection.Down) {
-                    val k = st.layoutInfo.visibleItemsInfo.firstOrNull { it.offset >= -4 }?.index ?: st.firstVisibleItemIndex
+                    val k = st.layoutInfo.visibleItemsInfo.firstOrNull { it.offset >= -it.size / 4 }?.index ?: st.firstVisibleItemIndex
                     reqs[k]?.let { r -> runCatching { r.requestFocus() } }
                 }
             }
         }.focusGroup()
         // Spazio attorno per il riquadro che si ingrandisce quando ha il focus.
-        CompositionLocalProvider(LocalRowId provides title) { TvRow { LazyRow(state = st, modifier = enter, overscrollEffect = if (tv) null else androidx.compose.foundation.rememberOverscrollEffect(), horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp)) {
-            Tagged(this, reqs).apply(content).item("__all", onAll != null) { SeeAllTile(captions, restore = Saved.focusAll == title) { Saved.focusAll = title; onAll?.invoke() } }
+        CompositionLocalProvider(LocalRowId provides id) { TvRow { LazyRow(state = st, modifier = enter, overscrollEffect = if (tv) null else androidx.compose.foundation.rememberOverscrollEffect(), horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp)) {
+            Tagged(this, reqs).apply(content).item("__all", onAll != null) { SeeAllTile(captions, restore = Saved.focusAll == id) { Saved.focusAll = id; onAll?.invoke() } }
         } } }
     }
 }

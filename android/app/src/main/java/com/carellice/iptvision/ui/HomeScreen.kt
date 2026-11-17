@@ -353,8 +353,15 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false, h
                 }
                 if (gained) asked[0] = false
             }
-            // Entrando con ◀ si torna sulla sezione aperta, non sulla voce più vicina.
-            .focusProperties { onEnter = { first.requestFocus() } }
+            // Entrando con ◀ si torna sulla sezione aperta, non sulla voce più vicina. Con ▲ ▼ dai contenuti nel menu
+            // non si entra mai: senza un titolo pronto sotto, il focus finiva qui e poi tornava a destra su un titolo a caso.
+            .focusProperties {
+                onEnter = {
+                    if (requestedFocusDirection == androidx.compose.ui.focus.FocusDirection.Up ||
+                        requestedFocusDirection == androidx.compose.ui.focus.FocusDirection.Down
+                    ) cancelFocusChange() else first.requestFocus()
+                }
+            }
             .focusGroup()
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
