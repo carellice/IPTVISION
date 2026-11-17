@@ -80,6 +80,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -137,7 +139,8 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                 // TV: il menu è una colonna di icone che si apre sopra i contenuti
                 // quando ci arriva il focus, come nelle app di streaming. Sempre lo stesso SideNav, così il focus non si perde.
                 val rail = vm.isTv
-                Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                var focused by remember { mutableStateOf(false) }
+                Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().onFocusChanged { focused = it.hasFocus }) {
                 Row(Modifier.fillMaxSize()) {
                     Box(Modifier.width(if (rail) RailWidth else NavWidth))
                     if (vm.section == Section.Discover) {
@@ -149,7 +152,7 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                     }
                 }
                     // Telefono in orizzontale: largo ma basso, il menu scorre e l'orologio sparisce.
-                    SideNav(vm, compact = short, rail = rail)
+                    SideNav(vm, compact = short, rail = rail, homeFocused = { focused })
                 }
             } else {
                 Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -296,9 +299,10 @@ private val RailWidth = 76.dp
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
+private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false, homeFocused: () -> Boolean = { false }) {
     val first = remember { FocusRequester() }
-    LaunchedEffect(Unit) { if (vm.isTv) runCatching { first.requestFocus() } }
+    // All'avvio il focus va al menu; tornando da una scheda o dal player solo se la sezione non l'ha già rimesso dov'era.
+    LaunchedEffect(Unit) { if (vm.isTv) { delay(150); if (!homeFocused()) runCatching { first.requestFocus() } } }
     var inside by remember { mutableStateOf(false) }
     LaunchedEffect(vm.focusMenu) { if (vm.focusMenu > 0) runCatching { first.requestFocus() } }
     // Scelta una voce, il menu si chiude subito e resta chiuso finché il focus non ci torna.
@@ -306,9 +310,20 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
     val open = !rail || (inside && !closed)
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val w by androidx.compose.animation.core.animateDpAsState(if (open) NavWidth else RailWidth, label = "rail")
+    // Apertura fluida: scritte e orologio restano composti (solo trasparenti), la larghezza cambia in fase di layout:
+    // niente ricomposizione a ogni fotogramma, che sui TV faceva scattare l'animazione.
+    val t by androidx.compose.animation.core.animateFloatAsState(
+        if (open) 1f else 0f, tween(220, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "rail",
+    )
+    val fade = Modifier.graphicsLayer { alpha = t }
     Column(
-        Modifier.width(w).fillMaxHeight()
+        Modifier
+            .layout { m, c ->
+                val w = (RailWidth + (NavWidth - RailWidth) * t).roundToPx()
+                val p = m.measure(c.copy(minWidth = w, maxWidth = w))
+                layout(w, p.height) { p.place(0, 0) }
+            }
+            .fillMaxHeight()
             .then(
                 if (open) Modifier.material(C.Panel)
                 else Modifier.background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(C.Bg, C.Bg.copy(alpha = 0.6f))))
@@ -323,10 +338,8 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 6.dp, top = if (compact) 0.dp else 8.dp, bottom = if (compact) 6.dp else 18.dp)) {
                 Image(painterResource(R.drawable.logo), null, Modifier.size(34.dp).clip(skinCorners(8.dp)))
-                if (open) {
-                    HSpace(10.dp)
-                    Text("IPTVISION", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 19.sp, maxLines = 1, softWrap = false)
-                }
+                HSpace(10.dp)
+                Text("IPTVISION", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 19.sp, maxLines = 1, softWrap = false, modifier = fade)
             }
             vm.sections.forEach { s ->
                 val selected = vm.section == s
@@ -337,6 +350,8 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
                             focusScale = 1.02f,
                             background = if (selected) C.AccentSoft else Color.Transparent,
                             focusedBackground = C.SurfacePressed,
+                            // Ci si sposta nel menu: la pagina che finisce di caricare non deve più rubare il focus.
+                            onFocus = { if (!selected) vm.focusContent = false },
                         ) { // Col telecomando si scorre il menu e si apre la sezione solo con OK.
                             if (s == Section.Discover) resetDiscoverScroll()
                             vm.section = s
@@ -344,9 +359,14 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
                                 closed = true
                                 vm.focusContent = true
                                 // La sezione che sa dove mettere il focus lo prende da sé; altrimenti il primo elemento a destra.
+                                // Pagina ancora in caricamento (niente a destra): si riprova finché è pronta, senza riaprire il menu.
+                                // "Film e serie" lo prende da sé appena compaiono i filtri.
                                 scope.launch {
                                     delay(150)
-                                    if (vm.focusContent) { vm.focusContent = false; focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Right) }
+                                    while (vm.focusContent && vm.section == s) {
+                                        if ((s != Section.Discover || vm.discoverOpen != null) && focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Right)) { vm.focusContent = false; break }
+                                        delay(250)
+                                    }
                                 }
                             }
                         }
@@ -354,14 +374,12 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(s.icon(), s.title, tint = if (selected) C.Accent else C.Text2, modifier = Modifier.size(22.dp))
-                    if (open) {
-                        HSpace(12.dp)
-                        Text(s.title, color = if (selected) C.Text else C.Text2, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, softWrap = false)
-                    }
+                    HSpace(12.dp)
+                    Text(s.title, color = if (selected) C.Text else C.Text2, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, softWrap = false, modifier = fade)
                 }
             }
         }
-        if (open) {
+        Column(fade) {
             if (!compact) Clock()
             ServerNetworkLine(vm, Modifier.padding(horizontal = 6.dp))
         }

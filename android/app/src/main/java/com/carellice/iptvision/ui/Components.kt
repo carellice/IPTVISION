@@ -339,6 +339,21 @@ fun Modifier.tvClickable(
 }
 
 /**
+ * Finestra aperta tenendo premuto OK: il rilascio di quel tasto arriva qui e premeva il pulsante col focus.
+ * Si ignora ogni rilascio di OK finché non c'è stata una pressione dentro la finestra.
+ */
+@Composable
+fun Modifier.ignoreStrayOk(): Modifier {
+    var armed by remember { mutableStateOf(false) }
+    return onPreviewKeyEvent { e ->
+        val ok = e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter
+        // Le ripetizioni del tasto ancora tenuto premuto non contano come nuova pressione.
+        if (e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount == 0) armed = true
+        ok && !armed
+    }
+}
+
+/**
  * Sui campi di testo il telecomando resterebbe "intrappolato": ▲ e ▼ spostano il cursore e non il focus.
  * Qui li si usa per passare al campo o al pulsante vicino.
  */

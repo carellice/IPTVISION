@@ -420,6 +420,7 @@ fun SeriesSection(vm: AppViewModel) {
 internal fun RemoveContinueDialog(title: String, myList: Boolean, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.ignoreStrayOk(),
         containerColor = C.Panel,
         title = { Text(if (myList) "Rimuovere dalla mia lista?" else "Rimuovere da Continua a guardare?", color = C.Text) },
         text = { Text(title, color = C.Text2) },

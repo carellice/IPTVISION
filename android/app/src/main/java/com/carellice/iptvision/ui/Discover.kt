@@ -138,7 +138,7 @@ private enum class Filter { All, Movie, Tv }
 private val LocalTvPin = compositionLocalOf { false }
 
 /** Aperta dal menu, la pagina riparte dall'inizio. */
-fun resetDiscoverScroll() { Saved.index = 0; Saved.offset = 0; Saved.rows.clear(); Saved.focusAll = null }
+fun resetDiscoverScroll() { Saved.index = 0; Saved.offset = 0; Saved.rows.clear(); Saved.focusAll = null; Saved.focusTitle = null }
 
 /**
  * Sul TV la riga o la locandina col focus si porta sempre allo stesso punto (in alto, a sinistra) invece
@@ -164,9 +164,23 @@ private object Saved {
     val rows = HashMap<String, Pair<Int, Int>>()
     /** La riga da cui si è aperto "Guarda tutto": al ritorno il focus torna lì. */
     var focusAll: String? = null
+    /** Il riquadro aperto (riga|titolo): tornando dalla scheda o dal player il focus riparte da lì, non dal menu. */
+    var focusTitle: String? = null
     /** Righe TMDB già confrontate col catalogo: tornando alla pagina non si rifà il lavoro (e la pagina non salta). */
     var matchKey: List<Any?>? = null
     var match: List<Pair<Tmdb.Row, List<Title>>>? = null
+}
+
+/** La riga in cui sta un riquadro: lo stesso titolo può stare in più righe. */
+private val LocalRowId = androidx.compose.runtime.compositionLocalOf { "" }
+
+/** Focus da rimettere sul riquadro al ritorno; la funzione restituita va chiamata all'apertura. */
+@Composable
+private fun returnFocus(t: Title): Pair<Modifier, () -> Unit> {
+    val id = LocalRowId.current + "|" + t.key
+    val me = remember { FocusRequester() }
+    if (Saved.focusTitle == id) LaunchedEffect(Unit) { Saved.focusTitle = null; delay(60); runCatching { me.requestFocus() } }
+    return Modifier.focusRequester(me) to { Saved.focusTitle = id }
 }
 
 private fun AppViewModel.openTitle(t: Title) {
@@ -204,7 +218,7 @@ private fun DiscoverHome(vm: AppViewModel) {
     // Si mostra appena c'è uno dei due cataloghi: l'altro (e TMDB) arriva dopo, senza bloccare la pagina.
     if (vm.movies == null && vm.series == null) {
         Box(Modifier.fillMaxSize()) {
-            DiscoverSkeleton(wide, edge)
+            DiscoverSkeleton(wide, edge, hero = !(vm.isTv && wide))
             LoadingBadge(vm, null)
         }
         return
@@ -496,10 +510,10 @@ private fun DRow(title: String, top: androidx.compose.ui.unit.Dp, onAll: (() -> 
             }
         }.focusGroup()
         // Spazio attorno per il riquadro che si ingrandisce quando ha il focus.
-        TvRow { LazyRow(state = st, modifier = enter, horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp)) {
+        CompositionLocalProvider(LocalRowId provides title) { TvRow { LazyRow(state = st, modifier = enter, horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 10.dp)) {
             FirstTagged(this, first).content()
             if (onAll != null) item("__all") { SeeAllTile(captions, restore = Saved.focusAll == title) { Saved.focusAll = title; onAll() } }
-        } }
+        } } }
     }
 }
 
@@ -508,7 +522,8 @@ private fun PosterTile(vm: AppViewModel, t: Title, known: Tmdb.Card?, lookup: Bo
     val wide = LocalWide.current
     val tm = rememberTmdb(vm, t.kind, t.name, t.year, known, lookup)
     val p = vm.progressOf(t)
-    Column(Modifier.width(if (wide) 154.dp else 112.dp).tvClickable(shape = RoundedCornerShape(8.dp), focusScale = 1.08f, background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong) { vm.openTitle(t) }) {
+    val (back, opened) = returnFocus(t)
+    Column(Modifier.width(if (wide) 154.dp else 112.dp).then(back).tvClickable(shape = RoundedCornerShape(8.dp), focusScale = 1.08f, background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong) { opened(); vm.openTitle(t) }) {
         Box {
             Artwork(Tmdb.img(tm?.poster) ?: t.poster, t.initials, Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(skinCorners(8.dp)), fontSize = 20)
             if (p > 0f && p < 1f) ProgressLine(p, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(6.dp))
@@ -573,8 +588,9 @@ private fun KindBadge() {
 private fun TopTile(vm: AppViewModel, t: Title, n: Int) {
     val wide = LocalWide.current
     val h = if (wide) 210.dp else 150.dp
+    val (back, opened) = returnFocus(t)
     Row(
-        Modifier.height(h).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent) { vm.openTitle(t) }.padding(end = 4.dp),
+        Modifier.height(h).then(back).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent) { opened(); vm.openTitle(t) }.padding(end = 4.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
         // Il numero grande col solo contorno, mezzo nascosto dietro la locandina.
@@ -594,7 +610,8 @@ private fun WideTile(vm: AppViewModel, t: Title, known: Tmdb.Card?, onLong: () -
     val wide = LocalWide.current
     val tm = rememberTmdb(vm, t.kind, t.name, t.year, known)
     val p = vm.progressOf(t)
-    Column(Modifier.width(if (wide) 290.dp else 220.dp).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong) { vm.playTitle(t) }) {
+    val (back, opened) = returnFocus(t)
+    Column(Modifier.width(if (wide) 290.dp else 220.dp).then(back).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent, onLongClick = onLong) { opened(); vm.playTitle(t) }) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(skinCorners(8.dp))) {
             Artwork(Tmdb.img(tm?.backdrop, "w780") ?: t.poster, t.initials, Modifier.fillMaxSize(), fontSize = 20)
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color(0xB3000000))))
@@ -713,9 +730,9 @@ private fun RowSkeleton(wide: Boolean, edge: Dp, top: Dp) {
 
 /** La pagina com'è fatta, con i riquadri che pulsano: si capisce subito cosa arriva e dove. */
 @Composable
-private fun DiscoverSkeleton(wide: Boolean, edge: Dp) {
+private fun DiscoverSkeleton(wide: Boolean, edge: Dp, hero: Boolean) {
     Column(Modifier.fillMaxSize().clipToBounds()) {
-        HeroSkeleton(wide, edge)
+        if (hero) HeroSkeleton(wide, edge)
         repeat(3) { RowSkeleton(wide, edge, if (wide) 26.dp else 20.dp) }
     }
 }
