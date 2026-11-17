@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -265,9 +268,10 @@ private fun DiscoverHome(vm: AppViewModel) {
     val tmdbRows = remember(matched, filter) {
         matched.orEmpty().map { (r, ts) -> r to ts.filter(::pass) }.filter { (r, ts) -> ts.size >= if (r.top) 5 else 4 }
     }
-    val providerRows = buildList {
-        if (filter != Filter.Tv) movies.categories.forEach { add(Triple(true, it.id, it.name)) }
-        if (filter != Filter.Movie) series.categories.forEach { add(Triple(false, it.id, it.name)) }
+    // Le categorie della lista: riquadri a griglia (nome e quanti titoli), quelle vuote no.
+    val providerCats = buildList {
+        if (filter != Filter.Tv) movies.categories.forEach { c -> movies.byCategory[c.id]?.size?.takeIf { it > 0 }?.let { add(ProviderCat(true, c.id, c.name, it)) } }
+        if (filter != Filter.Movie) series.categories.forEach { c -> series.byCategory[c.id]?.size?.takeIf { it > 0 }?.let { add(ProviderCat(false, c.id, c.name + " · Serie", it)) } }
     }
 
     // Liste di TMDB ancora in arrivo: al loro posto riquadri che pulsano, il resto della pagina è già usabile.
@@ -336,13 +340,16 @@ private fun DiscoverHome(vm: AppViewModel) {
         item("cats") {
             Text("Le categorie della lista", color = C.Text, fontSize = if (wide) 24.sp else 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = if (wide) 44.dp else 32.dp, start = edge + 2.dp))
         }
-        // Le righe della LazyColumn si compongono solo quando arrivano vicino allo schermo.
-        items(providerRows, key = { (m, id, _) -> "c:$m:$id" }) { (isMovie, id, name) ->
-            val titles = remember(id, isMovie, movies, series, vm.positionsVersion) {
-                if (isMovie) vm.moviesFor(id).take(30).map { it.title() } else vm.seriesFor(id).take(30).map { it.title() }
-            }
-            if (titles.isNotEmpty()) DRow(if (isMovie) name else "$name · Serie", gap, id = "c:$isMovie:$id", onAll = { vm.openCategory(Section.Discover, "${if (isMovie) "m" else "s"}:$id") }, captions = true) {
-                items(titles, key = { it.key }) { t -> PosterTile(vm, t, null, caption = true) }
+        val cols = if (wide) 5 else 2
+        items(providerCats.chunked(cols), key = { r -> "c:" + r.first().key }) { row ->
+            Row(Modifier.padding(start = edge + 2.dp, end = edge + 2.dp, top = if (wide) 14.dp else 10.dp), horizontalArrangement = Arrangement.spacedBy(if (wide) 14.dp else 10.dp)) {
+                row.forEach { c ->
+                    CatTile(c, Modifier.weight(1f), restore = Saved.focusAll == c.key) {
+                        Saved.focusAll = c.key
+                        vm.openCategory(Section.Discover, "${if (c.isMovie) "m" else "s"}:${c.id}")
+                    }
+                }
+                repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -361,6 +368,31 @@ private fun DiscoverHome(vm: AppViewModel) {
                 else -> vm.removeSeriesFromContinue(t.show!!)
             }
         }
+    }
+}
+
+private data class ProviderCat(val isMovie: Boolean, val id: String, val name: String, val count: Int) {
+    val key get() = "c:$isMovie:$id"
+}
+
+/** Una categoria della lista: si apre a griglia con tutti i suoi titoli. */
+@Composable
+private fun CatTile(c: ProviderCat, modifier: Modifier, restore: Boolean, onClick: () -> Unit) {
+    val me = remember { FocusRequester() }
+    // Tornando dalla categoria il focus riparte da qui.
+    if (restore) LaunchedEffect(Unit) { Saved.focusAll = null; delay(60); runCatching { me.requestFocus() } }
+    Column(
+        modifier.height(96.dp).focusRequester(me)
+            .tvClickable(background = if (Skin.metro) C.Accent else C.Surface, onClick = onClick)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(if (c.isMovie) Icons.Default.Movie else Icons.Default.Tv, null, tint = if (Skin.metro) Color.White else C.Text2, modifier = Modifier.size(20.dp))
+            Box(Modifier.weight(1f))
+            Text(c.count.toString(), color = if (Skin.metro) Color.White else C.Text3, fontSize = 13.sp)
+        }
+        Text(c.name, color = C.Text, fontWeight = if (Skin.metro) FontWeight.Normal else FontWeight.SemiBold, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 

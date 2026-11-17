@@ -123,10 +123,11 @@ function DiscoverHome() {
   // TMDB lists still on their way: pulsing tiles in their place, the rest of the page is already usable.
   const tmdbPending = matched == null && !error
 
-  const providerRows = [
-    ...(filter !== 'tv' && movies ? movies.categories.map((c) => ({ kind: 'movie' as Kind, id: c.id, name: c.name })) : []),
-    ...(filter !== 'movie' && series ? series.categories.map((c) => ({ kind: 'tv' as Kind, id: c.id, name: c.name })) : []),
-  ]
+  // The provider's categories: a grid of tiles (name and how many titles), empty ones left out.
+  const providerCats = [
+    ...(filter !== 'tv' && movies ? movies.categories.map((c) => ({ kind: 'movie' as Kind, id: c.id, name: c.name, count: movies.byCategory.get(c.id)?.length ?? 0 })) : []),
+    ...(filter !== 'movie' && series ? series.categories.map((c) => ({ kind: 'tv' as Kind, id: c.id, name: `${c.name} · Serie`, count: series.byCategory.get(c.id)?.length ?? 0 })) : []),
+  ].filter((c) => c.count > 0)
   const tmdbRows = (matched ?? []).map((r) => ({ ...r, titles: r.titles.filter(pass) })).filter((r) => r.titles.length >= (r.top ? 5 : 4))
 
   return (
@@ -170,7 +171,19 @@ function DiscoverHome() {
       )}
 
       <div style={{ color: 'var(--text)', fontSize: wide ? 24 : 20, fontWeight: 800, padding: `${wide ? 44 : 32}px 2px 0` }}>Le categorie della lista</div>
-      {providerRows.map((c) => <CategoryRow key={c.kind + c.id} kind={c.kind} catId={c.id} name={c.name} />)}
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${wide ? 200 : 150}px, 1fr))`, gap: wide ? 14 : 10, padding: '14px 2px 0' }}>
+        {providerCats.map((c) => (
+          <Clickable key={c.kind + c.id} onClick={() => openCategory('Discover', `${c.kind === 'movie' ? 'm' : 's'}:${c.id}`)}
+            style={{ height: 96, padding: 14, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <Icon name={c.kind === 'movie' ? 'movie' : 'tv'} size={20} color="var(--text2)" />
+              <div style={{ flex: 1 }} />
+              <div style={{ color: 'var(--text3)', fontSize: 13 }}>{c.count}</div>
+            </div>
+            <div className="clamp2" style={{ color: 'var(--text)', fontWeight: 600, fontSize: 15, lineHeight: '20px' }}>{c.name}</div>
+          </Clickable>
+        ))}
+      </div>
 
       <CategoriesDialog open={categories} filter={filter} onDismiss={() => setCategories(false)} />
       <AlertDialog open={remove != null} title={remove?.from === 'list' ? 'Rimuovere dalla mia lista?' : 'Rimuovere da Continua a guardare?'}
@@ -297,32 +310,6 @@ function WideTile({ t, known, onLong }: { t: Title; known?: Tmdb; onLong: () => 
       <div className="ellipsis" style={{ marginTop: 6, color: 'var(--text)', fontSize: 13, fontWeight: 600 }}>{tm?.title || nameOf(t)}</div>
       <div className="ellipsis" style={{ color: 'var(--text3)', fontSize: 12 }}>{t.kind === 'movie' ? 'Film' : le ? 'Serie TV · riprendi l\'episodio' : 'Serie TV'}</div>
     </Clickable>
-  )
-}
-
-/** A category of the provider: drawn only when it gets near the screen. */
-function CategoryRow({ kind, catId, name }: { kind: Kind; catId: string; name: string }) {
-  const wide = useWide()
-  const ref = useRef<HTMLDivElement>(null)
-  const [seen, setSeen] = useState(false)
-  useEffect(() => {
-    const el = ref.current
-    if (!el || seen) return
-    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setSeen(true); o.disconnect() } }, { rootMargin: '600px 0px' })
-    o.observe(el)
-    return () => o.disconnect()
-  }, [seen])
-  const titles = useMemo<Title[]>(() => !seen ? []
-    : kind === 'movie' ? moviesFor(catId).slice(0, 30).map((e) => ({ kind: 'movie', entry: e, tmdb: null }))
-      : seriesFor(catId).slice(0, 30).map((e) => ({ kind: 'tv', entry: e, tmdb: null })), [seen, app.movies, app.series, app.positionsVersion])
-  return (
-    <div ref={ref} style={{ minHeight: seen ? undefined : wide ? 300 : 230 }}>
-      {titles.length > 0 && (
-        <Row title={`${name}${kind === 'tv' ? ' · Serie' : ''}`} captions onAll={() => openCategory('Discover', `${kind === 'movie' ? 'm' : 's'}:${catId}`)}>
-          {titles.map((t) => <PosterTile key={keyOf(t)} t={t} caption />)}
-        </Row>
-      )}
-    </div>
   )
 }
 

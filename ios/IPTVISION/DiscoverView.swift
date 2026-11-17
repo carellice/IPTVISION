@@ -162,12 +162,20 @@ struct DiscoverView: View {
                         .font(.subheadline).foregroundStyle(.secondary).padding(.horizontal)
                 }
                 Text("Le categorie della lista").font(.title2.weight(.heavy)).padding(.horizontal).padding(.top, 18)
-                if filter != .series {
-                    ForEach(movies.categories) { c in CategoryTitles(category: DiscoverCategory(movies: true, id: c.id), name: c.name) }
+                // Le categorie della lista a griglia (nome e quanti titoli): toccandone una si aprono tutti i suoi titoli.
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                    if filter != .series {
+                        ForEach(movies.categories) { c in
+                            CategoryTile(category: DiscoverCategory(movies: true, id: c.id), name: c.name, count: movies.byCategory[c.id]?.count ?? 0)
+                        }
+                    }
+                    if filter != .movies {
+                        ForEach(series.categories) { c in
+                            CategoryTile(category: DiscoverCategory(movies: false, id: c.id), name: c.name + " · Serie", count: series.byCategory[c.id]?.count ?? 0)
+                        }
+                    }
                 }
-                if filter != .movies {
-                    ForEach(series.categories) { c in CategoryTitles(category: DiscoverCategory(movies: false, id: c.id), name: c.name + " · Serie") }
-                }
+                .padding(.horizontal)
             }
             .padding(.vertical)
         }
@@ -408,18 +416,29 @@ private struct WideTile: View {
     }
 }
 
-/// Una categoria della lista: i primi 30 titoli e "Vedi tutto".
-private struct CategoryTitles: View {
-    @EnvironmentObject var model: AppModel
+/// Una categoria della lista: nome e quanti titoli; si apre con tutti i suoi titoli. Vuota, non compare.
+private struct CategoryTile: View {
     let category: DiscoverCategory
     let name: String
+    let count: Int
 
     var body: some View {
-        let titles: [DiscoverTitle] = category.movies
-            ? model.movieEntries(category.id).prefix(30).map { DiscoverTitle(movie: $0) }
-            : model.seriesEntries(category.id).prefix(30).map { DiscoverTitle(show: $0) }
-        if !titles.isEmpty {
-            TitleRow(title: name, all: category, captions: true) { ForEach(titles) { PosterTile(title: $0, caption: true) } }
+        if count > 0 {
+            NavigationLink(value: category) {
+                VStack(alignment: .leading) {
+                    HStack {
+                        Image(systemName: category.movies ? "film" : "tv").foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(count)").font(.footnote).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Text(name).font(.subheadline.weight(.semibold)).lineLimit(2).multilineTextAlignment(.leading)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, minHeight: 96, maxHeight: 96, alignment: .leading)
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.corner(12)))
+            }
+            .buttonStyle(.plain)
         }
     }
 }

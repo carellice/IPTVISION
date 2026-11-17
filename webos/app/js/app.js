@@ -1053,8 +1053,11 @@
     });
     if (rows && !tmdbRows.length && !A.tmdbError) all.push({ note: 'Nessun titolo di TMDB trovato nel catalogo: sotto ci sono le categorie della lista.' });
     all.push({ heading: 'Le categorie della lista' });
-    if (discoverFilter !== 'tv') M.cats.forEach(function (c) { all.push({ title: c.name, cat: 'm:' + c.id }); });
-    if (discoverFilter !== 'movie') SR.cats.forEach(function (c) { all.push({ title: c.name + ' · Serie', cat: 's:' + c.id }); });
+    // Le categorie della lista a griglia (nome e quanti titoli): scelta una, tutti i suoi titoli.
+    var catGrid = [];
+    if (discoverFilter !== 'tv') M.cats.forEach(function (c) { catGrid.push({ id: 'm:' + c.id, name: c.name, count: ((M.by || {})[c.id] || []).length }); });
+    if (discoverFilter !== 'movie') SR.cats.forEach(function (c) { catGrid.push({ id: 's:' + c.id, name: c.name + ' · Serie', count: ((SR.by || {})[c.id] || []).length }); });
+    all.push({ catGrid: catGrid.filter(function (c) { return c.count > 0; }) });
 
     var shown = 0;
     function more() {
@@ -1065,6 +1068,15 @@
     function rowBox(r, i) {
       if (r.note) return h('div', { class: 'dim', style: 'margin:1rem 0', text: r.note });
       if (r.heading) return h('div', { class: 'page-title', style: 'margin-top:2rem', text: r.heading });
+      if (r.catGrid) {
+        var grid = h('div', { class: 'tiles', style: 'margin:0.4rem 0 0 -0.45rem' });
+        r.catGrid.forEach(function (c) {
+          var el = V.categoryTile(c, function () { A.discoverFrom = c.id; A.openCat.Discover = c.id; render(); });
+          el.dataset.key = 'all-' + c.id;
+          grid.appendChild(el);
+        });
+        return grid;
+      }
       var titles = r.titles;
       if (r.cat) {
         var id = r.cat.slice(2);

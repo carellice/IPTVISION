@@ -1742,6 +1742,28 @@
                             <TextBlock Text="{Binding Text}" FontSize="24" FontWeight="ExtraBold" Margin="30,44,28,0" TextWrapping="Wrap" />
                         </DataTemplate>
 
+                        <!-- Le categorie della lista a griglia: nome e quanti titoli, un clic apre tutti i titoli della categoria. -->
+                        <DataTemplate DataType="{x:Type vm:DiscoverCatGrid}">
+                            <ItemsControl ItemsSource="{Binding Cats}" Focusable="False" Margin="24,14,24,0">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource DiscoverTile}" ToolTip="{Binding Name}" Margin="0,0,10,10"
+                                                Command="{Binding DataContext.OpenDiscoverCatCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                                            <Grid Width="210" Height="96">
+                                                <Rectangle RadiusX="10" RadiusY="10" Fill="{StaticResource SurfaceBrush}" />
+                                                <Grid Margin="14">
+                                                    <TextBlock Text="{Binding Icon}" Style="{StaticResource Icon}" FontSize="18" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                                                    <TextBlock Text="{Binding Count}" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                                                    <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="40" VerticalAlignment="Bottom" />
+                                                </Grid>
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </DataTemplate>
+
                         <!-- Una riga: titolo, "Vedi tutto" e i riquadri che scorrono di lato con le frecce. -->
                         <DataTemplate DataType="{x:Type vm:DiscoverRow}">
                             <StackPanel Margin="0,22,0,0">

@@ -110,6 +110,15 @@ public sealed class DiscoverRow(string title, IReadOnlyList<DiscoverTile> tiles)
     public bool HasAll => All != null;
 }
 
+/// <summary>Una categoria della lista nella griglia in fondo: nome e quanti titoli; si apre con tutti i suoi titoli.</summary>
+public sealed record DiscoverCat(string Name, int Count, LibraryMode Mode, string Id)
+{
+    public string Icon => Mode == LibraryMode.Series ? "" : "";
+}
+
+/// <summary>Le categorie della lista a griglia, al posto delle righe che scorrono di lato.</summary>
+public sealed class DiscoverCatGrid(IReadOnlyList<DiscoverCat> cats) { public IReadOnlyList<DiscoverCat> Cats { get; } = cats; }
+
 /// <summary>Il titolo "Le categorie della lista" tra le righe.</summary>
 public sealed class DiscoverHeading(string text) { public string Text { get; } = text; }
 
@@ -410,18 +419,18 @@ public sealed partial class MainViewModel
             items.Add(new DiscoverHeading("Nessun titolo di TMDB trovato nel catalogo: sotto ci sono le categorie della lista."));
 
         items.Add(new DiscoverHeading("Le categorie della lista"));
+        var cats = new List<DiscoverCat>();
         if (_discoverFilter != "tv")
-            foreach (var c in _vodCats)
-            {
-                var list = _movies.Where(m => m.CategoryId == c.Id).DistinctBy(m => TextHelpers.VariantKey(m.Name)).Take(30).Select(m => Tile(m, caption: true)).ToList();
-                if (list.Count > 0) items.Add(new DiscoverRow(c.Name, list) { All = (LibraryMode.Movies, c.Id) });
-            }
+        {
+            var n = _movies.GroupBy(m => m.CategoryId ?? "").ToDictionary(g => g.Key, g => g.Count());
+            cats.AddRange(_vodCats.Where(c => n.GetValueOrDefault(c.Id) > 0).Select(c => new DiscoverCat(c.Name, n[c.Id], LibraryMode.Movies, c.Id)));
+        }
         if (_discoverFilter != "movie")
-            foreach (var c in _seriesCats)
-            {
-                var list = _series.Where(s => s.CategoryId == c.Id).DistinctBy(s => TextHelpers.VariantKey(s.Name)).Take(30).Select(s => Tile(s, caption: true)).ToList();
-                if (list.Count > 0) items.Add(new DiscoverRow(c.Name + " · Serie", list) { All = (LibraryMode.Series, c.Id) });
-            }
+        {
+            var n = _series.GroupBy(s => s.CategoryId ?? "").ToDictionary(g => g.Key, g => g.Count());
+            cats.AddRange(_seriesCats.Where(c => n.GetValueOrDefault(c.Id) > 0).Select(c => new DiscoverCat(c.Name + " · Serie", n[c.Id], LibraryMode.Series, c.Id)));
+        }
+        items.Add(new DiscoverCatGrid(cats));
 
         DiscoverItems = items;
         OnPropertyChanged(nameof(DiscoverMovieCategories));
@@ -454,6 +463,9 @@ public sealed partial class MainViewModel
         // Tornando a "Film e serie" la pagina è ancora allo stesso punto: le righe non si rifanno.
         OpenDiscoverCategory(a.Mode, a.Id);
     }
+
+    [RelayCommand]
+    private void OpenDiscoverCat(DiscoverCat? c) { if (c != null) OpenDiscoverCategory(c.Mode, c.Id); }
 
     [RelayCommand]
     private void OpenDiscoverMovieCategory(string? id) => OpenDiscoverCategory(LibraryMode.Movies, id ?? CategoryItem.AllId);
