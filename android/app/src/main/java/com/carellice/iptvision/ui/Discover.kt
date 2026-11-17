@@ -81,6 +81,9 @@ import com.carellice.iptvision.data.groupVariants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.lazy.LazyItemScope
@@ -728,6 +731,45 @@ private fun BoxScope.LoadingBadge(vm: AppViewModel, extra: String?) {
                 CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
                 Text(text ?: shown, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
             }
+        }
+    }
+}
+
+// ---------- La mia lista ----------
+
+/** Con la chiave TMDB: film e serie aggiunti con +, in una pagina tutta loro e nell'ordine in cui li hai aggiunti. */
+@Composable
+fun MyListSection(vm: AppViewModel) {
+    val wide = LocalWide.current
+    val movies = vm.movies
+    val series = vm.series
+    if (movies == null && series == null) {
+        if (vm.moviesLoading) DownloadProgress("Caricamento film…", vm.moviesProgress) else Loading("Caricamento della tua lista…")
+        return
+    }
+    val list = remember(movies, series, vm.positionsVersion) {
+        val order = vm.positions.myList().withIndex().associate { it.value to it.index }
+        (vm.moviesFor(MYLIST_ID).map { it.title() } + vm.seriesFor(MYLIST_ID).map { it.title() })
+            .sortedBy { t -> order[t.key] ?: Int.MAX_VALUE }
+    }
+    var remove by remember { mutableStateOf<Title?>(null) }
+    Column(Modifier.fillMaxSize()) {
+        Text("La mia lista", color = C.Text, fontSize = if (wide) 28.sp else 22.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(start = 2.dp))
+        Text(if (list.size == 1) "1 titolo" else "${list.size} titoli", color = C.Text2, fontSize = 14.sp, modifier = Modifier.padding(start = 2.dp, top = 2.dp, bottom = 8.dp))
+        if (list.isEmpty()) Empty("La lista è vuota: aggiungi film e serie con + dalla loro scheda.")
+        else LazyVerticalGrid(
+            GridCells.Adaptive(if (wide) 160.dp else 116.dp), Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 2.dp, end = 2.dp, top = 10.dp, bottom = 30.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (wide) 18.dp else 14.dp),
+        ) {
+            gridItems(list, key = { it.key }) { t -> PosterTile(vm, t, null, lookup = true, caption = true) { remove = t } }
+        }
+    }
+    remove?.let { t ->
+        RemoveContinueDialog(t.name, true, { remove = null }) {
+            remove = null
+            if (t.movie != null) vm.toggleMyList(t.movie.item) else vm.toggleMyList(t.show!!.item)
         }
     }
 }

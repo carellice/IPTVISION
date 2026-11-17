@@ -45,6 +45,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
@@ -105,6 +106,7 @@ private fun Section.icon(): ImageVector = when (this) {
     Section.Movies -> Icons.Default.Movie
     Section.Series -> Icons.Default.ViewModule
     Section.Discover -> Icons.Default.Theaters
+    Section.MyList -> Icons.Default.Bookmark
     Section.Search -> Icons.Default.Search
     Section.Downloads -> Icons.Default.Download
     Section.Settings -> Icons.Default.Settings
@@ -123,6 +125,7 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
     LaunchedEffect(vm.section) {
         if (vm.section == Section.Movies) vm.ensureMovies()
         if (vm.section == Section.Series) vm.ensureSeries()
+        if (vm.section == Section.MyList) { vm.ensureMovies(); vm.ensureSeries() }
     }
     BoxWithConstraints(Modifier.fillMaxSize().material(C.Bg)) {
         val wide = maxWidth >= 720.dp
@@ -197,6 +200,7 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
 private fun navLabel(s: Section) = when (s) {
     Section.Live -> "TV"
     Section.Discover -> "Film/serie"
+    Section.MyList -> "Lista"
     Section.Settings -> "Altro"
     else -> s.title
 }
@@ -280,6 +284,7 @@ private fun Content(vm: AppViewModel, onVoiceSearch: () -> Unit, section: Sectio
         Section.Movies -> MoviesSection(vm)
         Section.Series -> SeriesSection(vm)
         Section.Discover -> DiscoverSection(vm)
+        Section.MyList -> MyListSection(vm)
         Section.Search -> SearchSection(vm, onVoiceSearch)
         Section.Downloads -> DownloadsSection(vm)
         Section.Settings -> SettingsSection(vm)

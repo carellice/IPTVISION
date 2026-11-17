@@ -52,7 +52,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-enum class Section(val title: String) { Live("TV in diretta"), Movies("Film"), Series("Serie TV"), Discover("Film e serie"), Search("Cerca"), Downloads("Download"), Settings("Impostazioni") }
+enum class Section(val title: String) { Live("TV in diretta"), Movies("Film"), Series("Serie TV"), Discover("Film e serie"), MyList("La mia lista"), Search("Cerca"), Downloads("Download"), Settings("Impostazioni") }
 
 enum class ListSort(val label: String) {
     Default("Predefinito"), Number("Numero"), NameAsc("Nome (A-Z)"), NameDesc("Nome (Z-A)"),
@@ -119,7 +119,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val sections: List<Section>
         get() = Section.entries.filter {
             (it != Section.Downloads || !isTv) &&
-                if (hasTmdb) it != Section.Movies && it != Section.Series else it != Section.Discover
+                if (hasTmdb) it != Section.Movies && it != Section.Series else it != Section.Discover && it != Section.MyList
         }
 
     // ---------- TMDB ----------
@@ -139,7 +139,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         tmdbJob?.cancel(); tmdbJob = null
         discoverOpen = null
         if (hasTmdb && (section == Section.Movies || section == Section.Series)) section = Section.Discover
-        else if (!hasTmdb && section == Section.Discover) section = Section.Movies
+        else if (!hasTmdb && (section == Section.Discover || section == Section.MyList)) section = Section.Movies
     }
 
     /** Le righe di TMDB, chieste una volta per chiave. */
@@ -194,7 +194,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (screen == Screen.Home && openCategory(section) != null) { closeCategory(section); return true }
         // TV, "Film e serie": Indietro riapre il menu a sinistra; un altro Indietro torna alla TV in diretta.
-        if (isTv && screen == Screen.Home && section == Section.Discover && !menuFocused) { focusMenu++; return true }
+        if (isTv && screen == Screen.Home && (section == Section.Discover || section == Section.MyList) && !menuFocused) { focusMenu++; return true }
         if (screen == Screen.Home && section != Section.Live) { section = Section.Live; return true }
         return false
     }
