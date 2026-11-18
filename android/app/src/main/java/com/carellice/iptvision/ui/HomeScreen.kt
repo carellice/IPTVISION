@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
@@ -141,9 +142,14 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                 // quando ci arriva il focus, come nelle app di streaming. Sempre lo stesso SideNav, così il focus non si perde.
                 val rail = vm.isTv
                 var focused by remember { mutableStateOf(false) }
+                // Telefono e tablet: il menu si chiude a sole icone col pulsante ☰ e lascia spazio ai contenuti.
+                var navOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
+                val navW by androidx.compose.animation.core.animateDpAsState(
+                    if (rail || !navOpen) RailWidth else NavWidth, tween(220, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "nav",
+                )
                 Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().onFocusChanged { focused = it.hasFocus }) {
                 Row(Modifier.fillMaxSize()) {
-                    Box(Modifier.width(if (rail) RailWidth else NavWidth))
+                    Box(Modifier.width(navW))
                     if (vm.section == Section.Discover) {
                         Column(Modifier.weight(1f).fillMaxHeight()) {
                             androidx.compose.runtime.CompositionLocalProvider(LocalEdge provides 24.dp) { Content(vm, onVoiceSearch) }
@@ -153,7 +159,7 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                     }
                 }
                     // Telefono in orizzontale: largo ma basso, il menu scorre e l'orologio sparisce.
-                    SideNav(vm, compact = short, rail = rail, homeFocused = { focused })
+                    SideNav(vm, compact = short, rail = rail, homeFocused = { focused }, collapsed = !navOpen, onToggle = { navOpen = !navOpen })
                 }
             } else {
                 Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -300,7 +306,7 @@ private val RailWidth = 76.dp
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false, homeFocused: () -> Boolean = { false }) {
+private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false, homeFocused: () -> Boolean = { false }, collapsed: Boolean = false, onToggle: () -> Unit = {}) {
     val first = remember { FocusRequester() }
     // All'avvio il focus va al menu; tornando da una scheda o dal player solo se la sezione non l'ha già rimesso dov'era.
     // Il focus chiesto da qui (avvio, Indietro) apre il menu; quello arrivato da solo no (vedi onFocusChanged).
@@ -310,7 +316,7 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false, h
     LaunchedEffect(vm.focusMenu) { if (vm.focusMenu > 0) { asked[0] = true; runCatching { first.requestFocus() } } }
     // Scelta una voce, il menu si chiude subito e resta chiuso finché il focus non ci torna.
     var closed by remember { mutableStateOf(false) }
-    val open = !rail || (inside && !closed)
+    val open = if (rail) inside && !closed else !collapsed
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     // Apertura fluida: scritte e orologio restano composti (solo trasparenti), la larghezza cambia in fase di layout:
@@ -368,7 +374,10 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false, h
     ) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 6.dp, top = if (compact) 0.dp else 8.dp, bottom = if (compact) 6.dp else 18.dp)) {
-                Image(painterResource(R.drawable.logo), null, Modifier.size(34.dp).clip(skinCorners(8.dp)))
+                if (rail) Image(painterResource(R.drawable.logo), null, Modifier.size(34.dp).clip(skinCorners(8.dp)))
+                else Box(Modifier.size(34.dp).tvClickable(shape = androidx.compose.foundation.shape.CircleShape, background = Color.Transparent, onClick = onToggle), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Menu, if (open) "Chiudi menu" else "Apri menu", tint = C.Text, modifier = Modifier.size(24.dp))
+                }
                 HSpace(10.dp)
                 Text("IPTVISION", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 19.sp, maxLines = 1, softWrap = false, modifier = fade)
             }

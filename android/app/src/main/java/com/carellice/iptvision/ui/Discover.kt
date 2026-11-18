@@ -279,6 +279,8 @@ private fun DiscoverHome(vm: AppViewModel) {
     val state = rememberLazyListState(Saved.index, Saved.offset)
     DisposableEffect(Unit) { onDispose { Saved.index = state.firstVisibleItemIndex; Saved.offset = state.firstVisibleItemScrollOffset } }
     val gap = if (wide) 26.dp else 20.dp
+    // Telefono in orizzontale (largo ma basso): 4 colonne di categorie, con 5 i nomi non si leggevano.
+    val cols = if (!wide) 2 else if (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 500) 4 else 5
 
     val chips = @Composable { m: Modifier ->
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 2.dp), modifier = m) {
@@ -340,7 +342,6 @@ private fun DiscoverHome(vm: AppViewModel) {
         item("cats") {
             Text("Le categorie della lista", color = C.Text, fontSize = if (wide) 24.sp else 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = if (wide) 44.dp else 32.dp, start = edge + 2.dp))
         }
-        val cols = if (wide) 5 else 2
         items(providerCats.chunked(cols), key = { r -> "c:" + r.first().key }) { row ->
             Row(Modifier.padding(start = edge + 2.dp, end = edge + 2.dp, top = if (wide) 14.dp else 10.dp), horizontalArrangement = Arrangement.spacedBy(if (wide) 14.dp else 10.dp)) {
                 row.forEach { c ->
