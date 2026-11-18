@@ -1457,6 +1457,8 @@
                     <!-- Riquadro senza cornice che si ingrandisce sotto il mouse; col focus prende il bordo bianco. -->
                     <Style x:Key="DiscoverTile" TargetType="Button">
                         <Setter Property="Cursor" Value="Hand" />
+                        <!-- Senza, i testi sotto la locandina prendono il nero di sistema dei Button: illeggibili sul fondo scuro. -->
+                        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
                         <Setter Property="Margin" Value="0,0,10,0" />
                         <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
                         <Setter Property="RenderTransform"><Setter.Value><ScaleTransform /></Setter.Value></Setter>
