@@ -53,7 +53,7 @@ function PinDialog({ profile, onClose, onPin, title }: { profile: Profile | null
   }
   return (
     <FormDialog open={profile != null} onClose={close} title={title ?? `PIN di ${profile?.name ?? ''}`}>
-      <TextField value={pin} onChange={(v) => setPin(v.replace(/\D/g, '').slice(0, 8))} label="PIN" type="password" autoComplete="off" onDone={done} autoFocus />
+      <TextField value={pin} onChange={(v) => setPin(v.replace(/\D/g, '').slice(0, 8))} label="PIN" type="password" inputMode="numeric" autoComplete="off" onDone={done} autoFocus />
       {error && <div style={{ color: 'var(--danger)', fontSize: 14 }}>{error}</div>}
       <ActionButton text="Conferma" primary onClick={done} style={{ width: '100%' }} />
     </FormDialog>

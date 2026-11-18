@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Collections.ObjectModel;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -216,7 +217,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void AutoPlay()
     {
-        if (!_settings.AutoPlayLastChannel || CurrentChannel != null || IsVod) return;
+        if (!_settings.AutoPlayLastChannel || CurrentChannel != null || IsVod || _profilesPending || IsProfilePickerOpen) return;
         if (_settings.LastStreamId is int id && _byId.TryGetValue(id, out var ch)) PlayChannel(ch);
     }
 
@@ -825,6 +826,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             OnPropertyChanged();
             ScheduleSave();
             ReapplyHidden();
+            // Col server di casa vale per il profilo in uso.
+            QueueServerOp(new JsonObject { ["op"] = "hideAdult", ["on"] = value }, now: true);
         }
     }
 

@@ -41,7 +41,13 @@ public sealed partial class MainViewModel
         _serverTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _serverTimer.Tick += (_, _) => { _ = FlushServerOpsAsync(); _ = PullServerAsync(); _ = LoadServerNetworkAsync(); };
         _serverTimer.Start();
-        if (IsHomeServer) { _ = PullServerAsync(force: true); _ = LoadServerNetworkAsync(); }
+        if (IsHomeServer)
+        {
+            _profilesPending = true;
+            _ = LoadProfilesAsync(atStart: true);
+            _ = PullServerAsync(force: true);
+            _ = LoadServerNetworkAsync();
+        }
     }
 
     /// <summary>Se il server di casa esce su Internet con la VPN o no, con paese e indirizzo.</summary>
@@ -132,6 +138,13 @@ public sealed partial class MainViewModel
             if (key != (_settings.TmdbKey ?? "")) ApplyTmdbKey(key);
         }
         else if (HasOwnTmdb) QueueServerOp(new JsonObject { ["op"] = "tmdbKey", ["key"] = _settings.TmdbKey }, now: true);
+        // "Nascondi XXX" è del profilo: senza QueueServerOp, che lo rimanderebbe indietro.
+        if (state["hideAdult"] is JsonValue h && h.TryGetValue<bool>(out var hide) && hide != _settings.HideAdult)
+        {
+            _settings.HideAdult = hide;
+            OnPropertyChanged(nameof(HideAdult));
+            ReapplyHidden();
+        }
     }
 
     /// <summary>
@@ -191,6 +204,7 @@ public sealed partial class MainViewModel
             IsServerLogin = false;
             ServerStatus = "Canali, film e serie passano dal server.";
             _ = LoadServerNetworkAsync();
+            _ = LoadProfilesAsync(atStart: true);
             await InitializeAsync();
         }
         catch (Exception ex) when (ex is ServerException or XtreamException)

@@ -1156,6 +1156,12 @@
                                                     <Ellipse Width="7" Height="7" Fill="{Binding ServerNetworkColor}" VerticalAlignment="Center" />
                                                     <TextBlock Text="{Binding ServerNetwork}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="7,0,0,0" />
                                                 </StackPanel>
+                                                <DockPanel Margin="0,0,0,10" Visibility="{Binding HasProfiles, Converter={StaticResource BoolToVis}}">
+                                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Cambia profilo" Command="{Binding ChangeProfileCommand}" />
+                                                    <TextBlock VerticalAlignment="Center" FontSize="13">
+                                                        <Run Text="Profilo:" Foreground="{StaticResource TextSecondaryBrush}" /> <Run Text="{Binding CurrentProfileName, Mode=OneWay}" FontWeight="SemiBold" />
+                                                    </TextBlock>
+                                                </DockPanel>
                                                 <WrapPanel>
                                                     <Button Style="{StaticResource SecondaryButton}" Content="Aggiorna ora" Command="{Binding PullServerCommand}" Margin="0,0,8,0" />
                                                     <Button Style="{StaticResource SecondaryButton}" Content="Scollega il server" Command="{Binding DisconnectServerCommand}" />
@@ -2661,6 +2667,72 @@
                                FontSize="12" Margin="0,12,0,0" />
                 </Grid>
             </Border>
+        </Grid>
+
+        <!-- ======================= Chi guarda? (profili del server di casa) ======================= -->
+        <Grid Grid.Row="1" Panel.ZIndex="60" Background="{StaticResource BgBrush}"
+              Visibility="{Binding IsProfilePickerOpen, Converter={StaticResource BoolToVis}}">
+            <Grid.Resources>
+                <Style x:Key="ProfileTile" TargetType="Button">
+                    <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                    <Setter Property="Cursor" Value="Hand" />
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Frame" Background="Transparent" BorderBrush="Transparent" BorderThickness="2" CornerRadius="12" Padding="4">
+                                    <ContentPresenter />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Frame" Property="Background" Value="{StaticResource SurfaceHoverBrush}" />
+                                    </Trigger>
+                                    <Trigger Property="IsKeyboardFocused" Value="True">
+                                        <Setter TargetName="Frame" Property="BorderBrush" Value="White" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Grid.Resources>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="760">
+                <TextBlock Text="Chi guarda?" FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,28" />
+                <ItemsControl ItemsSource="{Binding Profiles}" Focusable="False" HorizontalAlignment="Center"
+                              Visibility="{Binding IsPinStep, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel HorizontalAlignment="Center" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ServerProfile}">
+                            <Button Style="{StaticResource ProfileTile}" Margin="10" ToolTip="{Binding Name}"
+                                    Command="{Binding DataContext.ChooseProfileCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                                <StackPanel Width="120" Margin="6">
+                                    <Border Width="96" Height="96" CornerRadius="48" Background="{StaticResource SurfaceHoverBrush}" HorizontalAlignment="Center">
+                                        <TextBlock Text="{Binding Initial}" FontSize="40" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+                                        <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="100" />
+                                        <TextBlock Text="&#xE72E;" Style="{StaticResource Icon}" FontSize="12" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource TextTertiaryBrush}"
+                                                   Visibility="{Binding HasPin, Converter={StaticResource BoolToVis}}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <!-- PIN: il campo ha già il focus, si scrive subito. -->
+                <StackPanel Width="300" Visibility="{Binding IsPinStep, Converter={StaticResource BoolToVis}}">
+                    <TextBlock FontSize="15" HorizontalAlignment="Center" Margin="0,0,0,12" Foreground="{StaticResource TextSecondaryBrush}">
+                        <Run Text="PIN di" /> <Run Text="{Binding LockedProfile.Name, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
+                    </TextBlock>
+                    <PasswordBox x:Name="ProfilePinBox" Style="{StaticResource PasswordInput}" KeyDown="ProfilePinBox_KeyDown" />
+                    <Button Style="{StaticResource PrimaryButton}" Content="Conferma" Click="ProfilePin_Click" Margin="0,12,0,0"
+                            IsEnabled="{Binding ProfileBusy, Converter={StaticResource InvertBool}}" HorizontalAlignment="Stretch" />
+                </StackPanel>
+                <TextBlock Text="{Binding ProfileError}" Foreground="#FFB3BA" FontSize="13" HorizontalAlignment="Center" Margin="0,12,0,0"
+                           Visibility="{Binding ProfileError, Converter={StaticResource NullToVis}}" />
+                <TextBlock Text="Esc per tornare indietro" Foreground="{StaticResource TextTertiaryBrush}" FontSize="12" HorizontalAlignment="Center" Margin="0,24,0,0" />
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

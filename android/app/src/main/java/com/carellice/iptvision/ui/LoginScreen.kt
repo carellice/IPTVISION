@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -100,9 +101,18 @@ fun LoginScreen(vm: AppViewModel) {
 @Composable
 internal fun Field(
     value: String, onChange: (String) -> Unit, label: String, hint: String?, type: KeyboardType,
-    password: Boolean = false, done: (() -> Unit)? = null,
+    password: Boolean = false, done: (() -> Unit)? = null, autoFocus: Boolean = false,
 ) {
     val typing = rememberTvTyping()
+    val focus = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    // autoFocus: il campo è già pronto e la tastiera aperta (anche col telecomando), si scrive subito.
+    if (autoFocus) androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
+        runCatching { focus.requestFocus() }
+        typing.editing = true
+        keyboard?.show()
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -118,6 +128,7 @@ internal fun Field(
             focusedContainerColor = C.Panel, unfocusedContainerColor = C.Panel,
         ),
         modifier = Modifier.fillMaxWidth()
+            .focusRequester(focus)
             .tvTyping(typing)
             .dpadLeavable(),
     )

@@ -135,6 +135,16 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.QuizResults):
                 if (_vm.IsQuizOpen) FocusQuiz();
                 break;
+            case nameof(MainViewModel.LockedProfile):
+            case nameof(MainViewModel.IsProfilePickerOpen):
+                ProfilePinBox.Clear();
+                // PIN: il campo prende subito il focus, si scrive senza cliccarci.
+                if (_vm.LockedProfile != null) Dispatcher.BeginInvoke(() => { ProfilePinBox.Focus(); Keyboard.Focus(ProfilePinBox); }, DispatcherPriority.Input);
+                else if (!_vm.IsProfilePickerOpen) Focus();
+                break;
+            case nameof(MainViewModel.ProfileError):
+                if (_vm.ProfileError != null && _vm.LockedProfile != null) { ProfilePinBox.Clear(); ProfilePinBox.Focus(); }
+                break;
             case nameof(MainViewModel.IsDownloadsOpen):
                 if (_vm.IsDownloadsOpen && !_panelVisible) SetPanel(true, save: false);
                 break;
@@ -479,6 +489,13 @@ public partial class MainWindow : Window
         if (!_vm.IsLoggedIn) return false;
         var ctrl = mods.HasFlag(ModifierKeys.Control);
 
+        // "Chi guarda?": solo Esc; il resto va ai profili e al campo del PIN.
+        if (_vm.IsProfilePickerOpen)
+        {
+            if (key != Key.Escape) return false;
+            _vm.BackFromProfiles();
+            return true;
+        }
         if (_vm.IsVariantChooserOpen) return HandleVariantKey(key);
         if (_vm.IsQuizOpen && !_vm.IsTvMode) return HandleQuizKey(key);
 
@@ -1167,6 +1184,18 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Server di casa collegato dalle impostazioni, con un account IPTV già aperto.</summary>
+    private void ProfilePinBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        ProfilePin_Click(sender, e);
+    }
+
+    private async void ProfilePin_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm.LockedProfile is { } p && !_vm.ProfileBusy) await _vm.SwitchProfileAsync(p, ProfilePinBox.Password);
+    }
+
     private async void ConnectServer_Click(object sender, RoutedEventArgs e)
     {
         await _vm.ConnectServerAsync(ServerPasswordBox.Password);

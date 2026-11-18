@@ -222,7 +222,8 @@ export function state(): UserState {
     watched: (pdb.prepare('SELECT key FROM watched').all() as { key: string }[]).map((r) => r.key),
     lastEpisode,
     myList,
-    hideAdult: getProfileMeta('hideAdult') === '1',
+    // Acceso finché il profilo non lo spegne.
+    hideAdult: getProfileMeta('hideAdult') !== '0',
     // Never set: absent, so a device with its own key sends it; removed: "" and every device drops it.
     ...(getMeta('tmdbKey') ? { tmdbKey: getMeta('tmdbKey')! } : process.env.TMDB_KEY ? { tmdbKey: process.env.TMDB_KEY.trim() } : getMeta('tmdbKey') !== null ? { tmdbKey: '' } : {}),
     xtream: x ? { server: x.server, username: x.username } : null,

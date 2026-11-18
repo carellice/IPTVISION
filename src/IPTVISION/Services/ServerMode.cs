@@ -86,6 +86,14 @@ public static class ServerApi
     public static Task<JsonObject> NetworkAsync(string url, string token) =>
         CallAsync(url, HttpMethod.Get, "/api/network", token, null);
 
+    /// <summary>Profili dell'account: {"current", "profiles": [{id, name, hasPin}]}.</summary>
+    public static Task<JsonObject> ProfilesAsync(string url, string token) =>
+        CallAsync(url, HttpMethod.Get, "/api/profiles", token, null);
+
+    /// <summary>Questo PC passa al profilo <paramref name="id"/>; torna i profili e lo stato ("state") del nuovo.</summary>
+    public static Task<JsonObject> UseProfileAsync(string url, string token, int id, string pin) =>
+        CallAsync(url, HttpMethod.Post, $"/api/profiles/{id}/use", token, new JsonObject { ["pin"] = pin });
+
     public static async Task LogoutAsync(string url, string token)
     {
         try { await CallAsync(url, HttpMethod.Post, "/api/logout", token, new JsonObject()); }

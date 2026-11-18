@@ -33,7 +33,7 @@ enum AppSettings {
 
     /// Nasconde le categorie con "XXX" nel nome (canali, film e serie).
     static var hideAdult: Bool {
-        get { d.bool(forKey: "hideAdult") }
+        get { d.object(forKey: "hideAdult") as? Bool ?? true }
         set { d.set(newValue, forKey: "hideAdult") }
     }
 

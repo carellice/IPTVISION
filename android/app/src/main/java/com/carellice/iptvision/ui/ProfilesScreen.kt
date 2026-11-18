@@ -115,7 +115,7 @@ private fun PinDialog(vm: AppViewModel, title: String, onDismiss: () -> Unit, on
     var pin by remember { mutableStateOf("") }
     val done = { onPin(pin); pin = "" }
     FormDialog(title, onDismiss) {
-        Field(pin, { pin = digits(it) }, "PIN", null, KeyboardType.NumberPassword, password = true, done = done)
+        Field(pin, { pin = digits(it) }, "PIN", null, KeyboardType.NumberPassword, password = true, done = done, autoFocus = true)
         vm.profileError?.let { Text(it, color = C.Danger, fontSize = 14.sp) }
         if (vm.profileBusy) Loading(null, Modifier.fillMaxWidth().padding(8.dp))
         else ActionButton("Conferma", null, primary = true, modifier = Modifier.fillMaxWidth()) { done() }

@@ -96,7 +96,7 @@ export const app = {
   loginError: null as string | null,
 
   xtream: null as UserState['xtream'],
-  hideAdult: false,
+  hideAdult: true,
   favorites: new Set<number>(),
   /** "La mia lista": films ("m:{id}") and series ("s:{id}") with when they were added. */
   myList: {} as Record<string, number>,

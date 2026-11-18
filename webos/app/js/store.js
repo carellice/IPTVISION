@@ -20,7 +20,7 @@
     server: null, username: null, password: null,
     favorites: [], lastStreamId: null, lastCategoryId: null,
     outputFormat: 'ts', autoPlayLast: true, autoCheckUpdates: true,
-    sorts: {}, grids: { Movies: true, Series: true }, hideAdult: false,
+    sorts: {}, grids: { Movies: true, Series: true }, hideAdult: true,
     // Server di casa (IPTVISION su CasaOS): indirizzo, ultima revisione avuta e l'account IPTV di prima.
     homeServer: null, homeRevision: -1, own: null,
     // Liste IPTV salvate: { alias, server, username, password, expiresAt } (secondi Unix, null = nessuna scadenza).

@@ -47,7 +47,8 @@ public sealed partial class MainViewModel
     [ObservableProperty] private string _tvDate = "";
 
     public bool ShowTvLayer => IsTvMode && IsTvBrowsing;
-    public bool ShowVideo => !ShowTvLayer && !ShowDiscover;
+    // "Chi guarda?" sta sopra: il video è una finestra nativa e lo coprirebbe.
+    public bool ShowVideo => !ShowTvLayer && !ShowDiscover && !IsProfilePickerOpen;
     public bool IsTvSearchScreen => TvScreen == TvScreen.Search;
     public bool IsTvSeriesScreen => TvScreen == TvScreen.Series;
     public bool IsTvSearchZone => TvZone == TvZone.Search;

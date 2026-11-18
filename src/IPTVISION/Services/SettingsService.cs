@@ -26,7 +26,7 @@ public sealed class AppSettings
     public bool StartInTvMode { get; set; }
     public bool AutoCheckUpdates { get; set; } = true;
     /// <summary>Nasconde le categorie con "XXX" nel nome (canali, film e serie).</summary>
-    public bool HideAdult { get; set; }
+    public bool HideAdult { get; set; } = true;
     /// <summary>Stile grafico: "classic" (moderno), "skeuo" (skeuomorfico), "metro" (Modern UI), "dueffe" (Dueffe) o "nothing" (Nothing). Si applica all'avvio.</summary>
     public string Skin { get; set; } = "classic";
     /// <summary>Chiave API o token di TMDB: con questa film e serie diventano una sola schermata, "Film e serie".</summary>

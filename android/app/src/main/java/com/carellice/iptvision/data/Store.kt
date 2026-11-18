@@ -65,7 +65,7 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
 
     /** Nasconde le categorie con "XXX" nel nome (canali, film e serie). */
     var hideAdult: Boolean
-        get() = p.getBoolean("hideAdult", false)
+        get() = p.getBoolean("hideAdult", true)
         set(v) = p.edit().putBoolean("hideAdult", v).apply()
 
     /** Ordinamento scelto per una sezione ("Live", "Movies", "Series"). */

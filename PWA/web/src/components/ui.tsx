@@ -198,7 +198,7 @@ export function TextField({
   placeholder?: string
   type?: string
   autoComplete?: string
-  inputMode?: 'url' | 'text' | 'search'
+  inputMode?: 'url' | 'text' | 'search' | 'numeric'
   onDone?: () => void
   leading?: ReactNode
   trailing?: ReactNode
@@ -208,6 +208,13 @@ export function TextField({
 }) {
   const [focused, setFocused] = useState(false)
   const floating = focused || value !== ''
+  const input = useRef<HTMLInputElement>(null)
+  // autoFocus again after the dialog's entry animation: the field is ready to type into (and opens the keyboard where allowed).
+  useEffect(() => {
+    if (!autoFocus) return
+    const t = setTimeout(() => input.current?.focus(), 60)
+    return () => clearTimeout(t)
+  }, [autoFocus])
   return (
     <div style={{ position: 'relative', ...style }}>
       <div style={{
@@ -225,6 +232,7 @@ export function TextField({
             }}>{label}</label>
           )}
           <input
+            ref={input}
             value={value}
             type={type}
             autoComplete={autoComplete}
