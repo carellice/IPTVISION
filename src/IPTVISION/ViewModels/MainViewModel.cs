@@ -417,6 +417,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OpenSeries = null;
         IsSettingsOpen = false;
         IsDownloadsOpen = false;
+        // "TV" dal pannello: si lasciano "Film e serie" e "La mia lista".
+        if (value == LibraryMode.Live) { ShowDiscover = false; _myListOpen = false; }
         OnPropertyChanged(nameof(IsLiveMode));
         OnPropertyChanged(nameof(IsMoviesMode));
         OnPropertyChanged(nameof(IsSeriesMode));

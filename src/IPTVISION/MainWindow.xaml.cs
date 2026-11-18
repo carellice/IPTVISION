@@ -501,7 +501,10 @@ public partial class MainWindow : Window
         if (_vm.ShowDiscover && !ctrl)
         {
             if (key != Key.Escape) return false;
-            _vm.CloseDiscoverCommand.Execute(null);
+            // Il pannello resta in vista: Esc chiude prima impostazioni o download aperti lì.
+            if (_vm.IsSettingsOpen) _vm.IsSettingsOpen = false;
+            else if (_vm.IsDownloadsOpen) _vm.IsDownloadsOpen = false;
+            else _vm.CloseDiscoverCommand.Execute(null);
             return true;
         }
 

@@ -278,15 +278,6 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void CloseDiscover() => ShowDiscover = false;
 
-    /// <summary>"TV" dalla schermata "Film e serie": si torna ai canali.</summary>
-    [RelayCommand]
-    private void DiscoverToLive()
-    {
-        ShowDiscover = false;
-        _myListOpen = false;
-        Mode = LibraryMode.Live;
-    }
-
     [RelayCommand]
     private void SetDiscoverFilter(string? f)
     {

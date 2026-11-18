@@ -1449,8 +1449,8 @@
                 </Grid>
             </Border>
 
-            <!-- ==== Film e serie (con la chiave TMDB): come le app di streaming, sopra pannello e video ==== -->
-            <Grid x:Name="DiscoverLayer" Grid.ColumnSpan="2" Panel.ZIndex="20" Background="{StaticResource BgBrush}"
+            <!-- ==== Film e serie (con la chiave TMDB): come le app di streaming, sopra il video; il pannello a sinistra resta in vista ==== -->
+            <Grid x:Name="DiscoverLayer" Grid.Column="1" Panel.ZIndex="20" Background="{StaticResource BgBrush}"
                   Visibility="{Binding ShowDiscover, Converter={StaticResource BoolToVis}}">
                 <Grid.Resources>
                     <conv:RankGeometryConverter x:Key="RankGeometry" />
@@ -1654,12 +1654,6 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal">
-                        <Button Style="{StaticResource SecondaryButton}" Command="{Binding DiscoverToLiveCommand}" ToolTip="TV in diretta (Ctrl+1)" Margin="0,0,14,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
-                                <TextBlock Text="TV" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
                         <Border Background="{DynamicResource SegmentTrackBrush}" CornerRadius="10" Padding="2" Width="300">
                             <UniformGrid Columns="3">
                                 <RadioButton Style="{StaticResource SegmentButton}" GroupName="discover" Content="Tutto"
