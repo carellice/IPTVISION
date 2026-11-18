@@ -116,8 +116,26 @@ public sealed record DiscoverCat(string Name, int Count, LibraryMode Mode, strin
     public string Icon => Mode == LibraryMode.Series ? "" : "";
 }
 
-/// <summary>Le categorie della lista a griglia, al posto delle righe che scorrono di lato.</summary>
-public sealed class DiscoverCatGrid(IReadOnlyList<DiscoverCat> cats) { public IReadOnlyList<DiscoverCat> Cats { get; } = cats; }
+/// <summary>Le categorie della lista a griglia, al posto delle righe che scorrono di lato.
+/// Con film e serie insieme, un selettore Film / Serie TV ne mostra un tipo alla volta.</summary>
+public sealed partial class DiscoverCatGrid(IReadOnlyList<DiscoverCat> movies, IReadOnlyList<DiscoverCat> series, bool showSeries, Action<bool> remember) : ObservableObject
+{
+    public bool HasSwitch { get; } = movies.Count > 0 && series.Count > 0;
+    public bool ShowSeries => HasSwitch ? _showSeries : movies.Count == 0;
+    public bool ShowMovies => !ShowSeries;
+    public IReadOnlyList<DiscoverCat> Cats => ShowSeries ? series : movies;
+    private bool _showSeries = showSeries;
+
+    [RelayCommand]
+    private void SetKind(string? kind)
+    {
+        _showSeries = kind == "tv";
+        remember(_showSeries);
+        OnPropertyChanged(nameof(ShowSeries));
+        OnPropertyChanged(nameof(ShowMovies));
+        OnPropertyChanged(nameof(Cats));
+    }
+}
 
 /// <summary>Il titolo "Le categorie della lista" tra le righe.</summary>
 public sealed class DiscoverHeading(string text) { public string Text { get; } = text; }
@@ -134,6 +152,8 @@ public sealed partial class MainViewModel
     private List<Tmdb.Row>? _tmdbRows;
     private Task? _tmdbTask;
     private string _discoverFilter = "all";
+    /// <summary>Con "Tutto", le categorie della lista mostrate in fondo: false i film, true le serie.</summary>
+    private bool _catGridSeries;
 
     /// <summary>La chiave TMDB in uso (per i riquadri che chiedono la propria scheda).</summary>
     internal static string? TmdbKeyNow { get; private set; }
@@ -410,18 +430,18 @@ public sealed partial class MainViewModel
             items.Add(new DiscoverHeading("Nessun titolo di TMDB trovato nel catalogo: sotto ci sono le categorie della lista."));
 
         items.Add(new DiscoverHeading("Le categorie della lista"));
-        var cats = new List<DiscoverCat>();
+        List<DiscoverCat> movieCats = [], seriesCats = [];
         if (_discoverFilter != "tv")
         {
             var n = _movies.GroupBy(m => m.CategoryId ?? "").ToDictionary(g => g.Key, g => g.Count());
-            cats.AddRange(_vodCats.Where(c => n.GetValueOrDefault(c.Id) > 0).Select(c => new DiscoverCat(c.Name, n[c.Id], LibraryMode.Movies, c.Id)));
+            movieCats.AddRange(_vodCats.Where(c => n.GetValueOrDefault(c.Id) > 0).Select(c => new DiscoverCat(c.Name, n[c.Id], LibraryMode.Movies, c.Id)));
         }
         if (_discoverFilter != "movie")
         {
             var n = _series.GroupBy(s => s.CategoryId ?? "").ToDictionary(g => g.Key, g => g.Count());
-            cats.AddRange(_seriesCats.Where(c => n.GetValueOrDefault(c.Id) > 0).Select(c => new DiscoverCat(c.Name + " · Serie", n[c.Id], LibraryMode.Series, c.Id)));
+            seriesCats.AddRange(_seriesCats.Where(c => n.GetValueOrDefault(c.Id) > 0).Select(c => new DiscoverCat(c.Name, n[c.Id], LibraryMode.Series, c.Id)));
         }
-        items.Add(new DiscoverCatGrid(cats));
+        items.Add(new DiscoverCatGrid(movieCats, seriesCats, _catGridSeries, v => _catGridSeries = v));
 
         DiscoverItems = items;
         OnPropertyChanged(nameof(DiscoverMovieCategories));

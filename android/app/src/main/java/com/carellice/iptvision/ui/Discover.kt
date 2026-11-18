@@ -157,6 +157,8 @@ private fun TvRow(content: @Composable () -> Unit) {
 /** Dove si era quando si è aperto un titolo o una categoria, per tornare allo stesso punto. */
 private object Saved {
     var filter = Filter.All; var index = 0; var offset = 0
+    /** Con "Tutto": le categorie della lista mostrate in fondo, dei film o delle serie (mai insieme). */
+    var catSeries = false
     /** Fin dove era scorsa ogni riga, per titolo. */
     val rows = HashMap<String, Pair<Int, Int>>()
     /** La riga da cui si è aperto "Guarda tutto": al ritorno il focus torna lì. */
@@ -269,10 +271,12 @@ private fun DiscoverHome(vm: AppViewModel) {
         matched.orEmpty().map { (r, ts) -> r to ts.filter(::pass) }.filter { (r, ts) -> ts.size >= if (r.top) 5 else 4 }
     }
     // Le categorie della lista: riquadri a griglia (nome e quanti titoli), quelle vuote no.
-    val providerCats = buildList {
-        if (filter != Filter.Tv) movies.categories.forEach { c -> movies.byCategory[c.id]?.size?.takeIf { it > 0 }?.let { add(ProviderCat(true, c.id, c.name, it)) } }
-        if (filter != Filter.Movie) series.categories.forEach { c -> series.byCategory[c.id]?.size?.takeIf { it > 0 }?.let { add(ProviderCat(false, c.id, c.name + " · Serie", it)) } }
-    }
+    val movieCats = if (filter == Filter.Tv) emptyList() else movies.categories.mapNotNull { c -> movies.byCategory[c.id]?.size?.takeIf { it > 0 }?.let { ProviderCat(true, c.id, c.name, it) } }
+    val seriesCats = if (filter == Filter.Movie) emptyList() else series.categories.mapNotNull { c -> series.byCategory[c.id]?.size?.takeIf { it > 0 }?.let { ProviderCat(false, c.id, c.name, it) } }
+    // Con "Tutto" un selettore Film / Serie TV: le categorie di un tipo alla volta.
+    val catSwitch = movieCats.isNotEmpty() && seriesCats.isNotEmpty()
+    var catSeries by remember { mutableStateOf(Saved.catSeries) }
+    val providerCats = if (if (catSwitch) catSeries else movieCats.isEmpty()) seriesCats else movieCats
 
     // Liste di TMDB ancora in arrivo: al loro posto riquadri che pulsano, il resto della pagina è già usabile.
     val tmdbPending = matched == null && vm.tmdbError == null
@@ -341,6 +345,12 @@ private fun DiscoverHome(vm: AppViewModel) {
         }
         item("cats") {
             Text("Le categorie della lista", color = C.Text, fontSize = if (wide) 24.sp else 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = if (wide) 44.dp else 32.dp, start = edge + 2.dp))
+        }
+        if (catSwitch) item("catSwitch") {
+            Row(Modifier.padding(start = edge + 2.dp, top = if (wide) 14.dp else 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Pill("Film", !catSeries) { catSeries = false; Saved.catSeries = false }
+                Pill("Serie TV", catSeries) { catSeries = true; Saved.catSeries = true }
+            }
         }
         items(providerCats.chunked(cols), key = { r -> "c:" + r.first().key }) { row ->
             Row(Modifier.padding(start = edge + 2.dp, end = edge + 2.dp, top = if (wide) 14.dp else 10.dp), horizontalArrangement = Arrangement.spacedBy(if (wide) 14.dp else 10.dp)) {

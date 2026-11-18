@@ -1740,6 +1740,17 @@
 
                         <!-- Le categorie della lista a griglia: nome e quanti titoli, un clic apre tutti i titoli della categoria. -->
                         <DataTemplate DataType="{x:Type vm:DiscoverCatGrid}">
+                            <StackPanel>
+                            <!-- Con film e serie insieme: un tipo alla volta, mai mescolati. -->
+                            <Border Background="{DynamicResource SegmentTrackBrush}" CornerRadius="10" Padding="2" Width="220" HorizontalAlignment="Left" Margin="28,14,0,0"
+                                    Visibility="{Binding HasSwitch, Converter={StaticResource BoolToVis}}">
+                                <UniformGrid Columns="2">
+                                    <RadioButton Style="{StaticResource SegmentButton}" Content="Film"
+                                                 IsChecked="{Binding ShowMovies, Mode=OneWay}" Command="{Binding SetKindCommand}" CommandParameter="movie" />
+                                    <RadioButton Style="{StaticResource SegmentButton}" Content="Serie TV"
+                                                 IsChecked="{Binding ShowSeries, Mode=OneWay}" Command="{Binding SetKindCommand}" CommandParameter="tv" />
+                                </UniformGrid>
+                            </Border>
                             <ItemsControl ItemsSource="{Binding Cats}" Focusable="False" Margin="24,14,24,0">
                                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
@@ -1758,6 +1769,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            </StackPanel>
                         </DataTemplate>
 
                         <!-- Una riga: titolo, "Vedi tutto" e i riquadri che scorrono di lato con le frecce. -->

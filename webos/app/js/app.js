@@ -959,6 +959,8 @@
   // ---------- Film e serie (TMDB) ----------
 
   var discoverFilter = 'all';
+  // Con "Tutto": le categorie della lista in fondo, dei film o delle serie (mai insieme).
+  var discoverCatSeries = false;
 
   function loadTmdb() {
     var key = tmdbKey();
@@ -1054,10 +1056,11 @@
     if (rows && !tmdbRows.length && !A.tmdbError) all.push({ note: 'Nessun titolo di TMDB trovato nel catalogo: sotto ci sono le categorie della lista.' });
     all.push({ heading: 'Le categorie della lista' });
     // Le categorie della lista a griglia (nome e quanti titoli): scelta una, tutti i suoi titoli.
-    var catGrid = [];
-    if (discoverFilter !== 'tv') M.cats.forEach(function (c) { catGrid.push({ id: 'm:' + c.id, name: c.name, count: ((M.by || {})[c.id] || []).length }); });
-    if (discoverFilter !== 'movie') SR.cats.forEach(function (c) { catGrid.push({ id: 's:' + c.id, name: c.name + ' · Serie', count: ((SR.by || {})[c.id] || []).length }); });
-    all.push({ catGrid: catGrid.filter(function (c) { return c.count > 0; }) });
+    function catsOf(L, p) {
+      return L.cats.map(function (c) { return { id: p + c.id, name: c.name, count: ((L.by || {})[c.id] || []).length }; })
+        .filter(function (c) { return c.count > 0; });
+    }
+    all.push({ catGrid: { m: discoverFilter !== 'tv' ? catsOf(M, 'm:') : [], s: discoverFilter !== 'movie' ? catsOf(SR, 's:') : [] } });
 
     var shown = 0;
     function more() {
@@ -1069,13 +1072,29 @@
       if (r.note) return h('div', { class: 'dim', style: 'margin:1rem 0', text: r.note });
       if (r.heading) return h('div', { class: 'page-title', style: 'margin-top:2rem', text: r.heading });
       if (r.catGrid) {
+        var cg = r.catGrid, both = cg.m.length > 0 && cg.s.length > 0;
         var grid = h('div', { class: 'tiles', style: 'margin:0.4rem 0 0 -0.45rem' });
-        r.catGrid.forEach(function (c) {
-          var el = V.categoryTile(c, function () { A.discoverFrom = c.id; A.openCat.Discover = c.id; render(); });
-          el.dataset.key = 'all-' + c.id;
-          grid.appendChild(el);
+        var fill = function () {
+          grid.innerHTML = '';
+          ((both ? discoverCatSeries : !cg.m.length) ? cg.s : cg.m).forEach(function (c) {
+            var el = V.categoryTile(c, function () { A.discoverFrom = c.id; A.openCat.Discover = c.id; render(); });
+            el.dataset.key = 'all-' + c.id;
+            grid.appendChild(el);
+          });
+        };
+        fill();
+        if (!both) return grid;
+        // Con "Tutto" un selettore Film / Serie TV: si cambia sul posto, senza ridisegnare la pagina.
+        var sw = h('div', { class: 'seasons', style: 'margin-top:0.6rem' });
+        [[false, 'Film'], [true, 'Serie TV']].forEach(function (o) {
+          var chip = V.focusable(h('div', { class: 'chip' + (discoverCatSeries === o[0] ? ' on' : ''), data: { key: 'dcs-' + o[0] }, text: o[1] }), function () {
+            discoverCatSeries = o[0];
+            Array.prototype.forEach.call(sw.children, function (c) { c.classList.toggle('on', c === chip); });
+            fill();
+          });
+          sw.appendChild(chip);
         });
-        return grid;
+        return h('div', null, [sw, grid]);
       }
       var titles = r.titles;
       if (r.cat) {

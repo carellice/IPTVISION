@@ -29,6 +29,8 @@ private enum Filter { case all, movies, series }
 struct DiscoverView: View {
     @EnvironmentObject var model: AppModel
     @State private var filter = Filter.all
+    /// Con "Tutto": le categorie della lista mostrate in fondo, dei film o delle serie (mai insieme).
+    @State private var catSeries = false
     @State private var matched: [(row: Tmdb.Row, titles: [DiscoverTitle])]?
 
     var body: some View {
@@ -162,16 +164,25 @@ struct DiscoverView: View {
                         .font(.subheadline).foregroundStyle(.secondary).padding(.horizontal)
                 }
                 Text("Le categorie della lista").font(.title2.weight(.heavy)).padding(.horizontal).padding(.top, 18)
+                // Con "Tutto" un selettore Film / Serie TV: le categorie di un tipo alla volta.
+                let catSwitch = filter == .all && !movies.categories.isEmpty && !series.categories.isEmpty
+                if catSwitch {
+                    Picker("Categorie della lista", selection: $catSeries) {
+                        Text("Film").tag(false)
+                        Text("Serie TV").tag(true)
+                    }
+                    .pickerStyle(.segmented).frame(maxWidth: 260).padding(.horizontal)
+                }
                 // Le categorie della lista a griglia (nome e quanti titoli): toccandone una si aprono tutti i suoi titoli.
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
-                    if filter != .series {
+                    if catSwitch ? !catSeries : filter != .series {
                         ForEach(movies.categories) { c in
                             CategoryTile(category: DiscoverCategory(movies: true, id: c.id), name: c.name, count: movies.byCategory[c.id]?.count ?? 0)
                         }
                     }
-                    if filter != .movies {
+                    if catSwitch ? catSeries : filter != .movies {
                         ForEach(series.categories) { c in
-                            CategoryTile(category: DiscoverCategory(movies: false, id: c.id), name: c.name + " · Serie", count: series.byCategory[c.id]?.count ?? 0)
+                            CategoryTile(category: DiscoverCategory(movies: false, id: c.id), name: c.name, count: series.byCategory[c.id]?.count ?? 0)
                         }
                     }
                 }

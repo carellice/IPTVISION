@@ -16,7 +16,8 @@ import { Poster, SortButton } from './Browse.tsx'
 type Filter = 'all' | Kind
 
 /** What the screen had when a category or a title was opened, to come back to the same place. */
-const saved = { filter: 'all' as Filter, scroll: 0, rows: new Map<string, number>() }
+// catSeries: with "Tutto", which provider categories are shown at the bottom (never movies and series together).
+const saved = { filter: 'all' as Filter, catSeries: false, scroll: 0, rows: new Map<string, number>() }
 
 let lastRows: { key: string; rows: TmdbRow[] | null } = { key: '', rows: null }
 
@@ -124,10 +125,13 @@ function DiscoverHome() {
   const tmdbPending = matched == null && !error
 
   // The provider's categories: a grid of tiles (name and how many titles), empty ones left out.
-  const providerCats = [
-    ...(filter !== 'tv' && movies ? movies.categories.map((c) => ({ kind: 'movie' as Kind, id: c.id, name: c.name, count: movies.byCategory.get(c.id)?.length ?? 0 })) : []),
-    ...(filter !== 'movie' && series ? series.categories.map((c) => ({ kind: 'tv' as Kind, id: c.id, name: `${c.name} · Serie`, count: series.byCategory.get(c.id)?.length ?? 0 })) : []),
-  ].filter((c) => c.count > 0)
+  const movieCats = (filter !== 'tv' && movies ? movies.categories.map((c) => ({ kind: 'movie' as Kind, id: c.id, name: c.name, count: movies.byCategory.get(c.id)?.length ?? 0 })) : []).filter((c) => c.count > 0)
+  const seriesCats = (filter !== 'movie' && series ? series.categories.map((c) => ({ kind: 'tv' as Kind, id: c.id, name: c.name, count: series.byCategory.get(c.id)?.length ?? 0 })) : []).filter((c) => c.count > 0)
+  // With "Tutto" a Film / Serie TV switch: one kind of category at a time.
+  const catSwitch = movieCats.length > 0 && seriesCats.length > 0
+  const [catSeries, setCatSeriesState] = useState(saved.catSeries)
+  const setCatSeries = (v: boolean) => { saved.catSeries = v; setCatSeriesState(v) }
+  const providerCats = (catSwitch ? catSeries : movieCats.length === 0) ? seriesCats : movieCats
   const tmdbRows = (matched ?? []).map((r) => ({ ...r, titles: r.titles.filter(pass) })).filter((r) => r.titles.length >= (r.top ? 5 : 4))
 
   return (
@@ -171,6 +175,12 @@ function DiscoverHome() {
       )}
 
       <div style={{ color: 'var(--text)', fontSize: wide ? 24 : 20, fontWeight: 800, padding: `${wide ? 44 : 32}px 2px 0` }}>Le categorie della lista</div>
+      {catSwitch && (
+        <div style={{ display: 'flex', gap: 8, padding: `${wide ? 14 : 10}px 2px 0` }}>
+          <Pill text="Film" selected={!catSeries} onClick={() => setCatSeries(false)} />
+          <Pill text="Serie TV" selected={catSeries} onClick={() => setCatSeries(true)} />
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${wide ? 200 : 150}px, 1fr))`, gap: wide ? 14 : 10, padding: '14px 2px 0' }}>
         {providerCats.map((c) => (
           <Clickable key={c.kind + c.id} onClick={() => openCategory('Discover', `${c.kind === 'movie' ? 'm' : 's'}:${c.id}`)}
