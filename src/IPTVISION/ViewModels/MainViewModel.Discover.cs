@@ -169,6 +169,8 @@ public sealed partial class MainViewModel
     public bool HasOwnTmdb => !string.IsNullOrEmpty(_settings.TmdbKey);
     /// <summary>Con la chiave TMDB le schede Film e Serie diventano due: "Film e serie" e "La mia lista".</summary>
     public int ModeTabColumns => HasTmdb ? 3 : 3;
+    /// <summary>Con la chiave TMDB non ci sono le schede Film e Serie: le categorie del pannello si scelgono con un selettore.</summary>
+    public bool ShowKindSwitch => HasTmdb && Mode != LibraryMode.Live;
 
     /// <summary>Cosa si sta caricando, in alto a destra in "Film e serie" (null: niente).</summary>
     [ObservableProperty] private string? _discoverBusy;
@@ -256,6 +258,7 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(HasTmdb));
         OnPropertyChanged(nameof(HasOwnTmdb));
         OnPropertyChanged(nameof(ModeTabColumns));
+        OnPropertyChanged(nameof(ShowKindSwitch));
     }
 
     private void InitDiscover()

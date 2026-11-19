@@ -294,8 +294,8 @@
                     </Grid>
 
                     <!-- Sezioni: TV / Film / Serie -->
-                    <Border Grid.Row="1" Margin="14,0,14,10" Background="{StaticResource SegmentTrackBrush}" CornerRadius="10" Padding="3"
-                            Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                    <StackPanel Grid.Row="1" Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                    <Border Margin="14,0,14,10" Background="{StaticResource SegmentTrackBrush}" CornerRadius="10" Padding="3">
                         <UniformGrid Columns="{Binding ModeTabColumns}">
                             <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsLiveMode}" ToolTip="TV in diretta (Ctrl+1)">
                                 <StackPanel Orientation="Horizontal">
@@ -335,6 +335,15 @@
                             </RadioButton>
                         </UniformGrid>
                     </Border>
+                    <!-- Con "Film e serie": le categorie del pannello sono dei film o delle serie, a scelta. -->
+                    <Border Margin="14,0,14,10" Background="{StaticResource SegmentTrackBrush}" CornerRadius="10" Padding="2"
+                            Visibility="{Binding ShowKindSwitch, Converter={StaticResource BoolToVis}}">
+                        <UniformGrid Columns="2">
+                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="kind" IsChecked="{Binding IsMoviesMode}" Content="Film" />
+                            <RadioButton Style="{StaticResource SegmentButton}" GroupName="kind" IsChecked="{Binding IsSeriesMode}" Content="Serie TV" />
+                        </UniformGrid>
+                    </Border>
+                    </StackPanel>
 
                     <!-- Ambito della ricerca: tutto oppure solo canali, film o serie -->
                     <Border Grid.Row="1" Margin="14,0,14,8" Background="{StaticResource SegmentTrackBrush}" CornerRadius="10" Padding="2"

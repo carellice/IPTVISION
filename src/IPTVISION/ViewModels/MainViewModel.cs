@@ -425,6 +425,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsSeriesMode));
         OnPropertyChanged(nameof(IsDiscoverMode));
         OnPropertyChanged(nameof(IsMyListMode));
+        OnPropertyChanged(nameof(ShowKindSwitch));
         OnPropertyChanged(nameof(FooterInfo));
         LoadBrowsePrefs();
         RebuildCategories();
