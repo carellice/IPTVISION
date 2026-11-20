@@ -41,6 +41,8 @@ import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
@@ -139,6 +141,11 @@ fun PlayerScreen(vm: AppViewModel) {
     // Gesto stile VLC sul telefono: (true = volume / false = luminosità, livello 0..1).
     var gesture by remember { mutableStateOf<Pair<Boolean, Float>?>(null) }
     LaunchedEffect(gesture) { if (gesture != null) { delay(900); gesture = null } }
+    // Telefono: comandi bloccati (tocchi, gesti e Indietro). Un tocco mostra per poco il lucchetto per sbloccare.
+    var locked by remember { mutableStateOf(false) }
+    var unlockShown by remember { mutableStateOf(false) }
+    var lockTaps by remember { mutableIntStateOf(0) }
+    LaunchedEffect(unlockShown, lockTaps) { if (unlockShown) { delay(3000); unlockShown = false } }
 
     fun show(o: Overlay) { overlay = o; interaction++ }
 
@@ -168,6 +175,7 @@ fun PlayerScreen(vm: AppViewModel) {
 
     fun onBack() {
         when {
+            locked -> { unlockShown = true; lockTaps++ }
             tracks -> tracks = false
             panel -> panel = false
             overlay == Overlay.Controls -> overlay = Overlay.None
@@ -193,7 +201,7 @@ fun PlayerScreen(vm: AppViewModel) {
                 // Con i comandi a schermo le frecce spostano il focus tra i pulsanti: prima arrivavano qui,
                 // ▶ mostrava le informazioni e ◀ l'elenco canali, e i comandi sparivano. Ogni tasto li tiene a schermo.
                 // Pannello canali o audio e sottotitoli aperti: i tasti sono tutti loro.
-                if (panel || tracks) return@onKeyEvent false
+                if (panel || tracks || locked) return@onKeyEvent false
                 if (overlay == Overlay.Controls) {
                     interaction++
                     if (code == AKey.KEYCODE_DPAD_LEFT || code == AKey.KEYCODE_DPAD_RIGHT ||
@@ -222,7 +230,7 @@ fun PlayerScreen(vm: AppViewModel) {
                 true
             }
             // Telefono: trascinando in verticale sulla metà destra cambia il volume, sulla sinistra la luminosità.
-            .then(if (vm.isTv) Modifier else Modifier.pointerInput(Unit) {
+            .then(if (vm.isTv || locked) Modifier else Modifier.pointerInput(Unit) {
                 val audio = activity.getSystemService(AudioManager::class.java)
                 val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                 var right = false
@@ -243,7 +251,8 @@ fun PlayerScreen(vm: AppViewModel) {
                 )
             })
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                show(if (overlay == Overlay.Controls) Overlay.None else Overlay.Controls)
+                if (locked) { unlockShown = true; lockTaps++ }
+                else show(if (overlay == Overlay.Controls) Overlay.None else Overlay.Controls)
             },
     ) {
         AndroidView(
@@ -286,7 +295,7 @@ fun PlayerScreen(vm: AppViewModel) {
                 modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(28.dp).background(Color(0xAA000000), RoundedCornerShape(12.dp)).padding(18.dp, 6.dp))
         }
 
-        AnimatedVisibility(overlay != Overlay.None, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility(overlay != Overlay.None && !locked, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
                 // Sfumature in alto e in basso per leggere il testo su qualsiasi immagine.
                 Box(Modifier.fillMaxWidth().fillMaxHeight(0.35f).align(Alignment.TopCenter).background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent))))
@@ -296,7 +305,8 @@ fun PlayerScreen(vm: AppViewModel) {
                     InfoBlock(vm, p)
                     if (overlay == Overlay.Controls) {
                         VSpace(14.dp)
-                        Controls(vm, p, playFocus, onChannels = { panel = true }, onTracks = { tracks = true }, onAny = { interaction++ })
+                        Controls(vm, p, playFocus, onChannels = { panel = true }, onTracks = { tracks = true }, onAny = { interaction++ },
+                            onLock = { locked = true; overlay = Overlay.None; unlockShown = true; lockTaps++ })
                     } else if (vm.isTv) {
                         VSpace(10.dp)
                         Text(
@@ -314,8 +324,21 @@ fun PlayerScreen(vm: AppViewModel) {
 
         if (tracks) TracksPanel(vm) { tracks = false }
 
-        vm.nextEpisodeCountdown?.let { s -> NextEpisodeCard(vm, s, Modifier.align(Alignment.BottomEnd)) }
-            ?: NextEpisodeButton(vm, p, raised = overlay != Overlay.None, Modifier.align(Alignment.BottomEnd))
+        if (!locked) {
+            vm.nextEpisodeCountdown?.let { s -> NextEpisodeCard(vm, s, Modifier.align(Alignment.BottomEnd)) }
+                ?: NextEpisodeButton(vm, p, raised = overlay != Overlay.None, Modifier.align(Alignment.BottomEnd))
+        }
+
+        AnimatedVisibility(locked && unlockShown, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopStart)) {
+            Row(
+                Modifier.safeDrawingPadding().padding(20.dp).clip(RoundedCornerShape(50)).background(Color(0xAA000000))
+                    .clickable { locked = false; unlockShown = false; show(Overlay.Controls) }.padding(16.dp, 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.LockOpen, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                Text("  Sblocca", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
     }
 }
 
@@ -413,7 +436,7 @@ private fun InfoBlock(vm: AppViewModel, p: Playing) {
 }
 
 @Composable
-private fun Controls(vm: AppViewModel, p: Playing, playFocus: FocusRequester, onChannels: () -> Unit, onTracks: () -> Unit, onAny: () -> Unit) {
+private fun Controls(vm: AppViewModel, p: Playing, playFocus: FocusRequester, onChannels: () -> Unit, onTracks: () -> Unit, onAny: () -> Unit, onLock: () -> Unit) {
     val pc = vm.player
     val paused = pc.state == PlaybackState.Paused
     if (p !is Playing.Live && pc.durationMs > 0) {
@@ -445,6 +468,7 @@ private fun Controls(vm: AppViewModel, p: Playing, playFocus: FocusRequester, on
             }
         }
         RoundButton(Icons.Default.Subtitles, "Audio e sottotitoli", onClick = act(onTracks))
+        if (!vm.isTv) RoundButton(Icons.Default.Lock, "Blocca comandi", onClick = onLock)
     }
 }
 
