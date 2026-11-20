@@ -1,6 +1,6 @@
 {
   "id": "com.carellice.iptvision",
-  "version": "1.30.0",
+  "version": "1.31.0",
   "vendor": "carellice",
   "type": "web",
   "main": "index.html",
