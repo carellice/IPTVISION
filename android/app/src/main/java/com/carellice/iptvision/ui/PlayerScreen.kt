@@ -2,6 +2,8 @@ package com.carellice.iptvision.ui
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.media.AudioManager
+import android.view.WindowManager
 import android.view.KeyEvent as AKey
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
@@ -13,6 +15,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +36,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -72,6 +77,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -92,6 +98,7 @@ import com.carellice.iptvision.Playing
 import com.carellice.iptvision.data.TextHelpers
 import com.carellice.iptvision.player.PlaybackState
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 private enum class Overlay { None, Info, Controls }
 
@@ -116,6 +123,8 @@ fun PlayerScreen(vm: AppViewModel) {
         onDispose {
             ctl.show(WindowInsetsCompat.Type.systemBars())
             view.keepScreenOn = false
+            // La luminosità scelta col gesto vale solo nel player.
+            window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
             activity.requestedOrientation = old
         }
     }
@@ -127,6 +136,9 @@ fun PlayerScreen(vm: AppViewModel) {
     var digits by remember { mutableStateOf("") }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
+    // Gesto stile VLC sul telefono: (true = volume / false = luminosità, livello 0..1).
+    var gesture by remember { mutableStateOf<Pair<Boolean, Float>?>(null) }
+    LaunchedEffect(gesture) { if (gesture != null) { delay(900); gesture = null } }
 
     fun show(o: Overlay) { overlay = o; interaction++ }
 
@@ -209,6 +221,27 @@ fun PlayerScreen(vm: AppViewModel) {
                 }
                 true
             }
+            // Telefono: trascinando in verticale sulla metà destra cambia il volume, sulla sinistra la luminosità.
+            .then(if (vm.isTv) Modifier else Modifier.pointerInput(Unit) {
+                val audio = activity.getSystemService(AudioManager::class.java)
+                val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                var right = false
+                var level = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { o ->
+                        right = o.x > size.width / 2
+                        level = if (right) audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / max
+                        else activity.window.attributes.screenBrightness.takeIf { it >= 0f } ?: 0.5f
+                    },
+                    onVerticalDrag = { change, dy ->
+                        change.consume()
+                        level = (level - dy / (size.height * 0.8f)).coerceIn(0f, 1f)
+                        if (right) audio.setStreamVolume(AudioManager.STREAM_MUSIC, (level * max).roundToInt(), 0)
+                        else activity.window.attributes = activity.window.attributes.apply { screenBrightness = level.coerceAtLeast(0.01f) }
+                        gesture = right to level
+                    },
+                )
+            })
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                 show(if (overlay == Overlay.Controls) Overlay.None else Overlay.Controls)
             },
@@ -235,6 +268,16 @@ fun PlayerScreen(vm: AppViewModel) {
                     VSpace(12.dp)
                     Text("Riconnessione… tentativo ${pc.attempt}", color = Color.White, modifier = Modifier.background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(10.dp, 6.dp))
                 }
+            }
+        }
+
+        gesture?.let { (vol, lvl) ->
+            Row(
+                Modifier.align(Alignment.Center).background(Color(0xAA000000), RoundedCornerShape(12.dp)).padding(18.dp, 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(if (vol) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.BrightnessMedium, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                Text("  ${(lvl * 100).roundToInt()}%", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             }
         }
 
