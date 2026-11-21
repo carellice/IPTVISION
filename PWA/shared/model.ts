@@ -12,6 +12,8 @@ export type Channel = {
   epgId: string | null
   searchKey: string
   initials: string
+  /** The other qualities of the same channel ("Rai 1 HD", "Rai 1 4K"): tried when the stream stalls. */
+  alternates?: number[]
 }
 
 export type Movie = {

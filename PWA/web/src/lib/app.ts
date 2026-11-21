@@ -7,7 +7,7 @@ import { type Entry, groupVariants } from '../../../shared/text.ts'
 import { ApiError, api } from './api.ts'
 import {
   ALL_ID, CONTINUE_ID, FAVORITES_ID, MYLIST_ID, type CategoryHit, type Library, type ListSort, type SearchScope, type Section,
-  library, search as searchLib, sortChannels, sortMovies, sortSeries, toChannels, toMovies, toSeries,
+  groupChannels, library, search as searchLib, sortChannels, sortMovies, sortSeries, toChannels, toMovies, toSeries,
 } from './library.ts'
 import { PlayerController } from './player.ts'
 import { hasTmdb, setTmdbKey, tmdbKey } from './tmdb.ts'
@@ -410,7 +410,7 @@ const cacheKey = (kind: string) => `${app.username.toLowerCase()}|${app.xtream?.
 
 function rebuildLibraries() {
   const h = app.hideAdult
-  if (app.rawLive) app.live = library(app.rawLive.categories, app.rawLive.items, (c) => c.categoryId, h)
+  if (app.rawLive) app.live = library(app.rawLive.categories, groupChannels(app.rawLive.items, app.favorites), (c) => c.categoryId, h)
   if (app.rawMovies) app.movies = library(app.rawMovies.categories, app.rawMovies.items, (m) => m.categoryId, h)
   if (app.rawSeries) app.series = library(app.rawSeries.categories, app.rawSeries.items, (s) => s.categoryId, h)
 }
@@ -817,10 +817,10 @@ export function openPick(p: quiz.Pick) {
 function autoPlayLast() {
   const id = app.settings.lastStreamId
   if (id == null || app.playing || !app.live) return
-  const ch = app.live.items.find((c) => c.streamId === id)
+  const ch = app.live.items.find((c) => c.streamId === id || c.alternates?.includes(id))
   if (!ch) return
   const list = channelsFor(app.settings.lastCategoryId ?? ALL_ID)
-  playChannel(ch, list.some((c) => c.streamId === id) ? list : app.live.items)
+  playChannel(ch, list.includes(ch) ? list : app.live.items)
 }
 
 export function playChannel(ch: Channel, playlist: Channel[]) {
@@ -829,7 +829,7 @@ export function playChannel(ch: Channel, playlist: Channel[]) {
   app.playing = { kind: 'Live', channel: ch, playlist }
   app.settings = { ...app.settings, lastStreamId: ch.streamId }
   saveSettings()
-  player.play({ kind: 'live', id: ch.streamId })
+  player.play({ kind: 'live', id: ch.streamId, alternates: ch.alternates })
   ensureShortEpg(ch)
   if (screen().kind !== 'Player') push({ kind: 'Player' })
   emit()

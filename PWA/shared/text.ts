@@ -53,6 +53,26 @@ export function variantKey(name: string): string {
   return words.length === 0 ? normalize(name) : words.join(' ')
 }
 
+// Only video quality tags: other languages and audio stay separate channels.
+const channelQualityTags = new Set([
+  '4k', 'uhd', '2160p', 'fhd', 'full', '1080p', '1080i', 'hd', '720p', 'sd', '576p', '576i', '480p',
+  'hdr', 'hevc', 'h265', 'h264', '50fps', '60fps', 'hq', 'lq',
+])
+
+/** Key that recognizes the same channel in different qualities ("Rai 1 FHD", "Rai 1 4K"). */
+export function channelKey(name: string): string {
+  const n = normalize(name)
+  const words = n.split(' ').filter((w) => w !== '' && !channelQualityTags.has(w))
+  return words.length === 0 ? n : words.join(' ')
+}
+
+/** "Rai 1 FHD" → "Rai 1": the name shown for a grouped channel. */
+export function withoutQuality(name: string): string {
+  const s = name.split(' ').filter((w) => { const n = normalize(w); return w !== '' && (n === '' || !channelQualityTags.has(n)) })
+    .join(' ').trim().replace(/[\s|:([-]+$/, '')
+  return s || name
+}
+
 /** The quality tags in the title, to tell the versions apart ("4K HDR", "FHD"). */
 export function qualityOf(name: string): string | null {
   const tags = [...new Set(normalize(name).split(' ').filter((w) => qualityTags.has(w)))]

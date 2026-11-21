@@ -1,5 +1,5 @@
 import type { Category, Channel, CompactLive, CompactMovies, CompactSeries, Movie, Series } from '../../../shared/model.ts'
-import { type Entry, groupVariants, initials, joinMeta, normalize, stars } from '../../../shared/text.ts'
+import { type Entry, channelKey, groupVariants, initials, joinMeta, normalize, stars, withoutQuality } from '../../../shared/text.ts'
 
 // The catalog as in AppViewModel: libraries per section, the lists of a category with their sort,
 // and the search over channels, films, series and categories.
@@ -44,6 +44,31 @@ export function toChannels(l: CompactLive): { categories: Category[]; items: Cha
       streamId, num, name, logo, categoryId, epgId, searchKey: normalize(name), initials: initials(name),
     })),
   }
+}
+
+/**
+ * The same channel in several qualities ("Rai 1 FHD", "Rai 1 HD", "Rai 1 4K") becomes one, "Rai 1", with the
+ * others in alternates. Grouped inside its category; the favorite version leads, else the first in the list.
+ */
+export function groupChannels(items: Channel[], favorites: Set<number>): Channel[] {
+  const groups = new Map<string, Channel[]>()
+  for (const c of items) {
+    const k = `${c.categoryId}|${channelKey(c.name)}`
+    const g = groups.get(k)
+    if (g) g.push(c)
+    else groups.set(k, [c])
+  }
+  return [...groups.values()].map((g) => {
+    if (g.length === 1) return g[0]
+    const main = g.find((c) => favorites.has(c.streamId)) ?? g[0]
+    const name = withoutQuality(main.name)
+    return {
+      ...main, name, searchKey: normalize(name), initials: initials(name),
+      logo: main.logo ?? g.find((c) => c.logo)?.logo ?? null,
+      epgId: main.epgId ?? g.find((c) => c.epgId)?.epgId ?? null,
+      alternates: g.filter((c) => c !== main).map((c) => c.streamId),
+    }
+  })
 }
 
 export function toMovies(l: CompactMovies): { categories: Category[]; items: Movie[] } {

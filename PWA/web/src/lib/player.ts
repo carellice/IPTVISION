@@ -10,7 +10,7 @@ import { api } from './api.ts'
 
 export type PlaybackState = 'Idle' | 'Connecting' | 'Buffering' | 'Playing' | 'Paused' | 'Reconnecting'
 
-export type Source = { kind: 'live'; id: number } | { kind: 'movie' | 'series'; id: string; ext: string }
+export type Source = { kind: 'live'; id: number; alternates?: number[] } | { kind: 'movie' | 'series'; id: string; ext: string }
 
 type Probe = {
   duration: number
@@ -291,7 +291,15 @@ export class PlayerController {
     }
     this.attempt++
     this.setState('Reconnecting')
-    const delay = Math.min(15_000, 1000 << Math.min(this.attempt - 1, 4))
+    let delay = Math.min(15_000, 1000 << Math.min(this.attempt - 1, 4))
+    // A channel in several qualities: reopen at once with the next quality; after a full round, wait as usual.
+    const src = this.source
+    if (src.kind === 'live' && src.alternates?.length) {
+      const ids = [src.id, ...src.alternates]
+      this.source = { ...src, id: ids[1], alternates: [...ids.slice(2), src.id] }
+      this.note(`passo alla qualità ${this.source.id}`)
+      if (this.attempt < ids.length) delay = 300
+    }
     console.warn(`Riconnessione (${reason}), tentativo ${this.attempt} tra ${delay}ms`)
     this.note(`riconnessione (${reason}), tentativo ${this.attempt} tra ${delay} ms`)
     this.release()
