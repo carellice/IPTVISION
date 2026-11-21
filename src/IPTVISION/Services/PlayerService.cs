@@ -24,6 +24,9 @@ public sealed class PlayerService : IDisposable
     private readonly SemaphoreSlim _vlcGate = new(1, 1);
 
     private string? _url;
+    // Le qualità dello stesso canale in diretta: se il flusso si blocca si passa alla successiva.
+    private IReadOnlyList<string> _urls = [];
+    private int _urlIndex;
     private bool _live = true;
     private long _resumeMs;
     private volatile int _generation;
@@ -142,9 +145,11 @@ public sealed class PlayerService : IDisposable
     }
 
     /// <summary>live=false per film/episodi: la fine del file non è un errore e si può riprendere da startMs.</summary>
-    public void Play(string url, bool live = true, long startMs = 0)
+    public void Play(string url, bool live = true, long startMs = 0, IReadOnlyList<string>? alternates = null)
     {
         _url = url;
+        _urls = live ? [url, .. alternates ?? []] : [];
+        _urlIndex = 0;
         _live = live;
         _resumeMs = live ? 0 : Math.Max(0, startMs);
         Attempt = 0;
@@ -297,6 +302,14 @@ public sealed class PlayerService : IDisposable
         }
         if (!_live && _lastTime > 0) _resumeMs = Math.Max(0, _lastTime - 3000);
         var delayMs = Attempt == 1 ? 400 : Math.Min(1000 * (1 << Math.Min(Attempt - 2, 4)), 8000);
+        // Canale in più qualità: si riapre subito con la qualità successiva; dopo un giro completo si aspetta come sempre.
+        if (_urls.Count > 1)
+        {
+            _urlIndex = (_urlIndex + 1) % _urls.Count;
+            _url = _urls[_urlIndex];
+            Log.Write($"Passo alla qualità {_urlIndex + 1} di {_urls.Count}");
+            if (Attempt < _urls.Count) delayMs = 300;
+        }
         _generation++; // ignora gli eventi residui del tentativo fallito
         SetState(PlaybackState.Reconnecting);
         _retryTimer.Interval = TimeSpan.FromMilliseconds(delayMs);

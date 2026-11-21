@@ -287,6 +287,30 @@ public static class TextHelpers
         return words.Length == 0 ? Normalize(name) : string.Join(' ', words);
     }
 
+    // Solo le sigle di qualità video: lingua e audio diversi restano canali separati.
+    private static readonly HashSet<string> ChannelQualityTags = new(StringComparer.Ordinal)
+    {
+        "4k", "uhd", "2160p", "fhd", "full", "1080p", "1080i", "hd", "720p", "sd", "576p", "576i", "480p",
+        "hdr", "hevc", "h265", "h264", "50fps", "60fps", "hq", "lq",
+    };
+
+    /// <summary>Chiave per riconoscere lo stesso canale in qualità diverse: nome normalizzato senza sigle di qualità.</summary>
+    public static string ChannelKey(string name)
+    {
+        var n = Normalize(name);
+        var words = n.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(w => !ChannelQualityTags.Contains(w)).ToArray();
+        return words.Length == 0 ? n : string.Join(' ', words);
+    }
+
+    /// <summary>"Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato.</summary>
+    public static string WithoutQuality(string name)
+    {
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => { var n = Normalize(w); return n.Length == 0 || !ChannelQualityTags.Contains(n); });
+        var s = string.Join(' ', words).Trim().TrimEnd('|', '-', ':', '(', '[', ' ');
+        return s.Length == 0 ? name : s;
+    }
+
     /// <summary>Le sigle di qualità presenti nel titolo, per distinguere le versioni ("4K HDR", "FHD").</summary>
     public static string? QualityOf(string name)
     {
@@ -301,19 +325,25 @@ public sealed partial class Channel : ObservableObject
     private ImageSource? _logo;
     private bool _logoRequested;
 
-    public Channel(ChannelData data)
+    /// <param name="name">Nome da mostrare, se diverso da quello del provider (canale raggruppato).</param>
+    /// <param name="alternates">Le altre qualità dello stesso canale: si provano se il flusso si blocca.</param>
+    public Channel(ChannelData data, string? name = null, IReadOnlyList<ChannelData>? alternates = null)
     {
         Data = data;
-        SearchKey = TextHelpers.Normalize(data.Name);
-        Initials = TextHelpers.Initials(data.Name);
+        Name = name ?? data.Name;
+        Alternates = alternates?.Select(a => a.StreamId).ToArray() ?? [];
+        EpgId = data.EpgId ?? alternates?.Select(a => a.EpgId).FirstOrDefault(e => e != null);
+        SearchKey = TextHelpers.Normalize(Name);
+        Initials = TextHelpers.Initials(Name);
     }
 
     public ChannelData Data { get; }
     public int StreamId => Data.StreamId;
     public int Num => Data.Num;
-    public string Name => Data.Name;
+    public string Name { get; }
+    public IReadOnlyList<int> Alternates { get; }
     public string? CategoryId => Data.CategoryId;
-    public string? EpgId => Data.EpgId;
+    public string? EpgId { get; }
     public string SearchKey { get; }
     public string Initials { get; }
 

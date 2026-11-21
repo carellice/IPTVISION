@@ -494,11 +494,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _rawLive = (cats, chans);
         (cats, chans) = WithoutHidden(cats, chans, c => c.CategoryId);
         _liveCats = cats;
+        // Lo stesso canale in più qualità ("Rai 1 FHD", "Rai 1 HD", "Rai 1 4K") diventa uno solo, "Rai 1", dentro
+        // la sua categoria. Resta in testa la versione nei preferiti, altrimenti la prima della lista.
         _all = chans
             .GroupBy(c => c.StreamId).Select(g => g.First())
-            .Select(d => new Channel(d) { IsFavorite = _settings.Favorites.Contains(d.StreamId) })
+            .GroupBy(c => (c.CategoryId, TextHelpers.ChannelKey(c.Name)))
+            .Select(g =>
+            {
+                var list = g.ToList();
+                if (list.Count == 1) return new Channel(list[0]) { IsFavorite = _settings.Favorites.Contains(list[0].StreamId) };
+                var main = list.FirstOrDefault(d => _settings.Favorites.Contains(d.StreamId)) ?? list[0];
+                return new Channel(main, TextHelpers.WithoutQuality(main.Name), list.Where(d => d != main).ToList())
+                    { IsFavorite = _settings.Favorites.Contains(main.StreamId) };
+            })
             .ToList();
-        _byId = _all.ToDictionary(c => c.StreamId);
+        _byId = new Dictionary<int, Channel>();
+        foreach (var c in _all)
+        {
+            _byId[c.StreamId] = c;
+            foreach (var a in c.Alternates) _byId.TryAdd(a, c);
+        }
 
         if (currentId is int cid && _byId.TryGetValue(cid, out var cur))
         {
@@ -623,7 +638,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         CurrentChannel = ch;
         ch.IsPlaying = true;
         NowPlayingTitle = ch.Name;
-        Player.Play(_client.GetLiveUrl(ch.StreamId, _settings.OutputFormat));
+        PlayLive(ch);
 
         _settings.LastStreamId = ch.StreamId;
         ScheduleSave();
@@ -678,7 +693,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         if (CurrentChannel is { } ch && _client != null)
         {
-            Player.Play(_client.GetLiveUrl(ch.StreamId, _settings.OutputFormat));
+            PlayLive(ch);
             MediaStarted?.Invoke(ch);
         }
     }
@@ -940,12 +955,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void PlayLive(Channel ch) =>
+        Player.Play(_client!.GetLiveUrl(ch.StreamId, _settings.OutputFormat),
+            alternates: ch.Alternates.Select(id => _client.GetLiveUrl(id, _settings.OutputFormat)).ToList());
+
     private void RestartCurrent()
     {
         if (!Player.IsActive) return;
         if (IsVod) Player.Reload();
         else if (CurrentChannel is { } ch && _client != null)
-            Player.Play(_client.GetLiveUrl(ch.StreamId, _settings.OutputFormat));
+            PlayLive(ch);
     }
 
     [RelayCommand]
