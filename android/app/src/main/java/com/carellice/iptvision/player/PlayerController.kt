@@ -58,6 +58,9 @@ class PlayerController(context: Context) {
     var onFailed: (() -> Unit)? = null
 
     private var url: String? = null
+    // Le qualità dello stesso canale in diretta: se il flusso si blocca si passa alla successiva.
+    private var urls: List<String> = emptyList()
+    private var urlIndex = 0
     var isLive = true; private set
     private var resumeMs = 0L
     private var lastPos = -1L
@@ -134,9 +137,11 @@ class PlayerController(context: Context) {
 
     val isActive get() = url != null
 
-    fun play(url: String, live: Boolean, resumeMs: Long = 0) {
+    fun play(url: String, live: Boolean, resumeMs: Long = 0, alternates: List<String> = emptyList()) {
         main.removeCallbacks(retry)
         this.url = url
+        urls = if (live) listOf(url) + alternates else emptyList()
+        urlIndex = 0
         this.isLive = live
         this.resumeMs = resumeMs
         attempt = 0
@@ -175,7 +180,14 @@ class PlayerController(context: Context) {
         }
         attempt++
         state = PlaybackState.Reconnecting
-        val delay = minOf(15_000L, 1000L shl minOf(attempt - 1, 4))
+        // Canale in più qualità: si riapre subito con la qualità successiva; dopo un giro completo si aspetta come sempre.
+        val switch = urls.size > 1
+        if (switch) {
+            urlIndex = (urlIndex + 1) % urls.size
+            url = urls[urlIndex]
+            Log.w("Passo alla qualità ${urlIndex + 1} di ${urls.size}")
+        }
+        val delay = if (switch && attempt < urls.size) 300L else minOf(15_000L, 1000L shl minOf(attempt - 1, 4))
         Log.w("Riconnessione ($reason), tentativo $attempt tra ${delay}ms")
         player.stop()
         main.postDelayed(retry, delay)

@@ -12,6 +12,8 @@ data class Channel(
     val logo: String?,
     val categoryId: String?,
     val epgId: String?,
+    /** Le altre qualità dello stesso canale ("Rai 1 HD", "Rai 1 4K"...): si provano se il flusso si blocca. */
+    val alternates: List<Int> = emptyList(),
 ) {
     val searchKey = TextHelpers.normalize(name)
     val initials = TextHelpers.initials(name)
@@ -223,9 +225,48 @@ object TextHelpers {
         return if (words.isEmpty()) normalize(name) else words.joinToString(" ")
     }
 
+    // Solo le sigle di qualità video: lingua e audio diversi restano canali separati.
+    private val channelQualityTags = setOf(
+        "4k", "uhd", "2160p", "fhd", "full", "1080p", "1080i", "hd", "720p", "sd", "576p", "576i", "480p",
+        "hdr", "hevc", "h265", "h264", "50fps", "60fps", "hq", "lq",
+    )
+
+    /** Chiave per riconoscere lo stesso canale in qualità diverse: nome normalizzato senza sigle di qualità. */
+    fun channelKey(name: String): String {
+        val n = normalize(name)
+        val words = n.split(' ').filter { it.isNotEmpty() && it !in channelQualityTags }
+        return if (words.isEmpty()) n else words.joinToString(" ")
+    }
+
+    /** "Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato. */
+    fun withoutQuality(name: String): String {
+        val words = name.split(' ').filter { w -> w.isNotEmpty() && normalize(w).let { it.isEmpty() || it !in channelQualityTags } }
+        return words.joinToString(" ").trim().trimEnd('|', '-', ':', '(', '[', ' ').ifEmpty { name }
+    }
+
     /** Le sigle di qualità presenti nel titolo, per distinguere le versioni ("4K HDR", "FHD"). */
     fun qualityOf(name: String): String? =
         normalize(name).split(' ').filter { it in qualityTags }.distinct().joinToString(" ") { it.uppercase() }.ifEmpty { null }
+}
+
+/**
+ * Un canale pubblicato in più qualità ("Rai 1 FHD", "Rai 1 HD", "Rai 1 4K") diventa uno solo, "Rai 1",
+ * con le altre versioni in [Channel.alternates]. Si raggruppa dentro la stessa categoria. Resta in testa
+ * la versione nei preferiti, altrimenti la prima della lista.
+ */
+fun groupChannels(items: List<Channel>, favorites: Set<Int>): List<Channel> {
+    val groups = LinkedHashMap<Pair<String?, String>, MutableList<Channel>>()
+    for (c in items) groups.getOrPut(c.categoryId to TextHelpers.channelKey(c.name)) { ArrayList(1) } += c
+    return groups.values.map { g ->
+        if (g.size == 1) return@map g[0]
+        val main = g.firstOrNull { it.streamId in favorites } ?: g[0]
+        main.copy(
+            name = TextHelpers.withoutQuality(main.name),
+            logo = main.logo ?: g.firstNotNullOfOrNull { it.logo },
+            epgId = main.epgId ?: g.firstNotNullOfOrNull { it.epgId },
+            alternates = g.filter { it !== main }.map { it.streamId },
+        )
+    }
 }
 
 /** Un titolo nelle liste: se è pubblicato più volte (per esempio in FHD e in 4K) raccoglie tutte le versioni. */

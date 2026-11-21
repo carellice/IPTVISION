@@ -18,6 +18,7 @@ import com.carellice.iptvision.data.Channel
 import com.carellice.iptvision.data.Downloads
 import com.carellice.iptvision.data.EpgService
 import com.carellice.iptvision.data.Entry
+import com.carellice.iptvision.data.groupChannels
 import com.carellice.iptvision.data.groupVariants
 import com.carellice.iptvision.data.Episode
 import com.carellice.iptvision.data.Log
@@ -586,7 +587,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!f.exists()) return null
         return try {
             val cats = file("live_cats", key).takeIf { it.exists() }?.let(XtreamClient::parseCategories) ?: emptyList()
-            library(cats, XtreamClient.parseChannels(f), Channel::categoryId)
+            library(cats, groupChannels(XtreamClient.parseChannels(f), settings.favorites), Channel::categoryId)
         } catch (e: Exception) {
             Log.w("Cache canali illeggibile", e); null
         }
@@ -1192,9 +1193,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val id = settings.lastStreamId ?: return
         // Con il server di casa si aspetta "Chi guarda?": niente canale che parte dietro.
         if (playing != null || profilesPending || profilePicker != null) return
-        val ch = live?.items?.firstOrNull { it.streamId == id } ?: return
+        val ch = live?.items?.firstOrNull { it.streamId == id || id in it.alternates } ?: return
         val cat = settings.lastCategoryId ?: ALL_ID
-        playChannel(ch, channelsFor(cat).takeIf { l -> l.any { it.streamId == id } } ?: live!!.items)
+        playChannel(ch, channelsFor(cat).takeIf { l -> l.any { it.streamId == ch.streamId } } ?: live!!.items)
     }
 
     fun playChannel(ch: Channel, playlist: List<Channel>) {
@@ -1203,7 +1204,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         cancelCountdown()
         playing = Playing.Live(ch, playlist)
         settings.lastStreamId = ch.streamId
-        player.play(c.liveUrl(ch.streamId, settings.outputFormat), live = true)
+        player.play(c.liveUrl(ch.streamId, settings.outputFormat), live = true, alternates = ch.alternates.map { c.liveUrl(it, settings.outputFormat) })
         ensureShortEpg(ch)
         if (screen != Screen.Player) push(Screen.Player)
     }
