@@ -13,9 +13,32 @@ struct Channel: Identifiable, Hashable {
     let categoryId: String?
     let epgId: String?
     let searchKey: String
+    /// Le altre qualità dello stesso canale ("Rai 1 HD", "Rai 1 4K"): si provano se il flusso si interrompe.
+    var alternates: [Int] = []
 
     var id: Int { streamId }
     var initials: String { TextHelpers.initials(name) }
+}
+
+/// Lo stesso canale in più qualità ("Rai 1 FHD", "Rai 1 HD", "Rai 1 4K") diventa uno solo, "Rai 1", dentro la sua
+/// categoria. Resta in testa la versione nei preferiti, altrimenti la prima della lista.
+func groupChannels(_ items: [Channel], favorites: Set<Int>) -> [Channel] {
+    var groups: [String: [Channel]] = [:]
+    var order: [String] = []
+    for c in items {
+        let k = (c.categoryId ?? "") + "|" + TextHelpers.channelKey(c.name)
+        if groups[k] == nil { order.append(k) }
+        groups[k, default: []].append(c)
+    }
+    return order.map { k in
+        let g = groups[k]!
+        if g.count == 1 { return g[0] }
+        let main = g.first { favorites.contains($0.streamId) } ?? g[0]
+        let name = TextHelpers.withoutQuality(main.name)
+        return Channel(streamId: main.streamId, num: main.num, name: name, logo: main.logo ?? g.compactMap(\.logo).first,
+                       categoryId: main.categoryId, epgId: main.epgId ?? g.compactMap(\.epgId).first,
+                       searchKey: TextHelpers.normalize(name), alternates: g.filter { $0.streamId != main.streamId }.map(\.streamId))
+    }
 }
 
 struct Movie: Identifiable, Hashable {
@@ -191,6 +214,30 @@ enum TextHelpers {
         let stripped = langPrefix.stringByReplacingMatches(in: name, range: NSRange(name.startIndex..., in: name), withTemplate: "")
         let words = normalize(stripped).split(separator: " ").filter { !qualityTags.contains(String($0)) }
         return words.isEmpty ? normalize(name) : words.joined(separator: " ")
+    }
+
+    // Solo le sigle di qualità video: lingua e audio diversi restano canali separati.
+    private static let channelQualityTags: Set<String> = [
+        "4k", "uhd", "2160p", "fhd", "full", "1080p", "1080i", "hd", "720p", "sd", "576p", "576i", "480p",
+        "hdr", "hevc", "h265", "h264", "50fps", "60fps", "hq", "lq",
+    ]
+
+    /// Chiave per riconoscere lo stesso canale in qualità diverse: nome normalizzato senza sigle di qualità.
+    static func channelKey(_ name: String) -> String {
+        let n = normalize(name)
+        let words = n.split(separator: " ").filter { !channelQualityTags.contains(String($0)) }
+        return words.isEmpty ? n : words.joined(separator: " ")
+    }
+
+    /// "Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato.
+    static func withoutQuality(_ name: String) -> String {
+        let words = name.split(separator: " ").filter { w in
+            let n = normalize(String(w))
+            return n.isEmpty || !channelQualityTags.contains(n)
+        }
+        var s = words.joined(separator: " ")
+        while let last = s.last, " |-:([".contains(last) { s.removeLast() }
+        return s.isEmpty ? name : s
     }
 
     /// Le sigle di qualità presenti nel titolo, per distinguere le versioni ("4K HDR", "FHD").

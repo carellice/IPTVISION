@@ -450,7 +450,7 @@ final class AppModel: ObservableObject {
             try await fetch([("get_live_categories", "live_cats"), ("get_live_streams", "live")], refresh: refresh)
             let (cf, sf) = (file("live_cats"), file("live"))
             let (cats, items) = try await Task.detached { (try XtreamClient.parseCategories(cf), try XtreamClient.parseChannels(sf)) }.value
-            live = library(cats, items) { $0.categoryId }
+            live = library(cats, groupChannels(items, favorites: favorites)) { $0.categoryId }
         } catch is CancellationError {
         } catch {
             if let e = error as? XtreamError, e.isAuthError { self.error = e.message } else { self.error = error.localizedDescription }
@@ -680,6 +680,12 @@ final class AppModel: ObservableObject {
         case .film(let m): return c.movieUrl(m)
         case .episode(_, let e, _): return c.episodeUrl(e)
         }
+    }
+
+    /// Le altre qualità del canale in diretta, da provare se il flusso si interrompe.
+    func alternateUrls(for p: Playing) -> [URL] {
+        guard let c = client, case .live(let ch, _) = p else { return [] }
+        return ch.alternates.map { c.liveUrl($0, ext: outputFormat) }
     }
 
     func resumePoint(for p: Playing, fromStart: Bool) -> Double {

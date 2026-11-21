@@ -17,6 +17,9 @@ final class Player: ObservableObject {
     var onEnded: (() -> Void)?
     private var timer: Timer?
     private var url: URL?
+    // Le qualità dello stesso canale in diretta: se il flusso si interrompe si passa alla successiva.
+    private var urls: [URL] = []
+    private var urlIndex = 0
     private var live = false
     private var retries = 0
     private var retryAt: Date?
@@ -30,9 +33,11 @@ final class Player: ObservableObject {
         }
     }
 
-    func play(_ url: URL, live: Bool, start: Double) {
+    func play(_ url: URL, live: Bool, start: Double, alternates: [URL] = []) {
         self.url = url
         self.live = live
+        urls = live ? [url] + alternates : []
+        urlIndex = 0
         retries = 0
         retryAt = nil
         failed = nil
@@ -87,6 +92,12 @@ final class Player: ObservableObject {
             } else if retries < 6 {
                 retries += 1
                 retryAt = Date().addingTimeInterval(Double(min(retries * 2, 10)))
+                // Canale in più qualità: si riapre subito con la qualità successiva.
+                if urls.count > 1 {
+                    urlIndex = (urlIndex + 1) % urls.count
+                    url = urls[urlIndex]
+                    if retries < urls.count { retryAt = Date().addingTimeInterval(0.3) }
+                }
             } else {
                 failed = "Impossibile riprodurre questo contenuto."
             }

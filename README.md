@@ -55,6 +55,7 @@ Dettagli in [PWA/README.md](PWA/README.md).
 - Cambi canale con le frecce, con PagSu/PagGiù o digitando il numero. Backspace torna al canale visto prima.
 - Le righe tipiche dei canali 576i/1080i del digitale vengono tolte in automatico (deinterlacciamento).
 - La lista canali è salvata sul PC: anche se il server è lento all'avvio, la visione parte subito.
+- Se un canale è pubblicato in più qualità ("Rai 1 FHD", "Rai 1 HD", "Rai 1 4K"...) compare una volta sola, "Rai 1". Se il flusso si blocca e parte la riconnessione, IPTVISION passa da solo a un'altra qualità dello stesso canale.
 
 ### 🎬 Film e serie TV
 - Locandine, categorie, anno e voto.

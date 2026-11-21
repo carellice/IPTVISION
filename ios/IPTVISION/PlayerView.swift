@@ -168,7 +168,7 @@ struct PlayerView: View {
     private func start() {
         guard let p = model.playing, let url = model.url(for: p) else { return }
         countdown = nil
-        player.play(url, live: isLive, start: model.resumePoint(for: p, fromStart: false))
+        player.play(url, live: isLive, start: model.resumePoint(for: p, fromStart: false), alternates: model.alternateUrls(for: p))
         if case .live(let ch, _) = p { Task { await model.loadEpg(ch) } }
     }
 
