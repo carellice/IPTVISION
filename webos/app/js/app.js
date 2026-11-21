@@ -127,11 +127,11 @@
     A.loading.live = !A.live;
     var client = A.client;
     loadList('live', function () { return Promise.all([client.categories('get_live_categories'), client.channels()]); }, function (v) {
-      A.live = library(v.cats, v.items);
+      A.live = library(v.cats, u.groupChannels(v.items, S.get('favorites')));
       repaint();
     }, refresh).then(function (c) {
       if (A.client !== client) return;
-      A.live = library(c.cats, c.items);
+      A.live = library(c.cats, u.groupChannels(c.items, S.get('favorites')));
       A.loading.live = false;
       if (A.screen === 'home') render(!!refresh);
       if (autoPlay) autoPlayLast();
@@ -1599,7 +1599,7 @@
     var id = S.get('lastStreamId');
     if (!id || !A.live || A.playing) return;
     var ch = null;
-    A.live.items.forEach(function (c) { if (c.streamId === id) ch = c; });
+    A.live.items.forEach(function (c) { if (c.streamId === id || (c.alternates || []).indexOf(id) >= 0) ch = c; });
     if (!ch) return;
     var list = channelsFor(S.get('lastCategoryId') || ALL);
     playChannel(ch, list.indexOf(ch) >= 0 ? list : A.live.items);
@@ -1620,7 +1620,9 @@
     A.playing = { kind: 'live', channel: ch, playlist: playlist || [ch] };
     S.set('lastStreamId', ch.streamId);
     if (A.openCat.Live) S.set('lastCategoryId', A.openCat.Live);
-    Player.play(A.client.liveUrl(ch.streamId, S.get('outputFormat')), true, 0);
+    var fmt = S.get('outputFormat');
+    Player.play(A.client.liveUrl(ch.streamId, fmt), true, 0,
+      (ch.alternates || []).map(function (id) { return A.client.liveUrl(id, fmt); }));
     nowTitle(ch, function () { renderPlayer(); });
     enterPlayer();
   }

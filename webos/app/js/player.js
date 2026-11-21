@@ -12,6 +12,8 @@
   var video = document.getElementById('video');
   var ts = null;
   var url = null, live = true, resumeMs = 0;
+  // Le qualità dello stesso canale in diretta: se il flusso si blocca si passa alla successiva.
+  var urls = [], urlIndex = 0;
   var attempt = 0, lastTime = -1, lastProgressAt = 0, startedAt = 0, everPlayed = false, userPaused = false;
   // Sui TV Samsung, in diretta, il lettore del TV lascia currentTime fermo a 0 anche mentre il video scorre:
   // l'unico segno che avanza sono gli eventi timeupdate, che smettono di arrivare quando il flusso si blocca.
@@ -141,6 +143,10 @@
       delete nativeAudio[url];
       nativeFailed[url] = true;
       console.log('Il lettore del TV non apre il canale: torno a mpegts.js');
+    } else if (live && everPlayed && urls.length > 1) {
+      urlIndex = (urlIndex + 1) % urls.length;
+      url = urls[urlIndex];
+      console.log('Passo alla qualità ' + (urlIndex + 1) + ' di ' + urls.length);
     } else if (live && !everPlayed && otherFormat(url)) {
       url = otherFormat(url);
       console.log('Il canale non parte: provo il formato ' + (/\.m3u8/i.test(url) ? 'HLS (m3u8)' : 'MPEG-TS'));
@@ -153,7 +159,7 @@
     setState('reconnecting');
     var wait = Math.min(15000, 1000 * Math.pow(2, Math.min(attempt - 1, 4)));
     // Una diretta che andava e cade una volta si riapre subito: di solito è il fornitore che ha chiuso la connessione.
-    if (live && everPlayed && attempt === 1) wait = 300;
+    if (live && everPlayed && (attempt === 1 || attempt < urls.length)) wait = 300;
     console.log('Riconnessione (' + reason + '), tentativo ' + attempt + ' tra ' + wait + ' ms');
     destroyTs();
     // Si chiude anche il lettore del TV: molti fornitori accettano una sola connessione, e quella
@@ -206,10 +212,11 @@
     if (Date.now() - lastProgressAt > limit) scheduleRetry('flusso bloccato');
   }, 1000);
 
-  P.play = function (newUrl, isLive, startMs) {
+  P.play = function (newUrl, isLive, startMs, alternates) {
     clearTimeout(retryTimer);
     retryTimer = null;
     url = newUrl; live = isLive; resumeMs = startMs || 0;
+    urls = isLive ? [newUrl].concat(alternates || []) : []; urlIndex = 0;
     attempt = 0; everPlayed = false; userPaused = false;
     start();
   };

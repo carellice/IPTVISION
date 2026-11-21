@@ -70,6 +70,49 @@ window.IPTV = IPTV;
     return words.length ? words.join(' ') : normalize(name);
   }
 
+  // Solo le sigle di qualità video: lingua e audio diversi restano canali separati.
+  var CHANNEL_QUALITY = {};
+  ['4k', 'uhd', '2160p', 'fhd', 'full', '1080p', '1080i', 'hd', '720p', 'sd', '576p', '576i', '480p',
+    'hdr', 'hevc', 'h265', 'h264', '50fps', '60fps', 'hq', 'lq'].forEach(function (t) { CHANNEL_QUALITY[t] = true; });
+
+  /** Chiave per riconoscere lo stesso canale in qualità diverse ("Rai 1 FHD", "Rai 1 4K"). */
+  function channelKey(name) {
+    var n = normalize(name);
+    var words = n.split(' ').filter(function (w) { return w && !CHANNEL_QUALITY[w]; });
+    return words.length ? words.join(' ') : n;
+  }
+
+  /** "Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato. */
+  function withoutQuality(name) {
+    var s = name.split(' ').filter(function (w) { var n = normalize(w); return w && (!n || !CHANNEL_QUALITY[n]); })
+      .join(' ').trim().replace(/[\s|:(\[-]+$/, '');
+    return s || name;
+  }
+
+  /**
+   * Lo stesso canale in più qualità diventa uno solo, "Rai 1", con le altre versioni in alternates: si provano
+   * se il flusso si blocca. Si raggruppa dentro la stessa categoria; resta in testa la versione nei preferiti.
+   */
+  function groupChannels(items, favorites) {
+    var groups = {}, order = [];
+    items.forEach(function (c) {
+      var k = c.categoryId + '|' + channelKey(c.name);
+      if (!groups[k]) { groups[k] = []; order.push(k); }
+      groups[k].push(c);
+    });
+    return order.map(function (k) {
+      var g = groups[k];
+      if (g.length === 1) return g[0];
+      var main = g.filter(function (c) { return favorites.indexOf(c.streamId) >= 0; })[0] || g[0];
+      var name = withoutQuality(main.name), out = {};
+      for (var p in main) out[p] = main[p];
+      out.name = name; out.key = normalize(name); out.initials = initials(name);
+      out.logo = main.logo || g.map(function (c) { return c.logo; }).filter(Boolean)[0] || null;
+      out.alternates = g.filter(function (c) { return c !== main; }).map(function (c) { return c.streamId; });
+      return out;
+    });
+  }
+
   /** "4K", "1080p"… dai dati tecnici di un film (vedi techOf in xtream.js). */
   function techResolution(t) {
     if (!t) return null;
@@ -222,7 +265,7 @@ window.IPTV = IPTV;
   }
 
   IPTV.u = {
-    h: h, append: append, normalize: normalize, initials: initials, variantKey: variantKey, qualityOf: qualityOf,
+    h: h, append: append, normalize: normalize, initials: initials, variantKey: variantKey, qualityOf: qualityOf, groupChannels: groupChannels,
     techResolution: techResolution, techDetails: techDetails,
     groupVariants: groupVariants, joinMeta: joinMeta, formatTime: formatTime, clock: clock, today: today,
     fetchTimeout: fetchTimeout, delay: delay, toast: toast, art: art, progressBar: progressBar,
