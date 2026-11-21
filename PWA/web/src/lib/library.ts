@@ -176,7 +176,16 @@ export function search(
     ...(wants('Series') ? catHits('Series', series) : []),
   ].slice(0, 60)
   // The copies of the same title become one result.
-  const channels = wants('Channels') ? (live?.items.filter((c) => ok(c.searchKey)).slice(0, 60) ?? []) : []
+  // The same channel in other qualities or categories is one result.
+  const seen = new Set<string>()
+  const channels = wants('Channels')
+    ? (live?.items.filter((c) => {
+      const k = channelKey(c.name)
+      if (!ok(c.searchKey) || seen.has(k)) return false
+      seen.add(k)
+      return true
+    }).slice(0, 60) ?? [])
+    : []
   const ms = wants('Movies') ? groupVariants(movies?.items.filter((m) => ok(m.searchKey)) ?? [], (m) => m.name).slice(0, 60) : []
   const ss = wants('Series') ? groupVariants(series?.items.filter((s) => ok(s.searchKey)) ?? [], (s) => s.name).slice(0, 60) : []
   return { channels, movies: ms, series: ss, categories, total: channels.length + ms.length + ss.length + categories.length }

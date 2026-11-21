@@ -1181,7 +1181,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }.take(60)
         // Le copie dello stesso titolo diventano un solo risultato.
         return SearchResults(
-            if (wants(SearchScope.Channels)) live?.items?.filter { ok(it.searchKey) }?.take(60) ?: emptyList() else emptyList(),
+            // Lo stesso canale in qualità o categorie diverse è un solo risultato.
+            if (wants(SearchScope.Channels)) live?.items?.filter { ok(it.searchKey) }?.distinctBy { TextHelpers.channelKey(it.name) }?.take(60) ?: emptyList() else emptyList(),
             if (wants(SearchScope.Movies)) groupVariants(movies?.items?.filter { ok(it.searchKey) } ?: emptyList()) { it.variantKey }.take(60) else emptyList(),
             if (wants(SearchScope.Series)) groupVariants(series?.items?.filter { ok(it.searchKey) } ?: emptyList()) { it.variantKey }.take(60) else emptyList(),
             categories,

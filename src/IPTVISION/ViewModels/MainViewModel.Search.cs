@@ -47,7 +47,8 @@ public sealed partial class MainViewModel
         var scope = SearchScope;
         IEnumerable<SearchHit> channels = scope is not (SearchScope.All or SearchScope.Channels) ? [] : Rank(_all, c => c.SearchKey, q)
             .Concat(isNumber ? _all.Where(c => c.Num.ToString().StartsWith(q, StringComparison.Ordinal)) : [])
-            .Distinct().Take(MaxHitsPerKind)
+            // Lo stesso canale in qualità o categorie diverse è un solo risultato.
+            .Distinct().DistinctBy(c => TextHelpers.ChannelKey(c.Name)).Take(MaxHitsPerKind)
             .Select(c => new SearchHit(c, "Canale", c.Name, c.NowTitle ?? (c.Num > 0 ? $"Canale {c.Num}" : null)));
         // Le copie dello stesso titolo diventano un solo risultato, con il numero di versioni.
         IEnumerable<SearchHit> movies = scope is not (SearchScope.All or SearchScope.Movies) ? [] : GroupVariants(Rank(_movies, m => m.SearchKey, q)).Take(MaxHitsPerKind)

@@ -265,7 +265,7 @@ window.IPTV = IPTV;
   }
 
   IPTV.u = {
-    h: h, append: append, normalize: normalize, initials: initials, variantKey: variantKey, qualityOf: qualityOf, groupChannels: groupChannels,
+    h: h, append: append, normalize: normalize, initials: initials, variantKey: variantKey, qualityOf: qualityOf, groupChannels: groupChannels, channelKey: channelKey,
     techResolution: techResolution, techDetails: techDetails,
     groupVariants: groupVariants, joinMeta: joinMeta, formatTime: formatTime, clock: clock, today: today,
     fetchTimeout: fetchTimeout, delay: delay, toast: toast, art: art, progressBar: progressBar,

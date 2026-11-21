@@ -724,7 +724,13 @@
         });
       });
       if ((A.scope === 'All' || A.scope === 'Channels') && A.live) {
-        var chs = A.live.items.filter(function (c) { return ok(c.key); }).slice(0, 60);
+        // Lo stesso canale in qualità o categorie diverse è un solo risultato.
+        var seen = {};
+        var chs = A.live.items.filter(function (c) {
+          if (!ok(c.key)) return false;
+          var k = u.channelKey(c.name);
+          return seen[k] ? false : (seen[k] = true);
+        }).slice(0, 60);
         group('Canali', chs, function (c) { return V.channelRow(c, { onOpen: function () { playChannel(c, chs); }, favorite: S.isFavorite(c.streamId) }); });
       }
       if ((A.scope === 'All' || A.scope === 'Movies') && A.movies) {

@@ -648,7 +648,9 @@ final class AppModel: ObservableObject {
     func search(_ query: String) -> (channels: [Channel], movies: [TitleEntry<Movie>], series: [TitleEntry<Series>]) {
         let q = TextHelpers.normalize(query)
         guard q.count >= 2 else { return ([], [], []) }
-        let ch = Array((live?.items ?? []).filter { $0.searchKey.contains(q) }.prefix(100))
+        // Lo stesso canale in qualità o categorie diverse è un solo risultato.
+        var seen = Set<String>()
+        let ch = Array((live?.items ?? []).filter { $0.searchKey.contains(q) && seen.insert(TextHelpers.channelKey($0.name)).inserted }.prefix(100))
         let mv = Array(groupVariants((movies?.items ?? []).filter { $0.searchKey.contains(q) }) { $0.variantKey }.prefix(100))
         let se = Array(groupVariants((series?.items ?? []).filter { $0.searchKey.contains(q) }) { $0.variantKey }.prefix(100))
         return (ch, mv, se)
