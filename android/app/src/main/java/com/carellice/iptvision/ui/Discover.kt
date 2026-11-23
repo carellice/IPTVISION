@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -288,7 +289,8 @@ private fun DiscoverHome(vm: AppViewModel) {
     val cols = if (!wide) 2 else if (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 500) 4 else 5
 
     val chips = @Composable { m: Modifier ->
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 2.dp), modifier = m) {
+      Row(m, verticalAlignment = Alignment.CenterVertically) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = edge + 2.dp, vertical = 2.dp), modifier = Modifier.weight(1f)) {
             item {
                 // TV: scelta la sezione dal menu, il focus parte da qui, in cima alla pagina.
                 val first = remember { androidx.compose.ui.focus.FocusRequester() }
@@ -299,6 +301,9 @@ private fun DiscoverHome(vm: AppViewModel) {
             item { Pill("Serie TV", filter == Filter.Tv) { filter = Filter.Tv; Saved.filter = filter } }
             item { Pill("Categorie", false, Icons.Default.KeyboardArrowDown) { categories = true } }
         }
+        // In alto a destra: riscarica cataloghi e posizioni, così "Continua a guardare" si aggiorna subito.
+        Pill("Ricarica", false, Icons.Default.Refresh, Modifier.padding(start = 8.dp, end = edge + 2.dp)) { vm.refreshAll() }
+      }
     }
     val tv = vm.isTv && wide
     val density = LocalDensity.current
