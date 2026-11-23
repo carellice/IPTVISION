@@ -461,6 +461,8 @@ public sealed partial class MainViewModel
         {
             if (!m.HasVariants) ShowDiscover = false;
             OpenMovie(m);
+            // Dopo l'avvio (che lo azzera); con più versioni vale per quella che si sceglie.
+            _vodFromDiscover = true;
         }
         else if (t.Item is Series s)
         {

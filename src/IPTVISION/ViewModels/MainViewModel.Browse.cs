@@ -316,8 +316,10 @@ public sealed partial class MainViewModel
         switch (item)
         {
             case Movie m:
+                var movieFromDiscover = ShowDiscover || _vodFromDiscover;
                 ShowDiscover = false;
                 PlayMovie(m);
+                _vodFromDiscover = movieFromDiscover && !IsTvMode;
                 if (IsTvMode) IsTvBrowsing = false;
                 break;
             case Series s:

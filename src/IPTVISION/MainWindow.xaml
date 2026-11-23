@@ -1710,13 +1710,22 @@
                             </Border>
                         </Popup>
                     </StackPanel>
-                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Command="{Binding CloseDiscoverCommand}"
-                            ToolTip="Elenco delle categorie e ricerca (Esc)">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8FD;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
-                            <TextBlock Text="Elenco e ricerca" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <!-- Ricarica: catalogo e "Continua a guardare" aggiornati, come Ctrl+R. -->
+                        <Button Style="{StaticResource SecondaryButton}" Command="{Binding RefreshCommand}" ToolTip="Ricarica (Ctrl+R)" Margin="0,0,10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE72C;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
+                                <TextBlock Text="Ricarica" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SecondaryButton}" Command="{Binding CloseDiscoverCommand}"
+                                ToolTip="Elenco delle categorie e ricerca (Esc)">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8FD;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
+                                <TextBlock Text="Elenco e ricerca" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </Grid>
 
                 <!-- Cosa si sta caricando, sempre in vista in alto a destra. -->

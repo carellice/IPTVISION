@@ -426,6 +426,9 @@ public sealed partial class MainViewModel
         if (back) OpenDiscover();
     }
 
+    /// <summary>Il film in riproduzione è partito da una locandina di "Film e serie".</summary>
+    private bool _vodFromDiscover;
+
     /// <summary>La serie aperta viene da una locandina di "Film e serie".</summary>
     private bool _seriesFromDiscover;
 
@@ -525,6 +528,7 @@ public sealed partial class MainViewModel
     private void EnterVod()
     {
         LeaveVod();
+        _vodFromDiscover = false;
         if (CurrentChannel != null) CurrentChannel.IsPlaying = false;
         IsVod = true;
         PositionMs = DurationMs = 0;
@@ -642,6 +646,9 @@ public sealed partial class MainViewModel
         if (mode != LibraryMode.Live) RefreshContinueCount();
         ShowToast("Riproduzione interrotta");
         if (IsTvMode) ShowTvBrowser();
+        // Film partito da "Film e serie": si torna alle locandine, non al player vuoto.
+        else if (_vodFromDiscover && OpenSeries == null) OpenDiscover();
+        _vodFromDiscover = false;
     }
 
     [RelayCommand]
