@@ -3,7 +3,7 @@ import { groupVariants } from '../../../shared/text.ts'
 import { AlertDialog, Artwork, Clickable, Dialog, Empty, Icon, Loading, Pill, ProgressLine, useWide } from '../components/ui.tsx'
 import { VirtualGrid } from '../components/virtual.tsx'
 import {
-  app, closeCategory, entryProgress, lastEpisode, moviesFor, openCategory, openMovieEntry, openSeriesEntry, playMovie,
+  app, closeCategory, entryProgress, flush, pull, refreshAll, lastEpisode, moviesFor, openCategory, openMovieEntry, openSeriesEntry, playMovie,
   removeMovieFromContinue, removeSeriesFromContinue, seriesFor, toggleMyList, useApp,
 } from '../lib/app.ts'
 import { ALL_ID, CONTINUE_ID, MYLIST_ID } from '../lib/library.ts'
@@ -142,6 +142,9 @@ function DiscoverHome() {
         <Pill text="Film" selected={filter === 'movie'} onClick={() => setFilter('movie')} />
         <Pill text="Serie TV" selected={filter === 'tv'} onClick={() => setFilter('tv')} />
         <Pill text="Categorie" icon="keyboard_arrow_down" selected={false} onClick={() => setCategories(true)} />
+        <div style={{ flex: 1 }} />
+        {/* In alto a destra: cataloghi e posizioni di nuovo dal server, così "Continua a guardare" si aggiorna. */}
+        <Pill text="Ricarica" icon="refresh" selected={false} onClick={() => { refreshAll(); void flush().then(pull) }} />
       </div>
 
       {error && <div style={{ color: 'var(--danger)', fontSize: 14, padding: '0 2px 12px' }}>{error} Controlla la chiave in Impostazioni → TMDB.</div>}
