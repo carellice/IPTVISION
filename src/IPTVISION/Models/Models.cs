@@ -390,7 +390,7 @@ public sealed partial class Channel : ObservableObject
 public abstract partial class ArtworkItem : ObservableObject
 {
     private ImageSource? _art;
-    private bool _artRequested;
+    private long _artRequestedAt = -1;
 
     protected abstract string? ArtUrl { get; }
 
@@ -398,9 +398,10 @@ public abstract partial class ArtworkItem : ObservableObject
     {
         get
         {
-            if (!_artRequested)
+            // senza locandina si riprova dopo 30 secondi, quando la tessera torna visibile (rete lenta o host saltato)
+            if (_art == null && (_artRequestedAt < 0 || Environment.TickCount64 - _artRequestedAt > 30_000))
             {
-                _artRequested = true;
+                _artRequestedAt = Environment.TickCount64;
                 LogoService.Instance.Request(ArtUrl, img => Art = img);
             }
             return _art;
