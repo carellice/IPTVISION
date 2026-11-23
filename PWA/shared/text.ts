@@ -66,6 +66,14 @@ export function channelKey(name: string): string {
   return words.length === 0 ? n : words.join(' ')
 }
 
+/** Quality from the name, to try the best first: 4K 4, FHD 3, HD 2, no tag 1, SD 0. */
+export function qualityRank(name: string): number {
+  const words = normalize(name).split(' ')
+  const has = (...tags: string[]) => words.some((w) => tags.includes(w))
+  return has('4k', 'uhd', '2160p') ? 4 : has('fhd', 'full', '1080p', '1080i') ? 3 : has('hd', '720p') ? 2
+    : has('sd', '576p', '576i', '480p') ? 0 : 1
+}
+
 /** "Rai 1 FHD" → "Rai 1": the name shown for a grouped channel. */
 export function withoutQuality(name: string): string {
   const s = name.split(' ').filter((w) => { const n = normalize(w); return w !== '' && (n === '' || !channelQualityTags.has(n)) })

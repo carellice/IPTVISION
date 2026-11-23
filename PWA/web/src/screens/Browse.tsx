@@ -7,7 +7,7 @@ import {
 } from '../components/ui.tsx'
 import { VirtualGrid } from '../components/virtual.tsx'
 import {
-  app, channelsFor, closeCategory, entryProgress, guideOf, isGrid, moviesFor, openCategory, openMovieEntry, openSeriesEntry, playChannel,
+  app, channelsFor, closeCategory, entryProgress, guideOf, isGrid, liveLocked, moviesFor, openCategory, openMovieEntry, openSeriesEntry, playChannel,
   removeMovieFromContinue, removeSeriesFromContinue, seriesFor, setGrid, setSort, sortOf, toggleFavorite, toggleMyList, useApp,
 } from '../lib/app.ts'
 import { ALL_ID, CONTINUE_ID, FAVORITES_ID, MYLIST_ID, type Section, sectionTitle, sortLabel, sortOptions } from '../lib/library.ts'
@@ -26,7 +26,7 @@ function LibrarySection({ section, entries, unit, count, children }: {
   count: (catId: string) => number
   children: (catId: string, grid: boolean) => ReactNode
 }) {
-  const open = app.open[section]
+  const open = app.open[section] ?? (liveLocked(section) ? ALL_ID : undefined)
   const entry = entries.find((e) => e.id === open)
   if (open == null || !entry) return <CategoryBrowser section={section} entries={entries} />
   return (
@@ -84,9 +84,11 @@ function ListHeader({ section, title, count }: { section: Section; title: string
   const wide = useWide()
   return (
     <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 8 }}>
-      <Clickable onClick={() => closeCategory(section)} title="Categorie" radius="50%" background="transparent" style={{ padding: 10 }}>
-        <Icon name="arrow_back" color="var(--text)" />
-      </Clickable>
+      {!liveLocked(section) && (
+        <Clickable onClick={() => closeCategory(section)} title="Categorie" radius="50%" background="transparent" style={{ padding: 10 }}>
+          <Icon name="arrow_back" color="var(--text)" />
+        </Clickable>
+      )}
       <div style={{ flex: 1, minWidth: 0, marginLeft: 6 }}>
         <div className="ellipsis" style={{ color: 'var(--text)', fontSize: wide ? 24 : 20, fontWeight: 700 }}>{title}</div>
         <div style={{ color: 'var(--text2)', fontSize: 12 }}>{count}</div>

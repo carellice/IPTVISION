@@ -131,7 +131,10 @@ struct LiveCategories: View {
 
     var body: some View {
         Group {
-            if let live = model.live {
+            if model.live != nil && model.singleChannelList {
+                // Elenco unico: i canali subito, senza categorie.
+                ChannelList(categoryId: allId)
+            } else if let live = model.live {
                 List {
                     if filter.isEmpty {
                         NavigationLink(value: favoritesId) { CategoryRow(title: "Preferiti", icon: "star.fill", count: model.favorites.count) }

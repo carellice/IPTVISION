@@ -302,6 +302,15 @@ public static class TextHelpers
         return words.Length == 0 ? n : string.Join(' ', words);
     }
 
+    /// <summary>Qualità dal nome, per provare prima la migliore: 4K 4, FHD 3, HD 2, senza sigla 1, SD 0.</summary>
+    public static int QualityRank(string name)
+    {
+        var words = Normalize(name).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        bool Has(params string[] tags) => words.Any(tags.Contains);
+        return Has("4k", "uhd", "2160p") ? 4 : Has("fhd", "full", "1080p", "1080i") ? 3 : Has("hd", "720p") ? 2
+            : Has("sd", "576p", "576i", "480p") ? 0 : 1;
+    }
+
     /// <summary>"Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato.</summary>
     public static string WithoutQuality(string name)
     {

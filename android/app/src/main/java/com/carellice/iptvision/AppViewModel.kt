@@ -203,7 +203,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (top == Screen.Player) leavePlayer()
             return true
         }
-        if (screen == Screen.Home && openCategory(section) != null) { closeCategory(section); return true }
+        if (screen == Screen.Home && openCategory(section) != null && !categoryLocked(section)) { closeCategory(section); return true }
         // TV, "Film e serie": Indietro riapre il menu a sinistra; un altro Indietro torna alla TV in diretta.
         if (isTv && screen == Screen.Home && (section == Section.Discover || section == Section.MyList) && !menuFocused) { focusMenu++; return true }
         if (screen == Screen.Home && section != Section.Live) { section = Section.Live; return true }
@@ -213,7 +213,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** C'è qualcosa da chiudere con Indietro prima di uscire dall'app. */
     val canGoBack: Boolean
         get() = variantChoice != null || stack.size > 1 ||
-            (screen == Screen.Home && (openCategory(section) != null || section != Section.Live))
+            (screen == Screen.Home && ((openCategory(section) != null && !categoryLocked(section)) || section != Section.Live))
 
     // ---------- Stato ----------
     var status by mutableStateOf<String?>(null); private set
@@ -251,8 +251,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var moviesOpen by mutableStateOf<String?>(null)
     private var seriesOpen by mutableStateOf<String?>(null)
 
+    /** TV in diretta con l'elenco unico: sempre "Tutti", niente categorie a cui tornare. */
+    fun categoryLocked(s: Section) = s == Section.Live && settings.singleChannelList
+
     fun openCategory(s: Section): String? = when (s) {
-        Section.Live -> liveOpen
+        Section.Live -> if (settings.singleChannelList) ALL_ID else liveOpen
         Section.Movies -> moviesOpen
         Section.Series -> seriesOpen
         Section.Discover -> discoverOpen
@@ -567,6 +570,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return Library(cats.filter { it.id !in hidden && by[it.id]?.isNotEmpty() == true }, visible, by)
     }
 
+    fun setSingleChannelList(value: Boolean) {
+        settings.singleChannelList = value
+        liveOpen = null
+        refreshUi()
+        val c = client ?: return
+        viewModelScope.launch { withContext(Dispatchers.IO) { loadLive(c.account.key) }?.let { live = it } }
+    }
+
     fun setHideAdult(value: Boolean) {
         settings.hideAdult = value
         refreshUi()
@@ -587,7 +598,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!f.exists()) return null
         return try {
             val cats = file("live_cats", key).takeIf { it.exists() }?.let(XtreamClient::parseCategories) ?: emptyList()
-            library(cats, groupChannels(XtreamClient.parseChannels(f), settings.favorites), Channel::categoryId)
+            library(cats, groupChannels(XtreamClient.parseChannels(f), settings.favorites, settings.singleChannelList), Channel::categoryId)
         } catch (e: Exception) {
             Log.w("Cache canali illeggibile", e); null
         }

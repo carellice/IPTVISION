@@ -23,6 +23,8 @@ public sealed class AppSettings
     public bool Deinterlace { get; set; } = true;
     public bool HardwareDecoding { get; set; } = true;
     public bool AutoPlayLastChannel { get; set; } = true;
+    /// <summary>TV in diretta come il digitale terrestre: un elenco unico, senza categorie.</summary>
+    public bool SingleChannelList { get; set; }
     public bool StartInTvMode { get; set; }
     public bool AutoCheckUpdates { get; set; } = true;
     /// <summary>Nasconde le categorie con "XXX" nel nome (canali, film e serie).</summary>

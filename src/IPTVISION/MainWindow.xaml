@@ -365,7 +365,8 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <Button Style="{StaticResource IconButton}" Content="&#xE72B;" FontSize="13"
-                                Command="{Binding CloseCategoryCommand}" ToolTip="Torna alle categorie (Esc)" />
+                                Command="{Binding CloseCategoryCommand}" ToolTip="Torna alle categorie (Esc)"
+                                Visibility="{Binding IsSingleChannelList, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
                         <TextBlock Grid.Column="1" Text="{Binding SelectedCategory.Name}" FontFamily="{StaticResource DisplayFont}" FontSize="16" FontWeight="SemiBold"
                                    Margin="6,0,6,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                         <Button x:Name="SortButton" Grid.Column="2" Style="{StaticResource IconButton}" Width="Auto" Click="Sort_Click"
@@ -1285,6 +1286,13 @@
                                         <StackPanel>
                                             <TextBlock Text="Riprendi l'ultimo canale all'avvio" />
                                             <TextBlock Text="Apri il programma e sei già sul canale" Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5" />
+                                        </StackPanel>
+                                    </CheckBox>
+                                    <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding SingleChannelList}" Margin="0,6,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Canali in un elenco unico" />
+                                            <TextBlock Text="Come il digitale terrestre: niente categorie, ogni canale una volta sola, partendo dalla qualità migliore"
+                                                       Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </CheckBox>
                                     <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding HideAdult}" Margin="0,6,0,0">

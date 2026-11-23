@@ -61,6 +61,15 @@
     return { cats: cats.filter(function (c) { return by[c.id]; }), items: visible, by: by, raw: { cats: cats, items: items } };
   }
 
+  /** Canali in diretta raggruppati per qualità; quelli del provider restano in A.liveItems per poterli rifare. */
+  function liveLibrary(cats, items) {
+    A.liveItems = items;
+    return library(cats, u.groupChannels(items, S.get('favorites'), S.get('singleChannelList')));
+  }
+
+  /** TV in diretta con l'elenco unico: sempre "Tutti", niente categorie a cui tornare. */
+  function liveLocked(section) { return section === 'Live' && S.get('singleChannelList'); }
+
   /** Rifà le liste con il filtro attuale (dopo aver cambiato "Nascondi XXX"). */
   function reapplyHidden() {
     ['live', 'movies', 'series'].forEach(function (k) { if (A[k]) A[k] = library(A[k].raw.cats, A[k].raw.items); });
@@ -127,11 +136,11 @@
     A.loading.live = !A.live;
     var client = A.client;
     loadList('live', function () { return Promise.all([client.categories('get_live_categories'), client.channels()]); }, function (v) {
-      A.live = library(v.cats, u.groupChannels(v.items, S.get('favorites')));
+      A.live = liveLibrary(v.cats, v.items);
       repaint();
     }, refresh).then(function (c) {
       if (A.client !== client) return;
-      A.live = library(c.cats, u.groupChannels(c.items, S.get('favorites')));
+      A.live = liveLibrary(c.cats, c.items);
       A.loading.live = false;
       if (A.screen === 'home') render(!!refresh);
       if (autoPlay) autoPlayLast();
@@ -587,7 +596,7 @@
       return;
     }
     var entries = catEntries(section);
-    var open = openId || A.openCat[section];
+    var open = openId || A.openCat[section] || (liveLocked(section) ? ALL : null);
     var entry = null;
     entries.forEach(function (e) { if (e.id === open) entry = e; });
 
@@ -617,7 +626,7 @@
     var listBtn = V.focusable(h('div', { class: 'toggle btn small' + (grid ? '' : ' on'), data: { key: 'view-list' }, text: '☰ Elenco' }), function () { S.setGrid(section, false); render(false, root.querySelector('[data-key="view-list"]')); });
     var gridBtn = V.focusable(h('div', { class: 'toggle btn small' + (grid ? ' on' : ''), data: { key: 'view-grid' }, text: '▦ Griglia' }), function () { S.setGrid(section, true); render(false, root.querySelector('[data-key="view-grid"]')); });
     content.appendChild(h('div', { class: 'header' }, [
-      backBtn,
+      liveLocked(section) && !openId ? null : backBtn,
       h('div', { class: 'title' }, [h('b', { text: entry.name }), h('span', { text: items.length + unit })]),
       sortBtn, listBtn, gridBtn,
     ]));
@@ -817,7 +826,7 @@
     if (A.screen !== 'home') return 'List';
     if (A.section === 'Search') return 'Search';
     if (A.section === 'Settings') return 'Setting';
-    return A.openCat[A.section] ? 'List' : 'Home';
+    return A.openCat[A.section] || liveLocked(A.section) ? 'List' : 'Home';
   };
 
   function settingRow(title, sub, on, toggle) {
@@ -904,6 +913,12 @@
       S.get('outputFormat') === 'm3u8', function () { S.set('outputFormat', S.get('outputFormat') === 'm3u8' ? 'ts' : 'm3u8'); }));
     box.appendChild(settingRow('Riprendi l\'ultimo canale all\'avvio', 'Apri l\'app e il canale riparte da dov\'eri rimasto.',
       S.get('autoPlayLast'), function () { S.set('autoPlayLast', !S.get('autoPlayLast')); }));
+    box.appendChild(settingRow('Canali in un elenco unico', 'Come il digitale terrestre: niente categorie, ogni canale una volta sola, partendo dalla qualità migliore.',
+      S.get('singleChannelList'), function () {
+        S.set('singleChannelList', !S.get('singleChannelList'));
+        A.openCat.Live = null;
+        if (A.live && A.liveItems) A.live = liveLibrary(A.live.raw.cats, A.liveItems);
+      }));
     box.appendChild(settingRow('Nascondi XXX', 'Toglie canali, film e serie delle categorie con XXX nel nome.',
       S.get('hideAdult'), function () { S.set('hideAdult', !S.get('hideAdult')); reapplyHidden(); }));
     box.appendChild(h('div', { class: 'group-title', text: 'Dati' }));

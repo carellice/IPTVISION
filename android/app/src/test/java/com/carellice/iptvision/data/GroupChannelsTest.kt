@@ -23,6 +23,15 @@ class GroupChannelsTest {
     }
 
     @Test
+    fun singleListJoinsCategoriesAndStartsFromBestQuality() {
+        val list = listOf(ch(1, "Rai 1 SD"), ch(2, "Rai 1"), ch(3, "Rai 1 FHD", cat = "2"), ch(4, "Rai 1 4K", cat = "3"), ch(5, "Rai 1 HD"))
+        val g = groupChannels(list, favorites = setOf(1), single = true).single()
+        assertEquals("Rai 1", g.name)
+        assertEquals(4, g.streamId)
+        assertEquals(listOf(3, 5, 2, 1), g.alternates)
+    }
+
+    @Test
     fun keepsLanguagesApartAndCleansName() {
         assertEquals(2, groupChannels(listOf(ch(1, "Sky Sport ITA"), ch(2, "Sky Sport ENG")), emptySet()).size)
         assertEquals("Rai 1", TextHelpers.withoutQuality("Rai 1 | FHD"))

@@ -238,6 +238,19 @@ object TextHelpers {
         return if (words.isEmpty()) n else words.joinToString(" ")
     }
 
+    /** Qualità dal nome, per provare prima la migliore: 4K 4, FHD 3, HD 2, senza sigla 1, SD 0. */
+    fun qualityRank(name: String): Int {
+        val words = normalize(name).split(' ')
+        fun has(vararg tags: String) = words.any { it in tags }
+        return when {
+            has("4k", "uhd", "2160p") -> 4
+            has("fhd", "full", "1080p", "1080i") -> 3
+            has("hd", "720p") -> 2
+            has("sd", "576p", "576i", "480p") -> 0
+            else -> 1
+        }
+    }
+
     /** "Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato. */
     fun withoutQuality(name: String): String {
         val words = name.split(' ').filter { w -> w.isNotEmpty() && normalize(w).let { it.isEmpty() || it !in channelQualityTags } }
@@ -254,12 +267,15 @@ object TextHelpers {
  * con le altre versioni in [Channel.alternates]. Si raggruppa dentro la stessa categoria. Resta in testa
  * la versione nei preferiti, altrimenti la prima della lista.
  */
-fun groupChannels(items: List<Channel>, favorites: Set<Int>): List<Channel> {
+fun groupChannels(items: List<Channel>, favorites: Set<Int>, single: Boolean = false): List<Channel> {
+    // Elenco unico: lo stesso canale si unisce anche tra categorie diverse e parte dalla qualità migliore;
+    // se il flusso si blocca il player gira sulle altre, dalla migliore alla peggiore.
     val groups = LinkedHashMap<Pair<String?, String>, MutableList<Channel>>()
-    for (c in items) groups.getOrPut(c.categoryId to TextHelpers.channelKey(c.name)) { ArrayList(1) } += c
-    return groups.values.map { g ->
+    for (c in items) groups.getOrPut((if (single) null else c.categoryId) to TextHelpers.channelKey(c.name)) { ArrayList(1) } += c
+    return groups.values.map { g0 ->
+        val g = if (single) g0.sortedByDescending { TextHelpers.qualityRank(it.name) } else g0
         if (g.size == 1) return@map g[0]
-        val main = g.firstOrNull { it.streamId in favorites } ?: g[0]
+        val main = if (single) g[0] else g.firstOrNull { it.streamId in favorites } ?: g[0]
         main.copy(
             name = TextHelpers.withoutQuality(main.name),
             logo = main.logo ?: g.firstNotNullOfOrNull { it.logo },

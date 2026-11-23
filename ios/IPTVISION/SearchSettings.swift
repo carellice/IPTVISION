@@ -110,6 +110,7 @@ struct SettingsView: View {
             }
             TmdbSection()
             Section {
+                Toggle("Canali in un elenco unico", isOn: $model.singleChannelList)
                 Toggle("Nascondi XXX", isOn: $model.hideAdult)
                 Picker("Formato della diretta", selection: $model.outputFormat) {
                     Text("MPEG-TS").tag("ts")

@@ -179,6 +179,13 @@ public sealed partial class MainViewModel
 
     private void ShowTvCategories(int index)
     {
+        // Elenco unico: si va dritti ai canali.
+        if (IsSingleChannelList && Categories.Count > 0)
+        {
+            CloseSeriesForTv();
+            ShowTvItems(Categories[0]);
+            return;
+        }
         CloseSeriesForTv();
         _tvCategory = null;
         SelectedCategory = null;
@@ -534,6 +541,9 @@ public sealed partial class MainViewModel
                     ShowTvItems(_tvCategory, _tvItemIndex);
                 }
                 else ShowTvCategories(_tvCategoryIndex);
+                break;
+            case TvScreen.Items when IsSingleChannelList:
+                TvZone = TvZone.Tabs;
                 break;
             case TvScreen.Items:
                 TvZone = TvZone.Grid;

@@ -64,6 +64,11 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
         set(v) = p.edit().putString("tmdbKey", v).apply()
 
     /** Nasconde le categorie con "XXX" nel nome (canali, film e serie). */
+    /** TV in diretta come il digitale terrestre: un elenco unico, senza categorie. */
+    var singleChannelList: Boolean
+        get() = p.getBoolean("singleChannelList", false)
+        set(v) = p.edit().putBoolean("singleChannelList", v).apply()
+
     var hideAdult: Boolean
         get() = p.getBoolean("hideAdult", true)
         set(v) = p.edit().putBoolean("hideAdult", v).apply()

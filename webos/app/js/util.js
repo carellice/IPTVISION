@@ -82,6 +82,14 @@ window.IPTV = IPTV;
     return words.length ? words.join(' ') : n;
   }
 
+  /** Qualità dal nome, per provare prima la migliore: 4K 4, FHD 3, HD 2, senza sigla 1, SD 0. */
+  function qualityRank(name) {
+    var words = normalize(name).split(' ');
+    function has(tags) { return words.some(function (w) { return tags.indexOf(w) >= 0; }); }
+    return has(['4k', 'uhd', '2160p']) ? 4 : has(['fhd', 'full', '1080p', '1080i']) ? 3 : has(['hd', '720p']) ? 2
+      : has(['sd', '576p', '576i', '480p']) ? 0 : 1;
+  }
+
   /** "Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato. */
   function withoutQuality(name) {
     var s = name.split(' ').filter(function (w) { var n = normalize(w); return w && (!n || !CHANNEL_QUALITY[n]); })
@@ -93,17 +101,21 @@ window.IPTV = IPTV;
    * Lo stesso canale in più qualità diventa uno solo, "Rai 1", con le altre versioni in alternates: si provano
    * se il flusso si blocca. Si raggruppa dentro la stessa categoria; resta in testa la versione nei preferiti.
    */
-  function groupChannels(items, favorites) {
+  function groupChannels(items, favorites, single) {
+    // Elenco unico: lo stesso canale si unisce anche tra categorie diverse e parte dalla qualità migliore;
+    // se il flusso si blocca il player gira sulle altre, dalla migliore alla peggiore.
     var groups = {}, order = [];
     items.forEach(function (c) {
-      var k = c.categoryId + '|' + channelKey(c.name);
+      var k = (single ? '' : c.categoryId) + '|' + channelKey(c.name);
       if (!groups[k]) { groups[k] = []; order.push(k); }
       groups[k].push(c);
     });
     return order.map(function (k) {
       var g = groups[k];
+      if (single) g = g.map(function (c, i) { return { c: c, i: i, r: qualityRank(c.name) }; })
+        .sort(function (a, b) { return b.r - a.r || a.i - b.i; }).map(function (x) { return x.c; });
       if (g.length === 1) return g[0];
-      var main = g.filter(function (c) { return favorites.indexOf(c.streamId) >= 0; })[0] || g[0];
+      var main = single ? g[0] : g.filter(function (c) { return favorites.indexOf(c.streamId) >= 0; })[0] || g[0];
       var name = withoutQuality(main.name), out = {};
       for (var p in main) out[p] = main[p];
       out.name = name; out.key = normalize(name); out.initials = initials(name);

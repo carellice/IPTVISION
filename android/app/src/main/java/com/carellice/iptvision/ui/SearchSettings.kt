@@ -225,6 +225,9 @@ fun SettingsSection(vm: AppViewModel) {
             vm.settings.autoPlayLastChannel = it
             vm.refreshUi()
         }
+        Toggle("Canali in un elenco unico", "Come il digitale terrestre: niente categorie, ogni canale una volta sola, partendo dalla qualità migliore.", vm.settings.singleChannelList) {
+            vm.setSingleChannelList(it)
+        }
         Toggle("Nascondi XXX", "Toglie canali, film e serie delle categorie con XXX nel nome.", vm.settings.hideAdult) {
             vm.setHideAdult(it)
         }

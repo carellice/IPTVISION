@@ -31,6 +31,12 @@ enum AppSettings {
         set { d.set(newValue, forKey: "outputFormat") }
     }
 
+    /// TV in diretta come il digitale terrestre: un elenco unico, senza categorie.
+    static var singleChannelList: Bool {
+        get { d.bool(forKey: "singleChannelList") }
+        set { d.set(newValue, forKey: "singleChannelList") }
+    }
+
     /// Nasconde le categorie con "XXX" nel nome (canali, film e serie).
     static var hideAdult: Bool {
         get { d.object(forKey: "hideAdult") as? Bool ?? true }

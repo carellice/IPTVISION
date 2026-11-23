@@ -3,7 +3,7 @@ import { ActionButton, Clickable, Dialog, Pill, SectionTitle, Switch, TextButton
 import { api } from '../lib/api.ts'
 import { NetworkStatus } from '../components/network.tsx'
 import { type Skin, setSkin, useSkin } from '../lib/skin.ts'
-import { type XtreamList, addXtreamList, app, clearCache, logoutXtream, refreshAll, setHideAdult, setTmdb, updateSettings, useApp, switchXtreamList } from '../lib/app.ts'
+import { type XtreamList, addXtreamList, app, clearCache, logoutXtream, refreshAll, setHideAdult, setSingleChannelList, setTmdb, updateSettings, useApp, switchXtreamList } from '../lib/app.ts'
 import { checkKey, hasTmdb } from '../lib/tmdb.ts'
 import { ProfilesSettings } from './Profiles.tsx'
 
@@ -109,6 +109,8 @@ export function SettingsSection() {
         <Group title="Riproduzione" />
         <Toggle title="Riprendi l'ultimo canale all'avvio" subtitle="Apri l'app e il canale riparte da dov'eri rimasto."
           checked={app.settings.autoPlayLast} onChange={(v) => updateSettings({ autoPlayLast: v })} />
+        <Toggle title="Canali in un elenco unico" subtitle="Come il digitale terrestre: niente categorie, ogni canale una volta sola, partendo dalla qualità migliore."
+          checked={app.settings.singleChannelList} onChange={setSingleChannelList} />
         <Toggle title="Nascondi XXX" subtitle="Toglie canali, film e serie delle categorie con XXX nel nome."
           checked={app.hideAdult} onChange={setHideAdult} />
 

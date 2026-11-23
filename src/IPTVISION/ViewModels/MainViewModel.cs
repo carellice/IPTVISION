@@ -412,6 +412,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnModeChanged(LibraryMode value)
     {
+        OnPropertyChanged(nameof(IsSingleChannelList));
         _suspendFilter = true;
         SearchText = "";
         _suspendFilter = false;
@@ -445,7 +446,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         switch (Mode)
         {
             case LibraryMode.Live:
-                if (_all.Count > 0)
+                if (_all.Count > 0 && _settings.SingleChannelList)
+                {
+                    // Elenco unico: solo "Tutti", già aperto.
+                    Categories.Add(new CategoryItem(CategoryItem.AllId, "Tutti i canali") { Count = _all.Count });
+                    _modeCategory[Mode] = CategoryItem.AllId;
+                }
+                else if (_all.Count > 0)
                 {
                     Categories.Add(new CategoryItem(CategoryItem.FavoritesId, "Preferiti") { Count = _all.Count(c => c.IsFavorite) });
                     Categories.Add(new CategoryItem(CategoryItem.AllId, "Tutti") { Count = _all.Count });
@@ -496,13 +503,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _liveCats = cats;
         // Lo stesso canale in più qualità ("Rai 1 FHD", "Rai 1 HD", "Rai 1 4K") diventa uno solo, "Rai 1", dentro
         // la sua categoria. Resta in testa la versione nei preferiti, altrimenti la prima della lista.
+        // Elenco unico: lo stesso canale si unisce anche tra categorie diverse e parte dalla qualità migliore;
+        // se il flusso si blocca il player gira sulle altre, dalla migliore alla peggiore.
+        var single = _settings.SingleChannelList;
         _all = chans
             .GroupBy(c => c.StreamId).Select(g => g.First())
-            .GroupBy(c => (c.CategoryId, TextHelpers.ChannelKey(c.Name)))
+            .GroupBy(c => (single ? null : c.CategoryId, TextHelpers.ChannelKey(c.Name)))
             .Select(g =>
             {
-                var list = g.ToList();
+                var list = single ? g.OrderByDescending(d => TextHelpers.QualityRank(d.Name)).ToList() : g.ToList();
                 if (list.Count == 1) return new Channel(list[0]) { IsFavorite = _settings.Favorites.Contains(list[0].StreamId) };
+                if (single)
+                    return new Channel(list[0], TextHelpers.WithoutQuality(list[0].Name), list.Skip(1).ToList())
+                        { IsFavorite = list.Any(d => _settings.Favorites.Contains(d.StreamId)) };
                 var main = list.FirstOrDefault(d => _settings.Favorites.Contains(d.StreamId)) ?? list[0];
                 return new Channel(main, TextHelpers.WithoutQuality(main.Name), list.Where(d => d != main).ToList())
                     { IsFavorite = _settings.Favorites.Contains(main.StreamId) };
@@ -544,7 +557,29 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void CloseCategory() => SelectedCategory = null;
+    private void CloseCategory()
+    {
+        if (!IsSingleChannelList) SelectedCategory = null;
+    }
+
+    /// <summary>TV in diretta con l'elenco unico: niente categorie a cui tornare.</summary>
+    public bool IsSingleChannelList => Mode == LibraryMode.Live && _settings.SingleChannelList;
+
+    public bool SingleChannelList
+    {
+        get => _settings.SingleChannelList;
+        set
+        {
+            if (_settings.SingleChannelList == value) return;
+            _settings.SingleChannelList = value;
+            if (!value && Mode == LibraryMode.Live) _modeCategory[Mode] = null;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsSingleChannelList));
+            ScheduleSave();
+            ReapplyHidden();
+            if (IsTvMode && Mode == LibraryMode.Live) ShowTvCategories(0);
+        }
+    }
 
     partial void OnSearchTextChanged(string value)
     {
@@ -604,7 +639,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (ch == null) return;
         ch.IsFavorite = !ch.IsFavorite;
         if (ch.IsFavorite) _settings.Favorites.Add(ch.StreamId);
-        else _settings.Favorites.Remove(ch.StreamId);
+        else
+        {
+            _settings.Favorites.Remove(ch.StreamId);
+            // Elenco unico: il preferito poteva essere un'altra qualità dello stesso canale.
+            foreach (var a in ch.Alternates)
+                if (_settings.Favorites.Remove(a))
+                    QueueServerOp(new System.Text.Json.Nodes.JsonObject { ["op"] = "favorite", ["streamId"] = a, ["on"] = false });
+        }
         ScheduleSave();
         QueueServerOp(new System.Text.Json.Nodes.JsonObject { ["op"] = "favorite", ["streamId"] = ch.StreamId, ["on"] = ch.IsFavorite }, now: true);
 

@@ -37,6 +37,8 @@ export const sectionList = (): Section[] => (hasTmdb() ? ['Live', 'Discover', 'M
 
 type DeviceSettings = {
   autoPlayLast: boolean
+  /** Live TV like digital terrestrial: one list, no categories. */
+  singleChannelList: boolean
   lastStreamId: number | null
   lastCategoryId: string | null
   sorts: Partial<Record<Section, ListSort>>
@@ -46,7 +48,7 @@ type DeviceSettings = {
 const settingsKey = (user: string) => `iptvision.settings.${user.toLowerCase()}`
 
 function loadSettings(user: string): DeviceSettings {
-  const defaults: DeviceSettings = { autoPlayLast: false, lastStreamId: null, lastCategoryId: null, sorts: {}, grids: {} }
+  const defaults: DeviceSettings = { autoPlayLast: false, singleChannelList: false, lastStreamId: null, lastCategoryId: null, sorts: {}, grids: {} }
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(settingsKey(user)) ?? '{}') } } catch { return defaults }
 }
 
@@ -410,7 +412,7 @@ const cacheKey = (kind: string) => `${app.username.toLowerCase()}|${app.xtream?.
 
 function rebuildLibraries() {
   const h = app.hideAdult
-  if (app.rawLive) app.live = library(app.rawLive.categories, groupChannels(app.rawLive.items, app.favorites), (c) => c.categoryId, h)
+  if (app.rawLive) app.live = library(app.rawLive.categories, groupChannels(app.rawLive.items, app.favorites, app.settings.singleChannelList), (c) => c.categoryId, h)
   if (app.rawMovies) app.movies = library(app.rawMovies.categories, app.rawMovies.items, (m) => m.categoryId, h)
   if (app.rawSeries) app.series = library(app.rawSeries.categories, app.rawSeries.items, (s) => s.categoryId, h)
 }
@@ -528,6 +530,19 @@ export function ensureSeries(force = false) {
   if (!app.xtream || (app.series && !force) || app.seriesLoading) return
   loadCatalog<CompactSeries, Series>('series', force, toSeries, () => app.rawSeries, (r) => { app.rawSeries = r }, (s) => s.seriesId,
     'serie nuova', 'serie nuove', 'seriesLoading', 'Impossibile caricare le serie.')
+}
+
+/** Live TV with the single list: always "Tutti", no categories to go back to. */
+export function liveLocked(s: Section): boolean {
+  return s === 'Live' && app.settings.singleChannelList
+}
+
+export function setSingleChannelList(value: boolean) {
+  app.settings = { ...app.settings, singleChannelList: value }
+  saveSettings()
+  delete app.open.Live
+  rebuildLibraries()
+  emit()
 }
 
 export function setHideAdult(value: boolean) {

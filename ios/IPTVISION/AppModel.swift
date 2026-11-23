@@ -108,6 +108,14 @@ final class AppModel: ObservableObject {
             reloadFromCache()
         }
     }
+    /// TV in diretta come il digitale terrestre: un elenco unico, senza categorie.
+    @Published var singleChannelList = AppSettings.singleChannelList {
+        didSet {
+            guard singleChannelList != oldValue else { return }
+            AppSettings.singleChannelList = singleChannelList
+            reloadFromCache()
+        }
+    }
     @Published var outputFormat = AppSettings.outputFormat { didSet { AppSettings.outputFormat = outputFormat } }
     @Published var sorts: [AppSection: ListSort] = Dictionary(uniqueKeysWithValues: [AppSection.live, .movies, .series].map { ($0, AppSettings.sort($0)) })
     /// Cambia quando cambiano posizioni o "La mia lista": le viste che ne dipendono si ridisegnano.
@@ -450,7 +458,7 @@ final class AppModel: ObservableObject {
             try await fetch([("get_live_categories", "live_cats"), ("get_live_streams", "live")], refresh: refresh)
             let (cf, sf) = (file("live_cats"), file("live"))
             let (cats, items) = try await Task.detached { (try XtreamClient.parseCategories(cf), try XtreamClient.parseChannels(sf)) }.value
-            live = library(cats, groupChannels(items, favorites: favorites)) { $0.categoryId }
+            live = library(cats, groupChannels(items, favorites: favorites, single: singleChannelList)) { $0.categoryId }
         } catch is CancellationError {
         } catch {
             if let e = error as? XtreamError, e.isAuthError { self.error = e.message } else { self.error = error.localizedDescription }

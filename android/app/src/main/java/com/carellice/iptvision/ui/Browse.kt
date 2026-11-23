@@ -187,10 +187,12 @@ private fun catTint(id: String) = when (id) {
 private fun ListHeader(vm: AppViewModel, section: Section, title: String, count: String) {
     val wide = LocalWide.current
     Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.tvClickable(shape = RoundedCornerShape(50), background = Color.Transparent) { vm.closeCategory(section) }.padding(10.dp)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Categorie", tint = C.Text)
+        if (!vm.categoryLocked(section)) {
+            Box(Modifier.tvClickable(shape = RoundedCornerShape(50), background = Color.Transparent) { vm.closeCategory(section) }.padding(10.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Categorie", tint = C.Text)
+            }
+            HSpace(6.dp)
         }
-        HSpace(6.dp)
         Column(Modifier.weight(1f)) {
             Text(title, color = C.Text, fontSize = if (wide) 24.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(count, color = C.Text2, fontSize = 12.sp)
