@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
@@ -519,14 +520,37 @@ private fun TopTile(vm: AppViewModel, t: Title, n: Int) {
         Modifier.height(h).then(back).tvClickable(shape = RoundedCornerShape(8.dp), background = Color.Transparent, focusedBackground = Color.Transparent) { opened(); vm.openTitle(t) }.padding(end = 4.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
-        // Il numero grande col solo contorno, mezzo nascosto dietro la locandina.
-        Text(
-            "$n", color = C.Text3, fontSize = (h.value * 0.95f).sp, lineHeight = (h.value * 0.8f).sp, fontWeight = FontWeight.Black,
-            letterSpacing = if (n == 10) (-h.value * 0.12f).sp else 0.sp,
-            style = TextStyle(drawStyle = Stroke(width = 6f)),
-            modifier = Modifier.offset(x = h * 0.12f),
-        )
+        // Il numero grande col solo contorno, mezzo nascosto dietro la locandina (come su Windows).
+        RankNumber(n, h * (150f / 210f), Modifier.offset(x = h * (22f / 210f)))
         Artwork(Tmdb.img(t.tmdb?.poster) ?: t.poster, t.initials, Modifier.fillMaxHeight().aspectRatio(2f / 3f).clip(skinCorners(8.dp)), fontSize = 18)
+    }
+}
+
+/**
+ * Cifre della classifica come su Windows: il disegno del numero pieno del colore di fondo, con un contorno sottile.
+ * Disegnate come sagoma e non come testo, così il 10 non si accavalla e niente viene tagliato sopra o sotto.
+ */
+@Composable
+private fun RankNumber(n: Int, height: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    val fill = C.Bg
+    val line = C.Text3
+    val (glyphs, bounds) = remember(n) {
+        val path = android.graphics.Path()
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL)
+            textSize = 190f
+        }.getTextPath("$n", 0, "$n".length, 0f, 0f, path)
+        path to android.graphics.RectF().also { path.computeBounds(it, true) }
+    }
+    if (bounds.height() <= 0f) return
+    androidx.compose.foundation.Canvas(modifier.size(height * (bounds.width() / bounds.height()), height)) {
+        val stroke = size.height * 2.5f / 150f
+        val k = (size.height - stroke) / bounds.height()
+        val p = android.graphics.Path(glyphs).apply {
+            transform(android.graphics.Matrix().apply { setTranslate(-bounds.left, -bounds.top); postScale(k, k); postTranslate(stroke / 2, stroke / 2) })
+        }.asComposePath()
+        drawPath(p, fill)
+        drawPath(p, line, style = Stroke(width = stroke, join = androidx.compose.ui.graphics.StrokeJoin.Round))
     }
 }
 
