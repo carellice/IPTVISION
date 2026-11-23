@@ -466,6 +466,8 @@ public sealed partial class MainViewModel
         {
             ShowDiscover = false;
             if (Mode != LibraryMode.Series) Mode = LibraryMode.Series;
+            // Prima di aprirla: con più versioni la scelta la apre dopo, e il segno resta.
+            _seriesFromDiscover = true;
             OpenSeriesItem(s);
         }
     }

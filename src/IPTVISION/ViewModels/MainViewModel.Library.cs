@@ -418,7 +418,18 @@ public sealed partial class MainViewModel
     }
 
     [RelayCommand]
-    private void CloseSeries() => OpenSeries = null;
+    private void CloseSeries()
+    {
+        // Aperta da "Film e serie" e senza niente in riproduzione: si torna alle locandine, non al player vuoto.
+        var back = _seriesFromDiscover && !Player.IsActive;
+        OpenSeries = null;
+        if (back) OpenDiscover();
+    }
+
+    /// <summary>La serie aperta viene da una locandina di "Film e serie".</summary>
+    private bool _seriesFromDiscover;
+
+    partial void OnOpenSeriesChanged(Series? value) { if (value == null) _seriesFromDiscover = false; }
 
     // ---------- Riproduzione on demand ----------
 

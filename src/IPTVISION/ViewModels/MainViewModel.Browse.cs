@@ -321,9 +321,11 @@ public sealed partial class MainViewModel
                 if (IsTvMode) IsTvBrowsing = false;
                 break;
             case Series s:
+                var fromDiscover = ShowDiscover || _seriesFromDiscover;
                 ShowDiscover = false;
                 if (HasTmdb && Mode != LibraryMode.Series && !IsTvMode) Mode = LibraryMode.Series;
                 OpenSeriesFromList(s);
+                _seriesFromDiscover = fromDiscover && !IsTvMode;
                 break;
         }
     }
@@ -331,6 +333,7 @@ public sealed partial class MainViewModel
     [RelayCommand]
     public void CloseVariants()
     {
+        if (OpenSeries == null) _seriesFromDiscover = false;
         VariantOwner = null;
         VariantChoices = [];
     }
