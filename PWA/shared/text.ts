@@ -74,6 +74,17 @@ export function qualityRank(name: string): number {
     : has('sd', '576p', '576i', '480p') ? 0 : 1
 }
 
+/** Mb/s each quality needs to play smoothly, by qualityRank: SD, no tag, HD, FHD, 4K. */
+const qualityMbps = [2, 4, 5, 9, 25]
+export const qualityLabels = ['SD', 'qualità standard', 'HD', 'FHD', '4K']
+
+/** The version to start from with [mbps] of speed: the best quality it carries, else the lowest. */
+export function pickBySpeed(ranks: number[], mbps: number): number {
+  let pick = -1
+  ranks.forEach((r, i) => { if (qualityMbps[r] <= mbps && (pick < 0 || r > ranks[pick])) pick = i })
+  return pick >= 0 ? pick : ranks.indexOf(Math.min(...ranks))
+}
+
 /** "Rai 1 FHD" → "Rai 1": the name shown for a grouped channel. */
 export function withoutQuality(name: string): string {
   const s = name.split(' ').filter((w) => { const n = normalize(w); return w !== '' && (n === '' || !channelQualityTags.has(n)) })

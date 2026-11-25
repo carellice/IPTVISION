@@ -113,6 +113,17 @@
 
     clearQueue: function () { pending = []; },
 
+    /** La velocità che avrà un canale: la più lenta tra Internet del server e la strada dal server al TV. */
+    speed: function () {
+      return Promise.all([
+        call(Server.url(), 'GET', '/api/speedtest', S.get('password'), null).then(function (o) { return o.mbps; }, function () { return null; }),
+        IPTV.u.downloadSpeed(Server.url() + '/api/speedtest/down?bytes=50000000', S.get('password')),
+      ]).then(function (v) {
+        v = v.filter(function (x) { return x != null; });
+        return v.length ? Math.min.apply(null, v) : null;
+      });
+    },
+
     /** Come esce su Internet il server di casa: { label, vpn } (es. "VPN attiva · Svizzera · 185.1.2.3"). */
     net: null,
     loadNetwork: function () {

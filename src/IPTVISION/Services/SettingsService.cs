@@ -25,6 +25,8 @@ public sealed class AppSettings
     public bool AutoPlayLastChannel { get; set; } = true;
     /// <summary>TV in diretta come il digitale terrestre: un elenco unico, senza categorie.</summary>
     public bool SingleChannelList { get; set; }
+    /// <summary>Speedtest prima di ogni canale in diretta, per scegliere la qualità che la connessione regge.</summary>
+    public bool LiveSpeedTest { get; set; }
     public bool StartInTvMode { get; set; }
     public bool AutoCheckUpdates { get; set; } = true;
     /// <summary>Nasconde le categorie con "XXX" nel nome (canali, film e serie).</summary>

@@ -116,6 +116,8 @@ final class AppModel: ObservableObject {
             reloadFromCache()
         }
     }
+    /// Speedtest prima di ogni canale in diretta, per scegliere la qualità.
+    @Published var speedTest = AppSettings.speedTest { didSet { AppSettings.speedTest = speedTest } }
     @Published var outputFormat = AppSettings.outputFormat { didSet { AppSettings.outputFormat = outputFormat } }
     @Published var sorts: [AppSection: ListSort] = Dictionary(uniqueKeysWithValues: [AppSection.live, .movies, .series].map { ($0, AppSettings.sort($0)) })
     /// Cambia quando cambiano posizioni o "La mia lista": le viste che ne dipendono si ridisegnano.
@@ -690,6 +692,23 @@ final class AppModel: ObservableObject {
         case .film(let m): return c.movieUrl(m)
         case .episode(_, let e, _): return c.episodeUrl(e)
         }
+    }
+
+    /// Gli indirizzi del canale in diretta: prima la versione [first], poi le altre da provare se il flusso si interrompe.
+    func liveUrls(_ ch: Channel, first: Int) -> [URL] {
+        guard let c = client else { return [] }
+        let ids = [ch.streamId] + ch.alternates
+        return ([ids[first]] + ids.enumerated().filter { $0.offset != first }.map(\.element)).map { c.liveUrl($0, ext: outputFormat) }
+    }
+
+    /// La versione da cui partire: con lo speedtest la qualità migliore che la connessione regge, se no la prima.
+    func liveStartIndex(_ ch: Channel) async -> Int {
+        guard speedTest, !ch.alternates.isEmpty, ch.ranks.count == ch.alternates.count + 1 else { return 0 }
+        notice = "Misuro la velocità…"
+        guard let mbps = await SpeedTest.live(homeServer: homeServer, token: homeServer == nil ? nil : account?.password) else { return 0 }
+        let i = TextHelpers.pickBySpeed(ch.ranks, mbps: mbps)
+        notice = "\(Int(mbps.rounded())) Mb/s · \(TextHelpers.qualityLabels[ch.ranks[i]])"
+        return i
     }
 
     /// Le altre qualità del canale in diretta, da provare se il flusso si interrompe.

@@ -14,6 +14,8 @@ data class Channel(
     val epgId: String?,
     /** Le altre qualità dello stesso canale ("Rai 1 HD", "Rai 1 4K"...): si provano se il flusso si blocca. */
     val alternates: List<Int> = emptyList(),
+    /** [TextHelpers.qualityRank] di ogni versione: prima questa, poi le [alternates]. */
+    val ranks: List<Int> = emptyList(),
 ) {
     val searchKey = TextHelpers.normalize(name)
     val initials = TextHelpers.initials(name)
@@ -251,6 +253,16 @@ object TextHelpers {
         }
     }
 
+    /** Mb/s che serve a ogni qualità per non bloccarsi, per [qualityRank]: SD, senza sigla, HD, FHD, 4K. */
+    private val qualityMbps = intArrayOf(2, 4, 5, 9, 25)
+    val qualityLabels = listOf("SD", "qualità standard", "HD", "FHD", "4K")
+
+    /** La versione da cui partire con [mbps] di velocità: la qualità migliore che regge, se no la più bassa. */
+    fun pickBySpeed(ranks: List<Int>, mbps: Double): Int {
+        val fits = ranks.indices.filter { qualityMbps[ranks[it]] <= mbps }
+        return fits.maxByOrNull { ranks[it] } ?: ranks.indices.minBy { ranks[it] }
+    }
+
     /** "Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato. */
     fun withoutQuality(name: String): String {
         val words = name.split(' ').filter { w -> w.isNotEmpty() && normalize(w).let { it.isEmpty() || it !in channelQualityTags } }
@@ -281,6 +293,7 @@ fun groupChannels(items: List<Channel>, favorites: Set<Int>, single: Boolean = f
             logo = main.logo ?: g.firstNotNullOfOrNull { it.logo },
             epgId = main.epgId ?: g.firstNotNullOfOrNull { it.epgId },
             alternates = g.filter { it !== main }.map { it.streamId },
+            ranks = (listOf(main) + g.filter { it !== main }).map { TextHelpers.qualityRank(it.name) },
         )
     }
 }

@@ -919,6 +919,8 @@
         A.openCat.Live = null;
         if (A.live && A.liveItems) A.live = liveLibrary(A.live.raw.cats, A.liveItems);
       }));
+    box.appendChild(settingRow('Speedtest all\'avvio dei canali', 'Prima di ogni canale in diretta misura la velocità (con il server di casa, anche la sua) e sceglie la qualità che la connessione regge.',
+      S.get('speedTest'), function () { S.set('speedTest', !S.get('speedTest')); }));
     box.appendChild(settingRow('Nascondi XXX', 'Toglie canali, film e serie delle categorie con XXX nel nome.',
       S.get('hideAdult'), function () { S.set('hideAdult', !S.get('hideAdult')); reapplyHidden(); }));
     box.appendChild(h('div', { class: 'group-title', text: 'Dati' }));
@@ -1635,15 +1637,30 @@
     showOverlay('info');
   }
 
+  // Speedtest prima di un canale: senza server di casa si misura Internet di questo TV.
+  var SPEED_URL = 'https://speed.cloudflare.com/__down?bytes=50000000', speedRun = 0;
+
   function playChannel(ch, playlist) {
     savePosition();
     cancelCountdown();
     A.playing = { kind: 'live', channel: ch, playlist: playlist || [ch] };
     S.set('lastStreamId', ch.streamId);
     if (A.openCat.Live) S.set('lastCategoryId', A.openCat.Live);
-    var fmt = S.get('outputFormat');
-    Player.play(A.client.liveUrl(ch.streamId, fmt), true, 0,
-      (ch.alternates || []).map(function (id) { return A.client.liveUrl(id, fmt); }));
+    var fmt = S.get('outputFormat'), ids = [ch.streamId].concat(ch.alternates || []);
+    function start(i) {
+      Player.play(A.client.liveUrl(ids[i], fmt), true, 0,
+        ids.filter(function (id, j) { return j !== i; }).map(function (id) { return A.client.liveUrl(id, fmt); }));
+    }
+    var run = ++speedRun;
+    if (S.get('speedTest') && ch.ranks && ids.length > 1) {
+      u.toast('Misuro la velocità…');
+      (Server.active() ? Server.speed() : u.downloadSpeed(SPEED_URL, null)).then(function (mbps) {
+        if (run !== speedRun || !A.playing || A.playing.channel !== ch) return;
+        var i = mbps == null ? 0 : u.pickBySpeed(ch.ranks, mbps);
+        if (mbps != null) u.toast(Math.round(mbps) + ' Mb/s · ' + u.qualityLabels[ch.ranks[i]]);
+        start(i);
+      });
+    } else start(0);
     nowTitle(ch, function () { renderPlayer(); });
     enterPlayer();
   }

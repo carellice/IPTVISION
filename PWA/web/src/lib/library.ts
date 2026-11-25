@@ -70,6 +70,7 @@ export function groupChannels(items: Channel[], favorites: Set<number>, single =
       logo: main.logo ?? g.find((c) => c.logo)?.logo ?? null,
       epgId: main.epgId ?? g.find((c) => c.epgId)?.epgId ?? null,
       alternates: g.filter((c) => c !== main).map((c) => c.streamId),
+      ranks: [main, ...g.filter((c) => c !== main)].map((c) => qualityRank(c.name)),
     }
   })
 }

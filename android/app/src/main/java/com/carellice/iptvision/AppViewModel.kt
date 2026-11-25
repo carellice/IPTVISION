@@ -33,6 +33,7 @@ import com.carellice.iptvision.data.SeriesInfo
 import com.carellice.iptvision.data.ServerApi
 import com.carellice.iptvision.data.ServerException
 import com.carellice.iptvision.data.Settings
+import com.carellice.iptvision.data.SpeedTest
 import com.carellice.iptvision.data.TextHelpers
 import com.carellice.iptvision.data.Tmdb
 import com.carellice.iptvision.data.UpdateInfo
@@ -45,6 +46,7 @@ import com.carellice.iptvision.player.PlayerController
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -1210,13 +1212,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         playChannel(ch, channelsFor(cat).takeIf { l -> l.any { it.streamId == ch.streamId } } ?: live!!.items)
     }
 
+    /** Speedtest del canale che sta partendo: un altro canale lo annulla. */
+    private var speedJob: Job? = null
+
     fun playChannel(ch: Channel, playlist: List<Channel>) {
         val c = client ?: return
         savePosition()
         cancelCountdown()
         playing = Playing.Live(ch, playlist)
         settings.lastStreamId = ch.streamId
-        player.play(c.liveUrl(ch.streamId, settings.outputFormat), live = true, alternates = ch.alternates.map { c.liveUrl(it, settings.outputFormat) })
+        val ids = listOf(ch.streamId) + ch.alternates
+        fun start(i: Int) = player.play(c.liveUrl(ids[i], settings.outputFormat), live = true,
+            alternates = ids.filterIndexed { j, _ -> j != i }.map { c.liveUrl(it, settings.outputFormat) })
+        speedJob?.cancel()
+        if (settings.speedTest && ids.size > 1 && ch.ranks.size == ids.size) {
+            notice = "Misuro la velocità…"
+            speedJob = viewModelScope.launch {
+                val mbps = SpeedTest.live(settings.homeServer, settings.password)
+                if ((playing as? Playing.Live)?.channel != ch) return@launch
+                val i = mbps?.let { TextHelpers.pickBySpeed(ch.ranks, it) } ?: 0
+                if (mbps != null) notice = "${mbps.roundToInt()} Mb/s · ${TextHelpers.qualityLabels[ch.ranks[i]]}"
+                start(i)
+            }
+        } else start(0)
         ensureShortEpg(ch)
         if (screen != Screen.Player) push(Screen.Player)
     }

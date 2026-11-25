@@ -69,6 +69,11 @@ class Settings(context: Context, private val defaultAutoPlay: Boolean) {
         get() = p.getBoolean("singleChannelList", false)
         set(v) = p.edit().putBoolean("singleChannelList", v).apply()
 
+    /** Speedtest prima di ogni canale in diretta, per scegliere la qualità che la connessione regge. */
+    var speedTest: Boolean
+        get() = p.getBoolean("speedTest", false)
+        set(v) = p.edit().putBoolean("speedTest", v).apply()
+
     var hideAdult: Boolean
         get() = p.getBoolean("hideAdult", true)
         set(v) = p.edit().putBoolean("hideAdult", v).apply()

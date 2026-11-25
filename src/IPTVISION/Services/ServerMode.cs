@@ -86,6 +86,10 @@ public static class ServerApi
     public static Task<JsonObject> NetworkAsync(string url, string token) =>
         CallAsync(url, HttpMethod.Get, "/api/network", token, null);
 
+    /// <summary>Velocità di Internet del server di casa in Mb/s, null se non si sa.</summary>
+    public static async Task<double?> SpeedAsync(string url, string token) =>
+        (await CallAsync(url, HttpMethod.Get, "/api/speedtest", token, null))["mbps"] is JsonValue v && v.TryGetValue<double>(out var mbps) ? mbps : null;
+
     /// <summary>Profili dell'account: {"current", "profiles": [{id, name, hasPin}]}.</summary>
     public static Task<JsonObject> ProfilesAsync(string url, string token) =>
         CallAsync(url, HttpMethod.Get, "/api/profiles", token, null);

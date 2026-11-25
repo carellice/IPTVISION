@@ -91,6 +91,11 @@ enum ServerApi {
     }
 
     /// Come esce su Internet il server di casa: "label" è già pronto da mostrare.
+    /// Velocità di Internet del server di casa in Mb/s, nil se non si sa.
+    static func speed(_ url: String, token: String) async throws -> Double? {
+        try await call(url, "GET", "/api/speedtest", token, nil)["mbps"] as? Double
+    }
+
     static func network(_ url: String, token: String) async throws -> [String: Any] {
         try await call(url, "GET", "/api/network", token, nil)
     }

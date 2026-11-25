@@ -228,6 +228,10 @@ fun SettingsSection(vm: AppViewModel) {
         Toggle("Canali in un elenco unico", "Come il digitale terrestre: niente categorie, ogni canale una volta sola, partendo dalla qualità migliore.", vm.settings.singleChannelList) {
             vm.setSingleChannelList(it)
         }
+        Toggle("Speedtest all'avvio dei canali", "Prima di ogni canale in diretta misura la velocità (con il server di casa, anche la sua) e sceglie la qualità che la connessione regge.", vm.settings.speedTest) {
+            vm.settings.speedTest = it
+            vm.refreshUi()
+        }
         Toggle("Nascondi XXX", "Toglie canali, film e serie delle categorie con XXX nel nome.", vm.settings.hideAdult) {
             vm.setHideAdult(it)
         }

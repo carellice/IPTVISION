@@ -14,6 +14,8 @@ export type Channel = {
   initials: string
   /** The other qualities of the same channel ("Rai 1 HD", "Rai 1 4K"): tried when the stream stalls. */
   alternates?: number[]
+  /** qualityRank of each version, this one first, then the alternates. */
+  ranks?: number[]
 }
 
 export type Movie = {

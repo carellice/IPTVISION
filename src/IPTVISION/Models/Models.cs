@@ -311,6 +311,22 @@ public static class TextHelpers
             : Has("sd", "576p", "576i", "480p") ? 0 : 1;
     }
 
+    /// <summary>Mb/s che serve a ogni qualità per non bloccarsi, per QualityRank: SD, senza sigla, HD, FHD, 4K.</summary>
+    private static readonly int[] QualityMbps = [2, 4, 5, 9, 25];
+    public static readonly string[] QualityLabels = ["SD", "qualità standard", "HD", "FHD", "4K"];
+
+    /// <summary>La versione da cui partire con <paramref name="mbps"/> di velocità: la qualità migliore che regge, se no la più bassa.</summary>
+    public static int PickBySpeed(IReadOnlyList<int> ranks, double mbps)
+    {
+        int pick = -1, low = 0;
+        for (var i = 0; i < ranks.Count; i++)
+        {
+            if (QualityMbps[ranks[i]] <= mbps && (pick < 0 || ranks[i] > ranks[pick])) pick = i;
+            if (ranks[i] < ranks[low]) low = i;
+        }
+        return pick >= 0 ? pick : low;
+    }
+
     /// <summary>"Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato.</summary>
     public static string WithoutQuality(string name)
     {
@@ -341,6 +357,7 @@ public sealed partial class Channel : ObservableObject
         Data = data;
         Name = name ?? data.Name;
         Alternates = alternates?.Select(a => a.StreamId).ToArray() ?? [];
+        Ranks = new[] { data }.Concat(alternates ?? []).Select(d => TextHelpers.QualityRank(d.Name)).ToArray();
         EpgId = data.EpgId ?? alternates?.Select(a => a.EpgId).FirstOrDefault(e => e != null);
         SearchKey = TextHelpers.Normalize(Name);
         Initials = TextHelpers.Initials(Name);
@@ -351,6 +368,8 @@ public sealed partial class Channel : ObservableObject
     public int Num => Data.Num;
     public string Name { get; }
     public IReadOnlyList<int> Alternates { get; }
+    /// <summary>QualityRank di ogni versione: prima questa, poi gli <see cref="Alternates"/>.</summary>
+    public IReadOnlyList<int> Ranks { get; }
     public string? CategoryId => Data.CategoryId;
     public string? EpgId { get; }
     public string SearchKey { get; }

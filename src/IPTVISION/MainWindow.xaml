@@ -1295,6 +1295,13 @@
                                                        Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </CheckBox>
+                                    <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding LiveSpeedTest}" Margin="0,6,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Speedtest all'avvio dei canali" />
+                                            <TextBlock Text="Prima di ogni canale in diretta misura la velocità (con il server di casa, anche la sua) e sceglie la qualità che la connessione regge"
+                                                       Foreground="{StaticResource TextTertiaryBrush}" FontSize="11.5" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </CheckBox>
                                     <CheckBox Style="{StaticResource ToggleSwitch}" IsChecked="{Binding HideAdult}" Margin="0,6,0,0">
                                         <StackPanel>
                                             <TextBlock Text="Nascondi XXX" />

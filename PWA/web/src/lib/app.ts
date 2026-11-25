@@ -3,7 +3,7 @@ import type { Category, Channel, CompactLive, CompactMovies, CompactSeries, Epis
 import { type Positions, positionOp, progress as progressOf, resumeMs as resumeOf, MAX_POSITIONS } from '../../../shared/positions.ts'
 import { listFor, nowNext } from '../../../shared/epg.ts'
 import * as quiz from '../../../shared/quiz.ts'
-import { type Entry, groupVariants } from '../../../shared/text.ts'
+import { type Entry, groupVariants, pickBySpeed, qualityLabels } from '../../../shared/text.ts'
 import { ApiError, api } from './api.ts'
 import {
   ALL_ID, CONTINUE_ID, FAVORITES_ID, MYLIST_ID, type CategoryHit, type Library, type ListSort, type SearchScope, type Section,
@@ -39,6 +39,8 @@ type DeviceSettings = {
   autoPlayLast: boolean
   /** Live TV like digital terrestrial: one list, no categories. */
   singleChannelList: boolean
+  /** Before every live channel, a quick speed test picks the quality the connection carries. */
+  speedTest: boolean
   lastStreamId: number | null
   lastCategoryId: string | null
   sorts: Partial<Record<Section, ListSort>>
@@ -48,7 +50,7 @@ type DeviceSettings = {
 const settingsKey = (user: string) => `iptvision.settings.${user.toLowerCase()}`
 
 function loadSettings(user: string): DeviceSettings {
-  const defaults: DeviceSettings = { autoPlayLast: false, singleChannelList: false, lastStreamId: null, lastCategoryId: null, sorts: {}, grids: {} }
+  const defaults: DeviceSettings = { autoPlayLast: false, singleChannelList: false, speedTest: false, lastStreamId: null, lastCategoryId: null, sorts: {}, grids: {} }
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(settingsKey(user)) ?? '{}') } } catch { return defaults }
 }
 
@@ -838,13 +840,61 @@ function autoPlayLast() {
   playChannel(ch, list.includes(ch) ? list : app.live.items)
 }
 
+let speedRun = 0
+
+/** Mb/s of a download from the server, counted from the first byte, for at most 1.5 seconds. */
+async function downloadSpeed(): Promise<number | null> {
+  try {
+    const res = await fetch('/api/speedtest/down?bytes=50000000', { credentials: 'same-origin', cache: 'no-store' })
+    if (!res.ok || !res.body) return null
+    const reader = res.body.getReader()
+    let start = 0
+    let bytes = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!start) start = performance.now()
+      else bytes += value.length
+      if (performance.now() - start > 1500) break
+    }
+    reader.cancel().catch(() => { /* already closed */ })
+    const seconds = (performance.now() - start) / 1000
+    return start && seconds > 0.05 ? (bytes * 8) / seconds / 1e6 : null
+  } catch {
+    return null
+  }
+}
+
+/** The speed a live stream gets: the slower of the server's Internet and the way from the server to here. */
+async function liveSpeed(): Promise<number | null> {
+  const [server, here] = await Promise.all([
+    api<{ mbps: number | null }>('/api/speedtest').then((r) => r.mbps).catch(() => null),
+    downloadSpeed(),
+  ])
+  const known = [server, here].filter((v): v is number => v != null)
+  return known.length ? Math.min(...known) : null
+}
+
 export function playChannel(ch: Channel, playlist: Channel[]) {
   savePosition()
   cancelCountdown()
   app.playing = { kind: 'Live', channel: ch, playlist }
   app.settings = { ...app.settings, lastStreamId: ch.streamId }
   saveSettings()
-  player.play({ kind: 'live', id: ch.streamId, alternates: ch.alternates })
+  const ids = [ch.streamId, ...(ch.alternates ?? [])]
+  if (app.settings.speedTest && ch.ranks && ids.length > 1) {
+    const run = ++speedRun
+    toast('Misuro la velocità…')
+    liveSpeed().then((mbps) => {
+      if (run !== speedRun || app.playing?.kind !== 'Live' || app.playing.channel !== ch) return
+      const i = mbps == null ? 0 : pickBySpeed(ch.ranks!, mbps)
+      if (mbps != null) toast(`${Math.round(mbps)} Mb/s · ${qualityLabels[ch.ranks![i]]}`)
+      player.play({ kind: 'live', id: ids[i], alternates: ids.filter((_, j) => j !== i) })
+    })
+  } else {
+    speedRun++
+    player.play({ kind: 'live', id: ch.streamId, alternates: ch.alternates })
+  }
   ensureShortEpg(ch)
   if (screen().kind !== 'Player') push({ kind: 'Player' })
   emit()

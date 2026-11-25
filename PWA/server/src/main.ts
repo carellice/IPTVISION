@@ -9,6 +9,7 @@ import * as relay from './relay.ts'
 import * as play from './play.ts'
 import { guide } from './epg.ts'
 import { networkInfo } from './network.ts'
+import { sendNoise, serverSpeed } from './speed.ts'
 import type { Op } from '../../shared/model.ts'
 
 const PORT = Number(process.env.PORT ?? 8080)
@@ -294,6 +295,10 @@ route('POST', '/api/profiles/:id/delete', async (req, res, p, _u, user) => {
 
 /** How the server reaches the Internet: through the VPN or not, with country and address. */
 route('GET', '/api/network', async (_req, res) => json(res, 200, await networkInfo()))
+
+// Speed test before a live channel: the server's Internet speed, and noise to time server → app.
+route('GET', '/api/speedtest', async (_req, res) => json(res, 200, { mbps: await serverSpeed() }))
+route('GET', '/api/speedtest/down', (_req, res, _p, url) => sendNoise(res, intParam(url, 'bytes') || 8_000_000))
 
 // --- favorites and positions, shared by the browser and the native apps ---------------------------
 

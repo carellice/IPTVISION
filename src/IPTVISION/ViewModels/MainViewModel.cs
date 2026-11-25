@@ -997,9 +997,37 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void PlayLive(Channel ch) =>
-        Player.Play(_client!.GetLiveUrl(ch.StreamId, _settings.OutputFormat),
-            alternates: ch.Alternates.Select(id => _client.GetLiveUrl(id, _settings.OutputFormat)).ToList());
+    /// <summary>Speedtest del canale che sta partendo: un altro avvio lo rende inutile.</summary>
+    private int _speedRun;
+
+    private async void PlayLive(Channel ch)
+    {
+        var client = _client!;
+        int[] ids = [ch.StreamId, .. ch.Alternates];
+        void Start(int i) => Player.Play(client.GetLiveUrl(ids[i], _settings.OutputFormat),
+            alternates: ids.Where((_, j) => j != i).Select(id => client.GetLiveUrl(id, _settings.OutputFormat)).ToList());
+        var run = ++_speedRun;
+        if (!_settings.LiveSpeedTest || ids.Length < 2) { Start(0); return; }
+        ShowToast("Misuro la velocità…");
+        var token = _settings.HomeServer == null ? null : SettingsService.Unprotect(_settings.ProtectedPassword);
+        var mbps = await SpeedTest.LiveAsync(_settings.HomeServer, token);
+        if (run != _speedRun || CurrentChannel != ch || IsVod) return;
+        var pick = mbps is { } m ? TextHelpers.PickBySpeed(ch.Ranks, m) : 0;
+        if (mbps is { } shown) ShowToast($"{Math.Round(shown)} Mb/s · {TextHelpers.QualityLabels[ch.Ranks[pick]]}");
+        Start(pick);
+    }
+
+    public bool LiveSpeedTest
+    {
+        get => _settings.LiveSpeedTest;
+        set
+        {
+            if (_settings.LiveSpeedTest == value) return;
+            _settings.LiveSpeedTest = value;
+            OnPropertyChanged();
+            ScheduleSave();
+        }
+    }
 
     private void RestartCurrent()
     {

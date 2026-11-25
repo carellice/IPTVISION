@@ -90,6 +90,47 @@ window.IPTV = IPTV;
       : has(['sd', '576p', '576i', '480p']) ? 0 : 1;
   }
 
+  /** Mb/s che serve a ogni qualità per non bloccarsi, per qualityRank: SD, senza sigla, HD, FHD, 4K. */
+  var QUALITY_MBPS = [2, 4, 5, 9, 25];
+  var QUALITY_LABELS = ['SD', 'qualità standard', 'HD', 'FHD', '4K'];
+
+  /** La versione da cui partire con mbps di velocità: la qualità migliore che regge, se no la più bassa. */
+  function pickBySpeed(ranks, mbps) {
+    var pick = -1, low = 0;
+    ranks.forEach(function (r, i) {
+      if (QUALITY_MBPS[r] <= mbps && (pick < 0 || r > ranks[pick])) pick = i;
+      if (r < ranks[low]) low = i;
+    });
+    return pick >= 0 ? pick : low;
+  }
+
+  /** Mb/s di un download, contati dal primo byte e per al massimo 1,5 secondi; null se non riesce. */
+  function downloadSpeed(url, token) {
+    return new Promise(function (resolve) {
+      var xhr = new XMLHttpRequest(), start = 0, first = 0, bytes = 0, done = false;
+      function finish() {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        var seconds = (Date.now() - start) / 1000;
+        try { xhr.abort(); } catch (e) { /* già chiusa */ }
+        resolve(start && seconds > 0.05 ? bytes * 8 / seconds / 1e6 : null);
+      }
+      var timer = setTimeout(finish, 5000);
+      xhr.open('GET', url, true);
+      if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.responseType = 'arraybuffer';
+      xhr.onprogress = function (e) {
+        if (!start) { start = Date.now(); first = e.loaded; return; }
+        bytes = e.loaded - first;
+        if (Date.now() - start > 1500) finish();
+      };
+      xhr.onload = finish;
+      xhr.onerror = function () { start = 0; finish(); };
+      xhr.send();
+    });
+  }
+
   /** "Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato. */
   function withoutQuality(name) {
     var s = name.split(' ').filter(function (w) { var n = normalize(w); return w && (!n || !CHANNEL_QUALITY[n]); })
@@ -121,6 +162,7 @@ window.IPTV = IPTV;
       out.name = name; out.key = normalize(name); out.initials = initials(name);
       out.logo = main.logo || g.map(function (c) { return c.logo; }).filter(Boolean)[0] || null;
       out.alternates = g.filter(function (c) { return c !== main; }).map(function (c) { return c.streamId; });
+      out.ranks = [main].concat(g.filter(function (c) { return c !== main; })).map(function (c) { return qualityRank(c.name); });
       return out;
     });
   }
@@ -280,6 +322,6 @@ window.IPTV = IPTV;
     h: h, append: append, normalize: normalize, initials: initials, variantKey: variantKey, qualityOf: qualityOf, groupChannels: groupChannels, channelKey: channelKey,
     techResolution: techResolution, techDetails: techDetails,
     groupVariants: groupVariants, joinMeta: joinMeta, formatTime: formatTime, clock: clock, today: today,
-    fetchTimeout: fetchTimeout, delay: delay, toast: toast, art: art, progressBar: progressBar,
+    fetchTimeout: fetchTimeout, delay: delay, toast: toast, pickBySpeed: pickBySpeed, downloadSpeed: downloadSpeed, qualityLabels: QUALITY_LABELS, art: art, progressBar: progressBar,
   };
 })();

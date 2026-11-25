@@ -37,6 +37,12 @@ enum AppSettings {
         set { d.set(newValue, forKey: "singleChannelList") }
     }
 
+    /// Speedtest prima di ogni canale in diretta, per scegliere la qualità che la connessione regge.
+    static var speedTest: Bool {
+        get { d.bool(forKey: "speedTest") }
+        set { d.set(newValue, forKey: "speedTest") }
+    }
+
     /// Nasconde le categorie con "XXX" nel nome (canali, film e serie).
     static var hideAdult: Bool {
         get { d.object(forKey: "hideAdult") as? Bool ?? true }

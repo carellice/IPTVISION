@@ -32,6 +32,15 @@ class GroupChannelsTest {
     }
 
     @Test
+    fun speedPicksTheBestQualityTheConnectionCarries() {
+        val g = groupChannels(listOf(ch(1, "Rai 1 SD"), ch(2, "Rai 1 4K"), ch(3, "Rai 1 FHD")), emptySet(), single = true).single()
+        assertEquals(listOf(4, 3, 0), g.ranks)
+        assertEquals(0, TextHelpers.pickBySpeed(g.ranks, 30.0))
+        assertEquals(1, TextHelpers.pickBySpeed(g.ranks, 12.0))
+        assertEquals(2, TextHelpers.pickBySpeed(g.ranks, 1.0))
+    }
+
+    @Test
     fun keepsLanguagesApartAndCleansName() {
         assertEquals(2, groupChannels(listOf(ch(1, "Sky Sport ITA"), ch(2, "Sky Sport ENG")), emptySet()).size)
         assertEquals("Rai 1", TextHelpers.withoutQuality("Rai 1 | FHD"))

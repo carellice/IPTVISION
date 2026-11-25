@@ -168,8 +168,18 @@ struct PlayerView: View {
     private func start() {
         guard let p = model.playing, let url = model.url(for: p) else { return }
         countdown = nil
+        if case .live(let ch, _) = p {
+            Task { @MainActor in
+                let first = await model.liveStartIndex(ch)
+                // Intanto si è cambiato canale: parte quello nuovo.
+                guard case .live(let now, _)? = model.playing, now.streamId == ch.streamId else { return }
+                let urls = model.liveUrls(ch, first: first)
+                if let main = urls.first { player.play(main, live: true, start: 0, alternates: Array(urls.dropFirst())) }
+                await model.loadEpg(ch)
+            }
+            return
+        }
         player.play(url, live: isLive, start: model.resumePoint(for: p, fromStart: false), alternates: model.alternateUrls(for: p))
-        if case .live(let ch, _) = p { Task { await model.loadEpg(ch) } }
     }
 
     private func savePosition() {

@@ -121,6 +121,10 @@ object ServerApi {
     /** Come esce su Internet il server di casa: VPN sì o no, paese, indirizzo ("label" è già pronto da mostrare). */
     suspend fun network(url: String, token: String): JSONObject = call(url, "GET", "/api/network", token, null)
 
+    /** Velocità di Internet del server di casa in Mb/s, null se non si sa. */
+    suspend fun speed(url: String, token: String): Double? =
+        call(url, "GET", "/api/speedtest", token, null).optDouble("mbps").takeUnless { it.isNaN() }
+
     suspend fun logout(url: String, token: String) {
         try { call(url, "POST", "/api/logout", token, JSONObject()) } catch (_: Exception) { /* già scollegato */ }
     }

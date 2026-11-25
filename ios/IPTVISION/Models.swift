@@ -15,6 +15,8 @@ struct Channel: Identifiable, Hashable {
     let searchKey: String
     /// Le altre qualità dello stesso canale ("Rai 1 HD", "Rai 1 4K"): si provano se il flusso si interrompe.
     var alternates: [Int] = []
+    /// qualityRank di ogni versione: prima questa, poi gli alternates.
+    var ranks: [Int] = []
 
     var id: Int { streamId }
     var initials: String { TextHelpers.initials(name) }
@@ -46,7 +48,8 @@ func groupChannels(_ items: [Channel], favorites: Set<Int>, single: Bool = false
         let name = TextHelpers.withoutQuality(main.name)
         return Channel(streamId: main.streamId, num: main.num, name: name, logo: main.logo ?? g.compactMap(\.logo).first,
                        categoryId: main.categoryId, epgId: main.epgId ?? g.compactMap(\.epgId).first,
-                       searchKey: TextHelpers.normalize(name), alternates: g.filter { $0.streamId != main.streamId }.map(\.streamId))
+                       searchKey: TextHelpers.normalize(name), alternates: g.filter { $0.streamId != main.streamId }.map(\.streamId),
+                       ranks: ([main] + g.filter { $0.streamId != main.streamId }).map { TextHelpers.qualityRank($0.name) })
     }
 }
 
@@ -247,6 +250,16 @@ enum TextHelpers {
         if has("hd", "720p") { return 2 }
         if has("sd", "576p", "576i", "480p") { return 0 }
         return 1
+    }
+
+    /// Mb/s che serve a ogni qualità per non bloccarsi, per qualityRank: SD, senza sigla, HD, FHD, 4K.
+    private static let qualityMbps: [Double] = [2, 4, 5, 9, 25]
+    static let qualityLabels = ["SD", "qualità standard", "HD", "FHD", "4K"]
+
+    /// La versione da cui partire con mbps di velocità: la qualità migliore che regge, se no la più bassa.
+    static func pickBySpeed(_ ranks: [Int], mbps: Double) -> Int {
+        let fits = ranks.indices.filter { qualityMbps[ranks[$0]] <= mbps }
+        return fits.max { ranks[$0] < ranks[$1] } ?? ranks.indices.min { ranks[$0] < ranks[$1] } ?? 0
     }
 
     /// "Rai 1 FHD" → "Rai 1": il nome da mostrare per un canale raggruppato.

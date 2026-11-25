@@ -111,6 +111,8 @@ export function SettingsSection() {
           checked={app.settings.autoPlayLast} onChange={(v) => updateSettings({ autoPlayLast: v })} />
         <Toggle title="Canali in un elenco unico" subtitle="Come il digitale terrestre: niente categorie, ogni canale una volta sola, partendo dalla qualità migliore."
           checked={app.settings.singleChannelList} onChange={setSingleChannelList} />
+        <Toggle title="Speedtest all'avvio dei canali" subtitle="Prima di ogni canale in diretta misura la velocità del server di casa e di questo dispositivo e sceglie la qualità che la connessione regge."
+          checked={app.settings.speedTest} onChange={(v) => updateSettings({ speedTest: v })} />
         <Toggle title="Nascondi XXX" subtitle="Toglie canali, film e serie delle categorie con XXX nel nome."
           checked={app.hideAdult} onChange={setHideAdult} />
 
