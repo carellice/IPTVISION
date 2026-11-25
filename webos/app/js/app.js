@@ -215,7 +215,11 @@
     var l = A.live;
     if (!l) return [];
     var list = cat === ALL ? l.items : cat === FAV ? l.items.filter(function (c) { return S.isFavorite(c.streamId); }) : l.by[cat] || [];
-    return sorted('Live', list);
+    list = sorted('Live', list);
+    if (cat !== ALL || !S.get('singleChannelList')) return list;
+    // Elenco unico: i preferiti restano in cima, nell'ordine scelto.
+    function fav(c) { return S.isFavorite(c.streamId) || (c.alternates || []).some(function (id) { return S.isFavorite(id); }); }
+    return list.filter(fav).concat(list.filter(function (c) { return !fav(c); }));
   }
 
   function moviesFor(cat) {
@@ -546,6 +550,8 @@
     sections().forEach(function (s) {
       var el = V.focusable(h('div', { class: 'nav-item' + (A.section === s.id ? ' active' : ''), data: { key: 'nav-' + s.id } }, [h('span', { class: 'ni', text: s.icon }), '  ', h('span', { class: 'nt', text: s.title })]), function () {
         // OK sulla voce di menu: si entra nel contenuto dal suo primo elemento, in cima (sotto il pivot nello stile Modern UI).
+        // Anche le liste tornano in cima: dal centesimo canale si riparte dal primo.
+        Array.prototype.forEach.call(root.querySelectorAll('.content .scroll'), function (b) { b.scrollTop = 0; });
         var first = root.querySelector('.content .f');
         if (first) Nav.focus(first); else Nav.move(metro() ? 'down' : 'right');
       }, function () {

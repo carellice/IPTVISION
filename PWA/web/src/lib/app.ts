@@ -717,7 +717,11 @@ export function channelsFor(categoryId: string): Channel[] {
   const l = app.live
   if (!l) return []
   const list = categoryId === ALL_ID ? l.items : categoryId === FAVORITES_ID ? l.items.filter((c) => app.favorites.has(c.streamId)) : l.byCategory.get(categoryId) ?? []
-  return sortChannels(list, sortOf('Live'))
+  const sorted = sortChannels(list, sortOf('Live'))
+  if (categoryId !== ALL_ID || !app.settings.singleChannelList) return sorted
+  // Single list: favorites stay on top, in the chosen order.
+  const fav = (c: Channel) => app.favorites.has(c.streamId) || (c.alternates ?? []).some((id) => app.favorites.has(id))
+  return [...sorted.filter(fav), ...sorted.filter((c) => !fav(c))]
 }
 
 export function moviesFor(categoryId: string): Entry<Movie>[] {

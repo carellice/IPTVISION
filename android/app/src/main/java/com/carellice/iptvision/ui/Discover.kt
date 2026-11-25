@@ -283,6 +283,7 @@ private fun DiscoverHome(vm: AppViewModel) {
     // Liste di TMDB ancora in arrivo: al loro posto riquadri che pulsano, il resto della pagina è già usabile.
     val tmdbPending = matched == null && vm.tmdbError == null
     val state = rememberLazyListState(Saved.index, Saved.offset)
+    ScrollTopEffect(vm) { state.scrollToItem(0) }
     DisposableEffect(Unit) { onDispose { Saved.index = state.firstVisibleItemIndex; Saved.offset = state.firstVisibleItemScrollOffset } }
     val gap = if (wide) 26.dp else 20.dp
     // Telefono in orizzontale (largo ma basso): 4 colonne di categorie, con 5 i nomi non si leggevano.
@@ -735,12 +736,14 @@ fun MyListSection(vm: AppViewModel) {
             .sortedBy { t -> order[t.key] ?: Int.MAX_VALUE }
     }
     var remove by remember { mutableStateOf<Title?>(null) }
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    ScrollTopEffect(vm) { gridState.scrollToItem(0) }
     Column(Modifier.fillMaxSize()) {
         Text("La mia lista", color = C.Text, fontSize = if (wide) 28.sp else 22.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(start = 2.dp))
         Text(if (list.size == 1) "1 titolo" else "${list.size} titoli", color = C.Text2, fontSize = 14.sp, modifier = Modifier.padding(start = 2.dp, top = 2.dp, bottom = 8.dp))
         if (list.isEmpty()) Empty("La lista è vuota: aggiungi film e serie con + dalla loro scheda.")
         else LazyVerticalGrid(
-            GridCells.Adaptive(if (wide) 160.dp else 116.dp), Modifier.fillMaxSize(),
+            GridCells.Adaptive(if (wide) 160.dp else 116.dp), Modifier.fillMaxSize(), gridState,
             contentPadding = PaddingValues(start = 2.dp, end = 2.dp, top = 10.dp, bottom = 30.dp),
             horizontalArrangement = Arrangement.spacedBy(if (wide) 10.dp else 8.dp),
             verticalArrangement = Arrangement.spacedBy(if (wide) 18.dp else 14.dp),

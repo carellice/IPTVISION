@@ -54,6 +54,7 @@ private struct CategoryList: View {
         List {
             if filter.isEmpty {
                 NavigationLink(value: continueId) { CategoryRow(title: "Continua a guardare", icon: "clock.arrow.circlepath", count: nil) }
+                    .id(scrollTopAnchor)
                 NavigationLink(value: myListId) { CategoryRow(title: "La mia lista", icon: "bookmark.fill", count: nil) }
                 NavigationLink(value: allId) { CategoryRow(title: "Tutti", icon: "square.grid.2x2", count: total) }
             }
@@ -61,6 +62,7 @@ private struct CategoryList: View {
                 NavigationLink(value: c.id) { CategoryRow(title: c.name, icon: nil, count: counts(c.id)) }
             }
         }
+        .scrollsToTop(scrollTopAnchor)
         .searchable(text: $filter, prompt: "Cerca categoria")
     }
 }
@@ -135,6 +137,7 @@ struct MovieGrid: View {
             }
             .padding()
         }
+        .scrollsToTop(list.first.map { AnyHashable($0.id) })
         .overlay { if all.isEmpty { Text("Niente da mostrare.").foregroundStyle(.secondary) } }
         .searchable(text: $filter, prompt: "Cerca film")
         .navigationTitle(categoryTitle(categoryId, model.movies?.categories))
@@ -172,6 +175,7 @@ struct SeriesGrid: View {
             }
             .padding()
         }
+        .scrollsToTop(list.first.map { AnyHashable($0.id) })
         .overlay { if all.isEmpty { Text("Niente da mostrare.").foregroundStyle(.secondary) } }
         .searchable(text: $filter, prompt: "Cerca serie")
         .navigationTitle(categoryTitle(categoryId, model.series?.categories))

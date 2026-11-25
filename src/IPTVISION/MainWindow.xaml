@@ -296,7 +296,7 @@
                     <!-- Sezioni: TV / Film / Serie -->
                     <StackPanel Grid.Row="1" Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
                     <Border Margin="14,0,14,10" Background="{StaticResource SegmentTrackBrush}" CornerRadius="10" Padding="3">
-                        <UniformGrid Columns="{Binding ModeTabColumns}">
+                        <UniformGrid Columns="{Binding ModeTabColumns}" PreviewMouseLeftButtonDown="ModeTabs_PreviewMouseLeftButtonDown">
                             <RadioButton Style="{StaticResource ModeTab}" GroupName="mode" IsChecked="{Binding IsLiveMode}" ToolTip="TV in diretta (Ctrl+1)">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />

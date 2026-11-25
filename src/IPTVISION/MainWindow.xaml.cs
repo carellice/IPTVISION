@@ -1405,4 +1405,24 @@ public partial class MainWindow : Window
             ShortcutGrid.Children.Add(d);
         }
     }
+
+    /// <summary>Clic sulla scheda già aperta (TV, Film...): le liste visibili tornano in cima.</summary>
+    private void ModeTabs_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        DependencyObject? dep = e.OriginalSource as DependencyObject;
+        while (dep != null && dep is not RadioButton) dep = dep is Visual ? VisualTreeHelper.GetParent(dep) : LogicalTreeHelper.GetParent(dep);
+        if (dep is not RadioButton { IsChecked: true }) return;
+        ScrollToTop(this);
+    }
+
+    private static void ScrollToTop(DependencyObject parent)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is UIElement { IsVisible: false }) continue;
+            if (child is ScrollViewer { VerticalOffset: > 0 } sv) sv.ScrollToTop();
+            ScrollToTop(child);
+        }
+    }
 }

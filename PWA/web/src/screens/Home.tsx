@@ -11,8 +11,15 @@ import { SearchSection } from './Search.tsx'
 import { DiscoverSection, MyListSection, resetDiscoverScroll } from './Discover.tsx'
 import { SettingsSection } from './Settings.tsx'
 
-/** From the menu "Film e serie" starts again from the top. */
-const pick = (s: Section) => { if (s === 'Discover') resetDiscoverScroll(); setSection(s) }
+/** From the menu "Film e serie" starts again from the top; the section already open goes back to the top of its list. */
+const pick = (s: Section) => {
+  if (s === app.section) {
+    document.querySelectorAll<HTMLElement>('[data-content], [data-content] *').forEach((el) => { if (el.scrollTop > 0) el.scrollTo({ top: 0 }) })
+    return
+  }
+  if (s === 'Discover') resetDiscoverScroll()
+  setSection(s)
+}
 
 const icons: Record<Section, IconName> = { Live: 'tv', Movies: 'movie', Series: 'view_module', Discover: 'theaters', MyList: 'bookmark', Search: 'search', Settings: 'settings' }
 
@@ -47,7 +54,7 @@ function Content() {
   return (
     <>
       {app.status && <div style={{ color: 'var(--text2)', fontSize: 13, lineHeight: '18px', paddingBottom: 6 }}>{app.status}</div>}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <div data-content style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {app.section === 'Live' && <LiveSection />}
         {app.section === 'Movies' && <MoviesSection />}
         {app.section === 'Series' && <SeriesSection />}

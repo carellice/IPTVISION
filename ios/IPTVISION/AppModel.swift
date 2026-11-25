@@ -116,6 +116,15 @@ final class AppModel: ObservableObject {
             reloadFromCache()
         }
     }
+    /// Sezione aperta nel menu, e quante volte è stata toccata di nuovo: a ogni tocco le sue liste tornano in cima.
+    @Published var tab: AppSection = .live
+    @Published var scrollTopTick: [AppSection: Int] = [:]
+
+    /// Dal menu: apre la sezione, oppure fa tornare in cima le sue liste se è già quella aperta.
+    func selectTab(_ s: AppSection) {
+        if s == tab { scrollTopTick[s, default: 0] += 1 } else { tab = s }
+    }
+
     /// Speedtest prima di ogni canale in diretta, per scegliere la qualità.
     @Published var speedTest = AppSettings.speedTest { didSet { AppSettings.speedTest = speedTest } }
     @Published var outputFormat = AppSettings.outputFormat { didSet { AppSettings.outputFormat = outputFormat } }
@@ -575,12 +584,16 @@ final class AppModel: ObservableObject {
         case favoritesId: l.items.filter { favorites.contains($0.streamId) }
         default: l.byCategory[categoryId] ?? []
         }
-        switch sort(.live) {
-        case .number: return list.sorted { ($0.num <= 0 ? Int.max : $0.num) < ($1.num <= 0 ? Int.max : $1.num) }
-        case .nameAsc: return list.sorted { $0.searchKey < $1.searchKey }
-        case .nameDesc: return list.sorted { $0.searchKey > $1.searchKey }
-        default: return list
+        let sorted: [Channel] = switch sort(.live) {
+        case .number: list.sorted { ($0.num <= 0 ? Int.max : $0.num) < ($1.num <= 0 ? Int.max : $1.num) }
+        case .nameAsc: list.sorted { $0.searchKey < $1.searchKey }
+        case .nameDesc: list.sorted { $0.searchKey > $1.searchKey }
+        default: list
         }
+        guard categoryId == allId, singleChannelList else { return sorted }
+        // Elenco unico: i preferiti restano in cima, nell'ordine scelto.
+        let fav = { (c: Channel) in self.favorites.contains(c.streamId) || c.alternates.contains { self.favorites.contains($0) } }
+        return sorted.filter(fav) + sorted.filter { !fav($0) }
     }
 
     func movieEntries(_ categoryId: String) -> [TitleEntry<Movie>] {

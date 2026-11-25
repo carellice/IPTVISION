@@ -17,10 +17,12 @@ struct HomeView: View {
     }
 
     private var tabs: some View {
-        TabView {
+        // Il set arriva anche toccando la scheda già aperta: le sue liste tornano in cima.
+        TabView(selection: Binding(get: { model.tab }, set: { model.selectTab($0) })) {
             ForEach(model.sections) { s in
                 NavigationStack { SectionPage(section: s) }
                     .tabItem { Label(s.title, systemImage: s.icon) }
+                    .tag(s)
             }
         }
     }
@@ -31,15 +33,18 @@ struct SectionPage: View {
     let section: AppSection
 
     var body: some View {
-        switch section {
-        case .live: LiveCategories()
-        case .movies: MovieCategories()
-        case .series: SeriesCategories()
-        case .discover: DiscoverView()
-        case .mylist: MyListView()
-        case .search: SearchView()
-        case .settings: SettingsView()
+        Group {
+            switch section {
+            case .live: LiveCategories()
+            case .movies: MovieCategories()
+            case .series: SeriesCategories()
+            case .discover: DiscoverView()
+            case .mylist: MyListView()
+            case .search: SearchView()
+            case .settings: SettingsView()
+            }
         }
+        .environment(\.appSection, section)
     }
 }
 
@@ -60,7 +65,10 @@ struct PivotHome: View {
                                 .font(.system(size: 44, weight: .light))
                                 .foregroundStyle(s == section ? Color.white : Color.white.opacity(0.4))
                                 .id(s)
-                                .onTapGesture { withAnimation(.easeOut(duration: 0.3)) { section = s } }
+                                .onTapGesture {
+                                    if s == section { model.scrollTopTick[s, default: 0] += 1 }
+                                    else { withAnimation(.easeOut(duration: 0.3)) { section = s } }
+                                }
                         }
                     }
                     .padding(.horizontal, 14)
@@ -89,6 +97,37 @@ extension AppSection {
         default: title.lowercased()
         }
     }
+}
+
+/// La sezione del menu in cui si trova una pagina.
+private struct AppSectionKey: EnvironmentKey { static let defaultValue: AppSection? = nil }
+extension EnvironmentValues {
+    var appSection: AppSection? {
+        get { self[AppSectionKey.self] }
+        set { self[AppSectionKey.self] = newValue }
+    }
+}
+
+/// Id da dare al primo elemento di una lista che non ne ha uno suo.
+let scrollTopAnchor = "scroll-top"
+
+/// Toccando di nuovo nel menu la sezione aperta, la lista torna in cima: [top] è l'id del suo primo elemento.
+private struct ScrollsToTop: ViewModifier {
+    @EnvironmentObject var model: AppModel
+    @Environment(\.appSection) var section
+    let top: AnyHashable?
+
+    func body(content: Content) -> some View {
+        ScrollViewReader { proxy in
+            content.onChange(of: section.map { model.scrollTopTick[$0] ?? 0 } ?? 0) { _ in
+                if let top { withAnimation { proxy.scrollTo(top, anchor: .top) } }
+            }
+        }
+    }
+}
+
+extension View {
+    func scrollsToTop(_ top: AnyHashable?) -> some View { modifier(ScrollsToTop(top: top)) }
 }
 
 /// Menu in alto a destra per scegliere l'ordine della lista.
@@ -138,12 +177,14 @@ struct LiveCategories: View {
                 List {
                     if filter.isEmpty {
                         NavigationLink(value: favoritesId) { CategoryRow(title: "Preferiti", icon: "star.fill", count: model.favorites.count) }
+                            .id(scrollTopAnchor)
                         NavigationLink(value: allId) { CategoryRow(title: "Tutti i canali", icon: "list.bullet", count: live.items.count) }
                     }
                     ForEach(live.categories.filter { filter.isEmpty || TextHelpers.normalize($0.name).contains(TextHelpers.normalize(filter)) }) { c in
                         NavigationLink(value: c.id) { CategoryRow(title: c.name, icon: nil, count: live.byCategory[c.id]?.count ?? 0) }
                     }
                 }
+                .scrollsToTop(scrollTopAnchor)
                 .searchable(text: $filter, prompt: "Cerca categoria")
                 .refreshable { await model.loadLive(refresh: true) }
             } else if model.liveLoading {
@@ -178,6 +219,7 @@ struct ChannelList: View {
             ChannelRow(channel: ch) { model.play(.live(ch, playlist: all)) }
         }
         .listStyle(.plain)
+        .scrollsToTop(list.first.map { AnyHashable($0.id) })
         .overlay { if all.isEmpty { Text(categoryId == favoritesId ? "Tieni premuto un canale per aggiungerlo ai preferiti." : "Nessun canale.").foregroundStyle(.secondary).padding() } }
         .searchable(text: $filter, prompt: "Cerca canale")
         .navigationTitle(title)

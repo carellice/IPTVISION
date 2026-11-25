@@ -125,6 +125,7 @@ private fun CategoryBrowser(vm: AppViewModel, section: Section, entries: List<Ca
         SectionTitle(section.title, if (entries.size == 1) "1 categoria" else "${entries.size} categorie", Modifier.padding(start = 4.dp, bottom = 10.dp))
         if (wide) {
             val state = rememberLazyGridState(initialFirstVisibleItemIndex = lastIndex)
+            ScrollTopEffect(vm) { state.scrollToItem(0) }
             val gf = rememberGridFocus(entries)
             LazyVerticalGrid(
                 state = state,
@@ -153,8 +154,10 @@ private fun CategoryBrowser(vm: AppViewModel, section: Section, entries: List<Ca
                 }
             }
         } else {
+            val state = rememberLazyListState(initialFirstVisibleItemIndex = lastIndex)
+            ScrollTopEffect(vm) { state.scrollToItem(0) }
             LazyColumn(
-                state = rememberLazyListState(initialFirstVisibleItemIndex = lastIndex),
+                state = state,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(vertical = 4.dp, horizontal = 2.dp),
             ) {
@@ -265,6 +268,7 @@ fun LiveSection(vm: AppViewModel) {
         val start = list.indexOfFirst { it.streamId == playingId }.coerceAtLeast(0)
         if (grid) {
             val state = rememberLazyGridState(initialFirstVisibleItemIndex = start)
+            ScrollTopEffect(vm) { state.scrollToItem(0) }
             val gf = rememberGridFocus(list)
             LazyVerticalGrid(
                 state = state,
@@ -279,8 +283,10 @@ fun LiveSection(vm: AppViewModel) {
                 }
             }
         } else {
+            val state = rememberLazyListState(initialFirstVisibleItemIndex = start)
+            ScrollTopEffect(vm) { state.scrollToItem(0) }
             LazyColumn(
-                state = rememberLazyListState(initialFirstVisibleItemIndex = start),
+                state = state,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp),
             ) {
@@ -446,6 +452,7 @@ internal fun <T> EntryList(
     val start = remember(list) { vm.lastEntry[section]?.let { k -> list.indexOfFirst { key(it.item) == k } }?.coerceAtLeast(0) ?: 0 }
     if (grid) {
         val state = rememberLazyGridState(initialFirstVisibleItemIndex = start)
+        ScrollTopEffect(vm) { state.scrollToItem(0) }
         val gf = rememberGridFocus(list)
         LazyVerticalGrid(
             state = state,
@@ -459,7 +466,9 @@ internal fun <T> EntryList(
             itemsIndexed(list, key = { _, e -> key(e.item) }) { i, e -> item(e, Modifier.gridItem(gf, i, i == start && vm.isTv), true) }
         }
     } else {
-        LazyColumn(state = rememberLazyListState(initialFirstVisibleItemIndex = start), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+        val state = rememberLazyListState(initialFirstVisibleItemIndex = start)
+        ScrollTopEffect(vm) { state.scrollToItem(0) }
+        LazyColumn(state = state, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
             itemsIndexed(list, key = { _, e -> key(e.item) }) { i, e -> item(e, Modifier.initialFocus(i == start, vm.isTv), false) }
         }
     }

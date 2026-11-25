@@ -404,6 +404,13 @@ fun Modifier.gridItem(g: GridFocus, i: Int, initial: Boolean): Modifier {
     }
 }
 
+/** Riporta la lista in cima quando si tocca di nuovo nel menu la sezione aperta (non alla prima composizione). */
+@Composable
+fun ScrollTopEffect(vm: com.carellice.iptvision.AppViewModel, scroll: suspend () -> Unit) {
+    val first = remember { vm.scrollTop }
+    LaunchedEffect(vm.scrollTop) { if (vm.scrollTop != first) scroll() }
+}
+
 /** Tenendo premuto, le ripetizioni passano al massimo una ogni [gapMs] millisecondi, il tempo di scorrere. */
 @Composable
 fun Modifier.dpadGrid(state: LazyGridState, g: GridFocus, count: Int, gapMs: Long = 120): Modifier {

@@ -336,6 +336,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var epgVersion by mutableIntStateOf(0); private set
     var positionsVersion by mutableIntStateOf(0); private set
     var settingsVersion by mutableIntStateOf(0); private set
+    /** Cresce a ogni tocco nel menu sulla sezione già aperta: le liste tornano in cima. */
+    var scrollTop by mutableIntStateOf(0); private set
+
+    /** Dal menu: apre la sezione, oppure torna in cima se è già quella aperta. */
+    fun selectSection(s: Section) {
+        if (section == s && screen == Screen.Home) scrollTop++ else section = s
+    }
 
     fun refreshUi() { settingsVersion++ }
 
@@ -717,12 +724,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             FAVORITES_ID -> l.items.filter { it.streamId in favorites }
             else -> l.byCategory[categoryId] ?: emptyList()
         }
-        return when (sortOf(Section.Live)) {
+        val sorted = when (sortOf(Section.Live)) {
             ListSort.Number -> list.sortedBy { if (it.num <= 0) Int.MAX_VALUE else it.num }
             ListSort.NameAsc -> list.sortedBy { it.searchKey }
             ListSort.NameDesc -> list.sortedByDescending { it.searchKey }
             else -> list
         }
+        // Elenco unico: i preferiti restano in cima, nell'ordine scelto.
+        if (!settings.singleChannelList || categoryId != ALL_ID) return sorted
+        val (pinned, rest) = sorted.partition { c -> c.streamId in favorites || c.alternates.any { it in favorites } }
+        return pinned + rest
     }
 
     private fun yearValue(y: String?) = y?.toIntOrNull() ?: 0

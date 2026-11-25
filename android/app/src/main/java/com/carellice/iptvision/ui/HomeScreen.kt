@@ -181,7 +181,7 @@ fun HomeScreen(vm: AppViewModel, onVoiceSearch: () -> Unit) {
                         vm.sections.forEach { s ->
                             NavigationBarItem(
                                 selected = vm.section == s,
-                                onClick = { if (s == Section.Discover) resetDiscoverScroll(); vm.section = s },
+                                onClick = { if (s == Section.Discover) resetDiscoverScroll(); vm.selectSection(s) },
                                 icon = { Icon(s.icon(), null) },
                                 label = {
                                     val l = navLabel(s)
@@ -266,7 +266,7 @@ private fun Pivot(vm: AppViewModel, wide: Boolean, onVoiceSearch: () -> Unit) {
                     maxLines = 1,
                     softWrap = false,
                     modifier = Modifier.padding(end = if (wide) 28.dp else 20.dp)
-                        .tvClickable(background = Color.Transparent, focusedBackground = Color.Transparent, focusScale = 1f) { vm.section = s },
+                        .tvClickable(background = Color.Transparent, focusedBackground = Color.Transparent, focusScale = 1f) { vm.selectSection(s) },
                 )
             }
         }
@@ -394,7 +394,7 @@ private fun SideNav(vm: AppViewModel, compact: Boolean, rail: Boolean = false, h
                             onFocus = { if (!selected) vm.focusContent = false },
                         ) { // Col telecomando si scorre il menu e si apre la sezione solo con OK.
                             if (s == Section.Discover) resetDiscoverScroll()
-                            vm.section = s
+                            vm.selectSection(s)
                             if (vm.isTv) {
                                 closed = true
                                 vm.focusContent = true

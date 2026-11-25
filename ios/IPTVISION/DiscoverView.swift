@@ -39,6 +39,7 @@ struct DiscoverView: View {
             if model.movies != nil || model.series != nil {
                 content(model.movies ?? Library(categories: [], items: [], byCategory: [:]),
                         model.series ?? Library(categories: [], items: [], byCategory: [:]))
+                    .scrollsToTop(scrollTopAnchor)
             } else {
                 ScrollView { VStack(alignment: .leading, spacing: 22) { ForEach(0..<3, id: \.self) { _ in SkeletonRow() } }.padding(.vertical) }
             }
@@ -119,6 +120,7 @@ struct DiscoverView: View {
 
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 22) {
+                Color.clear.frame(height: 0).id(scrollTopAnchor)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         Chip(text: "Tutto", selected: filter == .all) { filter = .all }
@@ -329,6 +331,7 @@ struct MyListView: View {
                     }
                     .padding()
                 }
+                .scrollsToTop(list.first.map { AnyHashable($0.id) })
             }
         }
         .navigationTitle("La mia lista")

@@ -615,6 +615,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                     : SortChannels(cat.IsFavorites ? _all.Where(c => c.IsFavorite).ToList()
                         : cat.Id == CategoryItem.AllId ? _all
                         : _all.Where(c => c.CategoryId == cat.Id).ToList());
+                // Elenco unico: i preferiti restano in cima, nell'ordine scelto.
+                if (cat?.Id == CategoryItem.AllId && _settings.SingleChannelList)
+                    VisibleChannels = [.. VisibleChannels.Where(c => c.IsFavorite), .. VisibleChannels.Where(c => !c.IsFavorite)];
                 break;
         }
         BuildGridRows();
@@ -654,7 +657,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             var fav = Categories.FirstOrDefault(c => c.IsFavorites);
             if (fav != null) fav.Count = _all.Count(c => c.IsFavorite);
-            if (SelectedCategory?.IsFavorites == true) ApplyFilter();
+            if (SelectedCategory?.IsFavorites == true || IsSingleChannelList) ApplyFilter();
         }
         ShowToast(ch.IsFavorite ? $"{ch.Name} aggiunto ai preferiti" : $"{ch.Name} rimosso dai preferiti");
     }

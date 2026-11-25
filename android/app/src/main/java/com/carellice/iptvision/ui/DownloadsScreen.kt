@@ -70,7 +70,9 @@ fun DownloadsSection(vm: AppViewModel) {
         Empty("Nessun download. Apri un film o una serie e premi Scarica: potrai guardarli anche senza connessione.")
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 10.dp)) {
+    val state = androidx.compose.foundation.lazy.rememberLazyListState()
+    ScrollTopEffect(vm) { state.scrollToItem(0) }
+    LazyColumn(Modifier.fillMaxSize(), state = state, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 10.dp)) {
         items(ordered, key = { it.key }) { item ->
             DownloadRow(vm, item, onDelete = { confirm = item })
         }

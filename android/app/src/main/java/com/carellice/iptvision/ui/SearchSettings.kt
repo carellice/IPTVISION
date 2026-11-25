@@ -119,7 +119,9 @@ fun SearchSection(vm: AppViewModel, onVoiceSearch: () -> Unit) {
         }
         VSpace(8.dp)
         if ((vm.moviesLoading || vm.seriesLoading) && scope != SearchScope.Channels) Text("Carico anche film e serie…", color = C.Text3, fontSize = 12.sp)
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        ScrollTopEffect(vm) { listState.scrollToItem(0) }
+        LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
             if (results.categories.isNotEmpty()) {
                 item { Header("Categorie", results.categories.size) }
                 items(results.categories, key = { "k${it.section}${it.id}" }) { c ->
@@ -180,7 +182,9 @@ private fun Hit(title: String, meta: String, kind: String, url: String?, initial
 @Composable
 fun SettingsSection(vm: AppViewModel) {
     @Suppress("UNUSED_VARIABLE") val sv = vm.settingsVersion // le preferenze non sono osservabili: si ridisegna a ogni modifica
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).widthIn(max = 760.dp)) {
+    val scroll = rememberScrollState()
+    ScrollTopEffect(vm) { scroll.scrollTo(0) }
+    Column(Modifier.fillMaxSize().verticalScroll(scroll).widthIn(max = 760.dp)) {
         SectionTitle("Impostazioni")
         VSpace(16.dp)
 
