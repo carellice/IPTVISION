@@ -190,7 +190,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Navigazione ----------
     val stack = mutableStateListOf<Screen>(if (settings.account != null) Screen.Home else Screen.Login)
     val screen: Screen get() = stack.last()
-    var section by mutableStateOf(Section.Live)
+    private var sectionState by mutableStateOf(Section.Live)
+    /** Sezione aperta. */
+    var section: Section
+        get() = sectionState
+        set(v) {
+            if (v != sectionState) enteredSection = v
+            sectionState = v
+        }
+    /** Sezione appena aperta arrivando da un'altra pagina: la sua lista parte dall'inizio, non dal canale in onda. */
+    var enteredSection: Section? = null
 
     fun push(s: Screen) { stack.add(s) }
 

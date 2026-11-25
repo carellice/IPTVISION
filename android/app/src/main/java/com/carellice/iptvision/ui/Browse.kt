@@ -265,7 +265,10 @@ fun LiveSection(vm: AppViewModel) {
             return@LibrarySection
         }
         val playingId = (vm.playing as? Playing.Live)?.channel?.streamId ?: vm.settings.lastStreamId
-        val start = list.indexOfFirst { it.streamId == playingId }.coerceAtLeast(0)
+        // Arrivando da un'altra pagina si parte dal primo canale; tornando dal player, da quello in onda.
+        val fromOtherPage = remember { vm.enteredSection == Section.Live }
+        LaunchedEffect(Unit) { if (vm.enteredSection == Section.Live) vm.enteredSection = null }
+        val start = if (fromOtherPage) 0 else list.indexOfFirst { it.streamId == playingId }.coerceAtLeast(0)
         if (grid) {
             val state = rememberLazyGridState(initialFirstVisibleItemIndex = start)
             ScrollTopEffect(vm) { state.scrollToItem(0) }
