@@ -291,6 +291,8 @@ public sealed partial class MainViewModel
         if (ShowDiscover) BuildDiscover();
     }
 
+    public void RefreshDiscover() => DiscoverChanged();
+
     /// <summary>Il testo del riquadro in alto a destra: cosa si sta caricando.</summary>
     private void UpdateDiscoverBusy() => DiscoverBusy =
         IsLibraryLoading && _movies.Count == 0 ? "Carico i film…"

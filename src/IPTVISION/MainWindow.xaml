@@ -1751,7 +1751,7 @@
                 </Border>
 
                 <!-- Le righe: virtualizzate, si costruiscono solo quelle in vista. -->
-                <ItemsControl x:Name="DiscoverList" Grid.Row="1" ItemsSource="{Binding DiscoverItems}" Focusable="False"
+                <ItemsControl x:Name="DiscoverList" ContextMenuOpening="Library_ContextMenuOpening" ContextMenu="{StaticResource EmptyMenu}" Grid.Row="1" ItemsSource="{Binding DiscoverItems}" Focusable="False"
                               VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel" VirtualizingPanel.VirtualizationMode="Recycling"
                               ScrollViewer.CanContentScroll="True" PreviewMouseWheel="DiscoverList_PreviewMouseWheel">
                     <ItemsControl.Template>

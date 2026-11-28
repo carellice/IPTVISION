@@ -977,12 +977,22 @@ public partial class MainWindow : Window
         var dep = e.OriginalSource as DependencyObject;
         while (dep != null && dep != sender && item == null)
         {
-            if (dep is FrameworkElement { DataContext: Movie or Series or Episode or SearchHit } fe) item = fe.DataContext;
+            if (dep is FrameworkElement { DataContext: Movie or Series or Episode or SearchHit or DiscoverTile } fe) item = fe.DataContext;
             dep = dep is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(dep) : LogicalTreeHelper.GetParent(dep);
         }
         if (item is SearchHit h) item = h.Item;
+        if (item is DiscoverTile t) item = t.Item;
         if (item is not (Movie or Series or Episode)) return;
         var menu = new ContextMenu { PlacementTarget = (UIElement)sender };
+        // Pagina in stile Netflix: dopo la modifica le righe si rifanno (lista, Continua a guardare), allo stesso punto.
+        if (sender == DiscoverList)
+            menu.AddHandler(MenuItem.ClickEvent, new RoutedEventHandler((_, _) =>
+            {
+                var sv = FindChild<ScrollViewer>(DiscoverList);
+                var offset = sv?.VerticalOffset ?? 0;
+                _vm.RefreshDiscover();
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => FindChild<ScrollViewer>(DiscoverList)?.ScrollToVerticalOffset(offset));
+            }));
 
         var key = item switch { Movie m => m.Key, Episode ep => ep.Key, _ => null };
         var existing = key != null ? _vm.DownloadService.Get(key) : null;
